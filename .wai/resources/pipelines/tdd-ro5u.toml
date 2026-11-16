@@ -1,0 +1,251 @@
+# TDD + Universal Rule of 5 implementation pipeline (per ticket).
+#
+# One run per beads ticket: orient -> plan -> red -> green -> refactor ->
+# ro5u-review -> fix-review -> quality-ledger -> ship-close.
+# Gates make progress verifiable: artifacts per step, real test execution
+# after green/refactor/fix, zero critical review findings, human approval
+# before ship-close (push always requires explicit authorization).
+#
+# Usage: wai pipeline start tdd-ro5u --topic="<ticket-id> <short title>"
+
+[pipeline]
+name = "tdd-ro5u"
+description = "Per-ticket TDD implementation with Universal Rule of 5 review and gated ship."
+
+[pipeline.metadata]
+when = "Autonomous feature, bugfix, or refactor work where tests and review must gate progress"
+skills = ["tdd", "rule-of-5-universal", "commit"]
+
+[[steps]]
+id = "orient"
+prompt = """
+{topic}: Orient on exactly one beads ticket before changing anything.
+
+Run:
+- `wai prime`
+- `wai status`
+- `bd show <ticket>` (and `bd ready` if the ticket is not yet chosen)
+- `openspec list --changes` / read the mapped spec scenarios in
+  openspec/changes/add-core-research-record/specs/
+- `wai search "<ticket area>"`
+
+Confirm the ticket's metadata (lane, complexity, files, base_commit) and
+restate its acceptance criteria as testable statements. If the ticket is
+ambiguous or its spec scenario is missing, stop and ask.
+
+Record orientation: `wai add research "ORIENT <ticket>: ..."`
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["research"]
+
+[[steps]]
+id = "plan"
+prompt = """
+{topic}: Produce the minimal TDD plan for this ticket.
+
+Include:
+- desired behavior (spec requirement/scenario ids)
+- out of scope
+- test cases to write first (fixtures and expected failures)
+- narrow test command
+- full verification command (`cargo test`, plus `ah check` where specs map to tests)
+- files likely touched (from ticket metadata.files)
+- commit shape: feature commit and, separately, any tidy/refactor commit
+
+Do not edit code yet.
+
+Record plan: `wai add plan "PLAN <ticket>: ..."`
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["plan"]
+
+[[steps]]
+id = "red"
+prompt = """
+{topic}: Write failing tests first.
+
+Rules:
+- Only test files change, unless test scaffolding requires otherwise.
+- Run the narrow test command.
+- Confirm the failure is the expected missing behavior, not setup breakage.
+
+Record evidence: `wai add research "RED <ticket>: command=... expected failure=..."`
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["research"]
+
+[[steps]]
+id = "green"
+prompt = """
+{topic}: Implement the minimum production change.
+
+Rules:
+- Make the red tests pass with the smallest correct change.
+- Run the narrow test command, then the relevant package/module suite.
+- No behavior beyond the ticket's acceptance criteria.
+
+Record decision: `wai add design "GREEN <ticket>: ..."`
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["design"]
+
+[[steps.gate.oracles]]
+name = "tests-pass"
+description = "cargo test must pass after green implementation"
+timeout = 600
+scope = "all"
+
+[[steps]]
+id = "refactor"
+prompt = """
+{topic}: Tidy the result while tests stay green.
+
+Allowed:
+- simplify names
+- remove duplication
+- clarify boundaries and error types
+- improve structure without behavior change
+
+Forbidden:
+- behavior expansion
+- unrelated cleanup
+- large architectural rewrites
+
+Run tests after refactoring. Keep this tidy pass in its own commit.
+
+Record refactor note: `wai add design "REFACTOR <ticket>: ..."`
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["design"]
+
+[[steps.gate.oracles]]
+name = "tests-pass"
+description = "cargo test must pass after refactor"
+timeout = 600
+scope = "all"
+
+[[steps]]
+id = "ro5u-review"
+prompt = """
+{topic}: Review the ticket diff using skill `rule-of-5-universal`.
+
+Review only. Do not fix yet.
+
+Cover: correctness vs spec scenario, invalid states made unrepresentable,
+error handling, boundaries/edge cases, allocation/IO cost, test quality.
+Return findings grouped by Critical / High / Medium / Low; each finding needs
+file/location, evidence, and a concrete fix.
+
+Record review: `wai add review "RO5U <ticket>: ..."`
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.procedural]
+require_review = true
+max_critical = 0
+
+[[steps]]
+id = "fix-review"
+prompt = """
+{topic}: Fix the RO5U findings.
+
+Rules:
+- Critical and High must be fixed.
+- Medium fixed unless explicitly deferred with a reason.
+- Low fixed if cheap, otherwise tracked in a beads ticket.
+- Add or adjust tests for behavior-impacting fixes.
+- Run the full test suite after fixes.
+
+Record fixes: `wai add research "RO5U-FIXES <ticket>: ..."`
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+
+[[steps.gate.oracles]]
+name = "tests-pass"
+description = "cargo test must pass after review fixes"
+timeout = 600
+scope = "all"
+
+[[steps]]
+id = "quality-ledger"
+prompt = """
+{topic}: Produce the quality ledger for this ticket.
+
+Record exactly:
+
+Changed:
+- files and purpose
+
+Verified:
+- commands run and result (`cargo test`, `ah check`, `openspec validate --strict`)
+
+Review:
+- RO5U status and remaining findings
+
+Risks:
+- known remaining risks or "none known"
+
+Next:
+- exact next action
+
+Record ledger: `wai add research "QUALITY LEDGER <ticket>: ..."`
+Advance: `wai pipeline next`
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+types = ["research"]
+
+[[steps]]
+id = "ship-close"
+prompt = """
+{topic}: Ship the completed ticket.
+
+Do:
+- inspect `git diff` and stage only this ticket's files
+- tick the mapped tasks in openspec/changes/add-core-research-record/tasks.md
+- `bd close <ticket>` (then `bd export -o .beads/issues.jsonl` and `git add -f .beads/issues.jsonl`; plain `git add` silently skips it)
+- commit atomically (feature and tidy/refactor commits stay separate)
+- create the session handoff with `wai close`
+
+Do NOT push: fleet policy requires explicit user authorization for push,
+deploy, or release. Report the commit and proposed push command instead.
+
+Record ship: `wai add research "SHIP <ticket>: <commit/ticket state>"`
+
+This step requires human approval: review the ship evidence, then run
+`wai pipeline approve` when ready.
+
+Pipeline complete.
+"""
+
+[steps.gate.structural]
+min_artifacts = 1
+
+[[steps.gate.oracles]]
+name = "tests-pass"
+description = "Final cargo test must pass before close"
+timeout = 600
+scope = "all"
+
+[steps.gate.approval]
+required = true
+message = "Human checkpoint before ship-close — review ship evidence, then run 'wai pipeline approve'"

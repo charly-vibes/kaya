@@ -40,6 +40,15 @@ When context reaches ~40%: stop and tell the user — responses degrade past
 this point. Recommend `wai close` then `/clear` to resume cleanly.
 Do NOT skip `wai close` — it enables resume detection.
 
+## Available Pipelines
+
+| Pipeline | When to Use | Start |
+|----------|-------------|-------|
+| tdd-ro5u | Autonomous feature, bugfix, or refactor work where tests and review must gate progress | `wai pipeline start tdd-ro5u --topic=<topic>` |
+
+> Pipeline steps may have gates that enforce artifact creation, review coverage, and oracle checks before advancement. Run `wai pipeline gates <name>` for details.
+> **Before any edit**: run `wai pipeline current --json`; if a run is active for this project, resume it (`wai pipeline next`) rather than starting ad-hoc work.
+
 ## Autonomous Work Policy
 
 Proceed without routine confirmation when the next step is clear.
@@ -62,7 +71,7 @@ Read it at the start of your first session or when you need detailed guidance.
 Keep this managed block so `wai init` can refresh the instructions.
 
 
-<!-- provenance: generator=wai version=0.13.2 source=WAI sha=3e02f7c4 -->
+<!-- provenance: generator=wai version=0.13.2 source=WAI sha=6e6014c5 -->
 <!-- WAI:END -->
 
 <!-- BEADS:START -->
@@ -198,3 +207,7 @@ bd prime                # Refresh Beads context
 
 **Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
 <!-- END BEADS CODEX SETUP -->
+
+## Per-ticket implementation protocol
+
+Every implementation ticket is exactly one `wai pipeline start tdd-ro5u --topic="<ticket-id> <short title>"` run; never implement a ticket outside a run. The gates enforce: orient → plan → red → green (`cargo test`) → refactor → Rule-of-5-Universal review (zero critical) → fix → quality ledger → ship-close. Ship-close needs human approval, commits atomically, closes the beads ticket, and never pushes.
