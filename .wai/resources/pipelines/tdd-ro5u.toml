@@ -72,6 +72,11 @@ prompt = """
 
 Rules:
 - Only test files change, unless test scaffolding requires otherwise.
+- Declare the spectular contracts for the scenarios this ticket owns:
+  `ah scenario new add-core-research-record <capability> --requirement <requirement> "<scenario heading>"`
+  (capability = e.g. `kaya-event`), then bind the Rust test names in the
+  generated `.espectacular/<capability>/<slug>.toml` `[tests]` table — the
+  cargo adapter is auto-detected once Cargo.toml exists.
 - Run the narrow test command.
 - Confirm the failure is the expected missing behavior, not setup breakage.
 
