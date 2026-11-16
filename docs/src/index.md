@@ -19,17 +19,18 @@ documentation compiler over it. It does not duplicate what those tools own.
 
 ```
   wai · dont · whisper · specodelic · git · test runners
-              │  (adapters capture what already exists)
+              │  [capture — adapters translate, never interpret]
               ▼
         research ledger         append-only JSONL, kaya.event/v0,
               │                 provenance + stable ids
-              ▼
+              ▼  [preserve — immutable evidence]
         research model          Project · Question · Idea · Hypothesis ·
               │                 Model · Experiment · Run · Artifact ·
               │                 Observation · Claim · Finding · Decision · Source
-              ▼
+              ▼  [understand — typed, direction-fixed relationships]
    documentation projections    research index, experiment reports,
-                                evidence dossiers, reproduction guides
+              ▼                 evidence dossiers, reproduction guides
+   [reveal — deterministic generation, authored sections preserved]
 ```
 
 Ledger, model and projections are deliberately separate: the ledger preserves
@@ -65,11 +66,15 @@ into an established finding. This is the defining design principle.
 
 Generation is a compiler: normalize → validate → link semantics → project.
 Deterministic, incremental, with source maps back to original evidence.
-Documents mix three ownership modes, never mixed inside one section:
+Documents mix two block forms, never mixed inside one block:
 
-- **derived** — generated inside `kaya:begin/end` managed blocks;
-- **authored** — human interpretation inside `kaya:authored` blocks;
-- **proposed** — AI drafts awaiting approval, always visibly flagged.
+- **generated** — compiler-owned, inside `kaya:begin/end generated:<name>`
+  markers;
+- **authored** — human-owned, inside `kaya:authored` markers.
+
+Proposals are not a block form but a record status: AI-drafted
+interpretations land as `proposed` assertions, always visibly flagged,
+until a human approves them (see [Events, assertions, conclusions](#events-assertions-conclusions)).
 
 ## Design decisions
 
@@ -80,7 +85,16 @@ Documents mix three ownership modes, never mixed inside one section:
 3. **Narrative authority:** human-owned interpretation, generated factual
    sections, proposed drafts kept distinct.
 4. **Scope:** workspace-first; experiment identities are namespace-qualified
-   from day one so multiple repositories can connect later.
+   from day one so multiple repositories can connect later (connect-later
+   semantics — merge and conflict resolution — are deliberately unspecified
+   until a second workspace actually exists).
+
+## Your data outlives kaya
+
+The ledger is append-only JSONL; the projections are Markdown; both live in
+git as plain files. Every artifact kaya produces is readable — by a human or
+another tool — without kaya running. There is no export step because there
+is no lock-in; if kaya is sunset, the record survives it.
 
 ## Deliberately not built
 
@@ -92,8 +106,9 @@ comes last, if ever).
 
 ## Milestones
 
-1. **MVP 1 — static research compilation.** Core entities, event format, wai
-   import, git history + test results import, research index, experiment
+1. **MVP 1 — static research compilation.** Core entities and event format
+   *(specified — [add-core-research-record](../../openspec/changes/add-core-research-record/proposal.md))*,
+   wai import, git history + test results import, research index, experiment
    report with authored sections preserved. *Validation: a useful dossier from
    existing project information, without rewriting anything.*
 2. **MVP 2 — continuous capture.** CLI capture, agent traces, deduplication,

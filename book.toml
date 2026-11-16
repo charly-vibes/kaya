@@ -1,0 +1,13 @@
+[book]
+title = "kaya"
+description = "A living record of exploration — kaya compiles the artifacts a project already produces into continuously generated, human-owned documentation"
+authors = ["charly vibes"]
+language = "en"
+src = "docs/src"
+
+[output.html]
+default-theme = "coal"
+preferred-dark-theme = "coal"
+additional-css = ["theme/charly.css"]
+git-repository-url = "https://github.com/charly-vibes/kaya"
+edit-url-template = "https://github.com/charly-vibes/kaya/edit/main/docs/src/{path}"
