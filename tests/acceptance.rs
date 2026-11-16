@@ -27,7 +27,8 @@ const LEDGER: &str = ".kaya/ledger.jsonl";
 const SEED: &str = ".kaya/seeds/add-core-research-record.jsonl";
 const INDEX: &str = "docs/research/index.md";
 const REPORT: &str = "docs/research/experiments/kaya-Experiment-add-core-research-record.md";
-const CHECKED_IN_REPORT: &str = "docs/research/experiments/add-core-research-record.md";
+const CHECKED_IN_REPORT: &str =
+    "docs/research/experiments/kaya-Experiment-add-core-research-record.md";
 const REPORT_NAME: &str = "experiment-report:kaya/Experiment/add-core-research-record";
 const SEED_EVENTS: u64 = 13;
 const SOURCE_COMMIT: &str = "43b606f";
