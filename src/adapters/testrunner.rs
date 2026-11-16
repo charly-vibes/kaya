@@ -5,8 +5,10 @@
 //! Responsibilities: parse libtest JSONL, ignore non-test records, and
 //! refuse malformed or unknown records atomically.
 //! Rationale: a run's counts are facts the runner already owns; kaya only
-//! references the report and derives a stable id from its path, mtime, and
-//! counts so replaying the same report yields the same ledger line.
+//! references the report and derives a stable id from the tool, its version,
+//! the project namespace, the observation timestamp, the report path, and the
+//! serialized counts so replaying the same report yields the same ledger line
+//! while a capture from another environment cannot collide with it.
 
 use std::path::Path;
 
@@ -90,15 +92,18 @@ pub fn capture(report: &Path, project: &str) -> Result<Event, AdapterError> {
         })?;
     let observed: DateTime<Utc> = DateTime::<Utc>::from(modified);
     let timestamp = observed.to_rfc3339_opts(SecondsFormat::Secs, true);
-    let epoch = observed.timestamp();
 
     let total = counts.passed + counts.failed + counts.ignored;
     let slug = slug_for(report);
     let reference = report.display().to_string();
-    let identity = format!(
-        "{SOURCE}|{reference}|{epoch}|passed={},failed={},ignored={},total={total}",
-        counts.passed, counts.failed, counts.ignored
-    );
+    let data = serde_json::json!({
+        "passed": counts.passed,
+        "failed": counts.failed,
+        "ignored": counts.ignored,
+        "total": total,
+    });
+    let identity =
+        format!("{SOURCE}\x1f{VERSION}\x1f{project}\x1f{timestamp}\x1f{reference}\x1f{data}");
     let digest = sha256_hex(identity.as_bytes());
 
     Ok(Event {
@@ -114,12 +119,7 @@ pub fn capture(report: &Path, project: &str) -> Result<Event, AdapterError> {
             r#type: "Run".to_owned(),
             id: format!("{project}/Run/{slug}"),
         },
-        data: serde_json::json!({
-            "passed": counts.passed,
-            "failed": counts.failed,
-            "ignored": counts.ignored,
-            "total": total,
-        }),
+        data,
         provenance: Provenance {
             tool: SOURCE.to_owned(),
             version: VERSION.to_owned(),

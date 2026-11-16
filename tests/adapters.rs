@@ -221,6 +221,57 @@ fn git_failure_is_labeled_and_emits_nothing() {
     );
 }
 
+#[test]
+fn git_capture_on_unborn_head_yields_no_events() {
+    let dir = init_repo();
+
+    let events = git::capture(dir.path(), PROJECT, 10)
+        .expect("an unborn HEAD is an empty history, not a failure");
+
+    assert!(
+        events.is_empty(),
+        "a repository without commits has no history"
+    );
+    assert_eq!(
+        git_ok(
+            dir.path(),
+            &["status", "--porcelain", "--untracked-files=all"]
+        ),
+        "",
+        "capture must not write to the source repository"
+    );
+}
+
+#[test]
+fn git_event_id_digests_the_project_namespace() {
+    let dir = init_repo();
+    let shas = seed_commits(dir.path());
+
+    let first = git::capture(dir.path(), PROJECT, 10).expect("capture succeeds");
+    let second = git::capture(dir.path(), "alternate", 10).expect("second capture succeeds");
+
+    let ids_by_sha = |events: &[Event]| -> HashMap<String, String> {
+        events
+            .iter()
+            .map(|event| {
+                (
+                    event.data["sha"].as_str().expect("sha").to_owned(),
+                    event.id.clone(),
+                )
+            })
+            .collect()
+    };
+    let first_ids = ids_by_sha(&first);
+    let second_ids = ids_by_sha(&second);
+
+    for sha in shas {
+        assert_ne!(
+            first_ids[&sha], second_ids[&sha],
+            "the project namespace is part of commit {sha}'s event identity"
+        );
+    }
+}
+
 // ---------------------------------------------------------------------------
 // test runner fixtures
 // ---------------------------------------------------------------------------
@@ -288,6 +339,28 @@ fn testrunner_capture_summarises_the_run_deterministically() {
     assert_eq!(first.provenance.reference, reference);
     assert_eq!(first.artifacts, vec![reference]);
     assert_eq!(first.actor.r#type.as_str(), "tool");
+}
+
+#[test]
+fn testrunner_event_id_digests_the_project_namespace() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let report = write_report(dir.path(), "cargo-test-results.jsonl", LIBTEST_REPORT);
+
+    let first = testrunner::capture(&report, PROJECT).expect("capture succeeds");
+    let second = testrunner::capture(&report, "alternate").expect("second capture succeeds");
+
+    assert_eq!(
+        first.provenance.reference, second.provenance.reference,
+        "both captures reference the same report"
+    );
+    assert_eq!(
+        first.data, second.data,
+        "the same report produces the same payload"
+    );
+    assert_ne!(
+        first.id, second.id,
+        "the project namespace is part of the run identity"
+    );
 }
 
 #[test]

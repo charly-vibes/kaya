@@ -7,6 +7,7 @@ use std::time::{Duration, SystemTime};
 
 use kaya::adapters::{REGISTRY, wai};
 use kaya::event::{ActorType, Event, to_line};
+use kaya::model;
 
 const PROJECT: &str = "kaya";
 
@@ -118,7 +119,7 @@ fn capture_emits_one_event_per_markdown_artifact() {
     }
 
     let alpha = by_path(&events, ALPHA);
-    assert_eq!(alpha.subject.id, "kaya/Artifact/2026-01-02-alpha");
+    assert_eq!(alpha.subject.id, "kaya/Artifact/designs-2026-01-02-alpha");
     assert_eq!(alpha.data["kind"], "designs");
     assert_eq!(alpha.timestamp, "2026-01-02T00:00:00Z");
     assert_eq!(alpha.provenance.tool, "wai");
@@ -127,15 +128,29 @@ fn capture_emits_one_event_per_markdown_artifact() {
     assert_eq!(alpha.artifacts, vec![ALPHA.to_string()]);
 
     let beta = by_path(&events, BETA);
-    assert_eq!(beta.subject.id, "kaya/Artifact/2026-01-03-beta-design");
+    assert_eq!(
+        beta.subject.id,
+        "kaya/Artifact/designs-2026-01-03-beta-design"
+    );
     assert_eq!(beta.data["kind"], "designs");
 
     let renamed = by_path(&events, RENAMED);
-    assert_eq!(renamed.subject.id, "kaya/Artifact/renamed-design");
+    assert_eq!(renamed.subject.id, "kaya/Artifact/designs-renamed-design");
     assert_eq!(renamed.timestamp, fixed_mtime());
 
-    assert_eq!(by_path(&events, RESEARCH).data["kind"], "research");
-    assert_eq!(by_path(&events, HANDOFF).data["kind"], "handoffs");
+    let research = by_path(&events, RESEARCH);
+    assert_eq!(
+        research.subject.id,
+        "kaya/Artifact/research-2026-02-05-origin"
+    );
+    assert_eq!(research.data["kind"], "research");
+
+    let handoff = by_path(&events, HANDOFF);
+    assert_eq!(
+        handoff.subject.id,
+        "kaya/Artifact/handoffs-2026-03-06-latest"
+    );
+    assert_eq!(handoff.data["kind"], "handoffs");
 }
 
 #[test]
@@ -165,6 +180,83 @@ fn capture_sorts_by_id_and_replays_byte_identically() {
     let first_lines: Vec<String> = first.iter().map(to_line).collect();
     let second_lines: Vec<String> = second.iter().map(to_line).collect();
     assert_eq!(first_lines, second_lines);
+}
+
+#[test]
+fn same_stem_under_two_kinds_yields_distinct_nodes() {
+    let temp = tempfile::tempdir().unwrap();
+    let designs = ".wai/projects/kaya/designs/shared.md";
+    let research = ".wai/projects/kaya/research/shared.md";
+    write_file(temp.path(), designs, "# design\n");
+    write_file(temp.path(), research, "# research\n");
+
+    let events = wai::capture(temp.path(), PROJECT).unwrap();
+    assert_eq!(events.len(), 2);
+
+    let subjects: Vec<&str> = events
+        .iter()
+        .map(|event| event.subject.id.as_str())
+        .collect();
+    assert!(subjects.contains(&"kaya/Artifact/designs-shared"));
+    assert!(subjects.contains(&"kaya/Artifact/research-shared"));
+    assert_ne!(events[0].id, events[1].id, "the records keep distinct ids");
+
+    let graph = model::build(&events).expect("both artifacts enter the model");
+    assert_eq!(graph.nodes().count(), 2);
+    assert!(graph.node("kaya/Artifact/designs-shared").is_some());
+    assert!(graph.node("kaya/Artifact/research-shared").is_some());
+}
+
+#[test]
+fn subject_ids_separate_wai_source_projects() {
+    let temp = tempfile::tempdir().unwrap();
+    write_file(
+        temp.path(),
+        ".wai/projects/kaya/designs/shared.md",
+        "# kaya\n",
+    );
+    write_file(
+        temp.path(),
+        ".wai/projects/other/designs/shared.md",
+        "# other\n",
+    );
+
+    let events = wai::capture(temp.path(), PROJECT).unwrap();
+    let subjects: Vec<&str> = events
+        .iter()
+        .map(|event| event.subject.id.as_str())
+        .collect();
+    assert!(subjects.contains(&"kaya/Artifact/designs-shared"));
+    assert!(subjects.contains(&"other/Artifact/designs-shared"));
+
+    let graph = model::build(&events).expect("both source projects enter the model");
+    assert_eq!(graph.nodes().count(), 2);
+}
+
+#[test]
+fn event_id_digests_the_project_namespace() {
+    let temp = tempfile::tempdir().unwrap();
+    fixture(temp.path());
+
+    let first = wai::capture(temp.path(), PROJECT).unwrap();
+    let second = wai::capture(temp.path(), "other-project").unwrap();
+
+    assert_eq!(first.len(), second.len());
+    for event in &first {
+        let reference = event.provenance.reference.as_str();
+        let counterpart = second
+            .iter()
+            .find(|candidate| candidate.provenance.reference == reference)
+            .expect("both captures cover the same records");
+        assert_eq!(
+            event.data, counterpart.data,
+            "the same source produces the same payload"
+        );
+        assert_ne!(
+            event.id, counterpart.id,
+            "the project namespace is part of the event identity"
+        );
+    }
 }
 
 #[test]

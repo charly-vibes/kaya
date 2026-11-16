@@ -6,8 +6,9 @@
 //! one deterministic `capture.commit.observed` event per commit.
 //! Rationale: the commit sha is the source's own identity and the only
 //! anchor a later projection can resolve, so every event carries it in both
-//! provenance and artifacts, while the event id is derived from that sha so
-//! re-capturing the same history yields the same ledger lines.
+//! provenance and artifacts, while the event id digests that sha plus every
+//! other field the event writes (tool, version, project, timestamp, payload)
+//! so an environment change cannot masquerade as the same observation.
 
 use std::path::Path;
 use std::process::Command;
@@ -30,8 +31,16 @@ const LOG_FORMAT: &str = "--format=%H%x1f%aI%x1f%s";
 /// Capture up to `limit` commits from the repository at `root`.
 ///
 /// Events are sorted by id and carry the commit sha as their source
-/// reference. Nothing is written under `root`.
+/// reference. A fresh repository whose HEAD is unborn has no history to
+/// observe and yields an empty vector rather than a failure. Nothing is
+/// written under `root`.
 pub fn capture(root: &Path, project: &str, limit: usize) -> Result<Vec<Event>, AdapterError> {
+    // Verify the directory is a repository before treating a HEAD probe miss
+    // as merely an unborn branch; a non-repository still fails atomically.
+    checked_git(root, &["rev-parse", "--git-dir"], "git rev-parse --git-dir")?;
+    if !has_head(root)? {
+        return Ok(Vec::new());
+    }
     let version = git_version(root)?;
     let log_limit = limit.to_string();
     let log = checked_git(root, &["log", LOG_FORMAT, "-n", &log_limit], "git log")?;
@@ -66,7 +75,12 @@ pub fn capture(root: &Path, project: &str, limit: usize) -> Result<Vec<Event>, A
         };
 
         let short_sha = &sha[..SHORT_SHA_CHARS];
-        let digest = sha256_hex(format!("{SOURCE}|{sha}").as_bytes());
+        let data = serde_json::json!({
+            "sha": sha,
+            "message": message,
+            "short_sha": short_sha,
+        });
+        let digest = event_id(&version, project, &timestamp, sha, &data);
         events.push(Event {
             id: format!("{ID_PREFIX}{}", &digest[..ID_DIGEST_CHARS]),
             schema: SCHEMA_V0.to_owned(),
@@ -80,11 +94,7 @@ pub fn capture(root: &Path, project: &str, limit: usize) -> Result<Vec<Event>, A
                 r#type: "Artifact".to_owned(),
                 id: format!("{project}/Artifact/{short_sha}"),
             },
-            data: serde_json::json!({
-                "sha": sha,
-                "message": message,
-                "short_sha": short_sha,
-            }),
+            data,
             provenance: Provenance {
                 tool: SOURCE.to_owned(),
                 version: version.clone(),
@@ -106,6 +116,39 @@ fn git_version(root: &Path) -> Result<String, AdapterError> {
         return Err(failure("git: `git --version` reported no version"));
     }
     Ok(version)
+}
+
+/// Deterministic event id over every field the event writes.
+///
+/// Tool, tool version, project namespace, timestamp, commit reference, and the
+/// serialized payload all contribute, so captures from different environments
+/// never share an id while a replay of the same environment does.
+fn event_id(
+    version: &str,
+    project: &str,
+    timestamp: &str,
+    reference: &str,
+    data: &serde_json::Value,
+) -> String {
+    let identity =
+        format!("{SOURCE}\x1f{version}\x1f{project}\x1f{timestamp}\x1f{reference}\x1f{data}");
+    sha256_hex(identity.as_bytes())
+}
+
+/// Whether `HEAD` resolves to a commit; an unborn branch reports `false`.
+fn has_head(root: &Path) -> Result<bool, AdapterError> {
+    let output = Command::new(SOURCE)
+        .arg("-C")
+        .arg(root)
+        .args(["rev-parse", "--verify", "HEAD"])
+        .output()
+        .map_err(|err| {
+            failure(&format!(
+                "git: cannot run `git rev-parse --verify HEAD` in {}: {err}",
+                root.display()
+            ))
+        })?;
+    Ok(output.status.success())
 }
 
 /// Convert a git strict-ISO author date into an RFC 3339 UTC `Z` stamp.

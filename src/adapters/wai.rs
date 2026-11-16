@@ -41,8 +41,10 @@ const SLUG_FALLBACK_LEN: usize = 8;
 
 /// Capture every markdown artifact under `<root>/.wai/projects/*/{kind}/`.
 ///
-/// `project` is the kaya project namespace that prefixes subject ids; the
-/// wai tree may hold more than one source project and all are traversed.
+/// `project` is the kaya project namespace recorded in each event's identity;
+/// the wai tree may hold more than one source project and all are traversed.
+/// Subject ids are prefixed with the wai source project directory so the same
+/// kind and file stem in two source projects never collapses into one node.
 /// A missing `.wai` tree or missing kind directory yields no events. Every
 /// emitted event is sorted by id so replaying the same tree produces the
 /// same sequence. Nothing under `root` is ever written.
@@ -59,6 +61,13 @@ pub fn capture(root: &Path, project: &str) -> Result<Vec<Event>, AdapterError> {
         if !metadata.is_dir() {
             continue;
         }
+        let Some(source_project) = project_dir.file_name().and_then(|name| name.to_str()) else {
+            return Err(io_failure(
+                &project_dir,
+                "read project directory name",
+                "is not UTF-8",
+            ));
+        };
         for kind in KINDS {
             let Some(artifacts) = read_dir_sorted(&project_dir.join(kind))? else {
                 continue;
@@ -72,7 +81,13 @@ pub fn capture(root: &Path, project: &str) -> Result<Vec<Event>, AdapterError> {
                 if !metadata.is_file() {
                     continue;
                 }
-                events.push(capture_file(root, project, kind, &artifact)?);
+                events.push(capture_file(
+                    root,
+                    source_project,
+                    project,
+                    kind,
+                    &artifact,
+                )?);
             }
         }
     }
@@ -84,6 +99,7 @@ pub fn capture(root: &Path, project: &str) -> Result<Vec<Event>, AdapterError> {
 /// Translate one markdown artifact into an observation event.
 fn capture_file(
     root: &Path,
+    source_project: &str,
     project: &str,
     kind: &str,
     path: &Path,
@@ -96,8 +112,9 @@ fn capture_file(
         .map_err(|err| record_failure(&relative, format!("read record: {err}")))?;
 
     let timestamp = timestamp_for(path, &relative)?;
+    let data = json!({ "kind": kind, "path": relative.clone() });
     let event = Event {
-        id: event_id(project, &relative),
+        id: event_id(project, &timestamp, &relative, &data),
         schema: SCHEMA_V0.to_owned(),
         r#type: EVENT_TYPE.to_owned(),
         timestamp,
@@ -107,9 +124,12 @@ fn capture_file(
         },
         subject: Subject {
             r#type: "Artifact".to_owned(),
-            id: format!("{project}/Artifact/{}", slug_for(path, &relative)),
+            id: format!(
+                "{source_project}/Artifact/{kind}-{}",
+                slug_for(path, &relative)
+            ),
         },
-        data: json!({ "kind": kind, "path": relative.clone() }),
+        data,
         provenance: Provenance {
             tool: TOOL.to_owned(),
             version: SOURCE_VERSION.to_owned(),
@@ -231,9 +251,15 @@ fn slug_for(path: &Path, relative: &str) -> String {
     slug
 }
 
-/// Deterministic event id: `evt-` plus a digest prefix over source and record.
-fn event_id(project: &str, relative: &str) -> String {
-    let digest = sha256_hex(format!("{TOOL}|{project}|{relative}").as_bytes());
+/// Deterministic event id over every field the event writes.
+///
+/// Tool, tool version, project namespace, timestamp, source reference, and the
+/// serialized payload all contribute, so two captures from different
+/// environments never share an id while a replay of the same environment does.
+fn event_id(project: &str, timestamp: &str, reference: &str, data: &serde_json::Value) -> String {
+    let identity =
+        format!("{TOOL}\x1f{SOURCE_VERSION}\x1f{project}\x1f{timestamp}\x1f{reference}\x1f{data}");
+    let digest = sha256_hex(identity.as_bytes());
     format!("evt-{}", &digest[..ID_DIGEST_LEN])
 }
 
