@@ -26,6 +26,7 @@ producing plausible research narratives from incomplete evidence".
 | ai_proposed_only             | invariant | `an interpretation authored by an agent actor lands as a proposed assertion flagged machine-proposed — a conclusion never originates from an agent actor` | [[kaya.promotion.layer]] |
 | approval_provenance          | invariant | `every promotion event names its approver and the promoted assertion id and persists in the ledger`                                                       | [[kaya.promotion.layer]] |
 | challenge_without_deletion   | invariant | `a counter-assertion citing counter-events demotes a conclusion's displayed status to challenged; the conclusion's record remains byte-intact`            | [[kaya.promotion.layer]] |
+| pending_proposals_bounded    | invariant | `pending proposals fit one session-close; over-cap proposal generation is ranked/capped, never pushed onto the human; proposals never expire and never masquerade as settled` | [[kaya.promotion.layer]] |
 
 ## Model
 
@@ -55,6 +56,7 @@ producing plausible research narratives from incomplete evidence".
 | challenge_demotes_status      | unit | [[kaya.promotion.layer.challenge_without_deletion]] | `counter_assertion_on_conclusion()` | `status == challenged ∧ original record byte-intact`          |
 | category_closed_checked       | unit | [[kaya.promotion.layer.category_closed]]  | `record_with_foreign_category()`      | `ingest ⇒ refusal naming the closed categories`               |
 | proposal_channel_checked      | unit | [[kaya.promotion.layer.proposal_channel]] | `assertion_without_status_author()`   | `write ⇒ refusal naming status ∧ author ∧ event references`   |
+| pending_proposals_bounded_checked | unit | [[kaya.promotion.layer.pending_proposals_bounded]] | `proposal_burst_over_one_session_close()` | `over-cap ⇒ generation ranks/caps ∧ approval queue not grown ∧ human never prompted to approve more` |
 
 ## Requirements
 ### Requirement: Layer sidecar contract

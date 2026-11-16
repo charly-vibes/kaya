@@ -59,6 +59,34 @@ record.
 - **THEN** the conclusion's displayed status is `challenged` and its
   original record is byte-intact in the ledger
 
+### Requirement: Proposal budget is pulled, never pushed
+
+Promotion approval SHALL be pulled at the point of use: a pending proposal
+SHALL surface as a count in `kaya status` and on dossier build and dossier
+read, and no command SHALL block on or prompt for approval. Pending
+proposals SHALL fit one session-close; where they would not, proposal
+generation SHALL be ranked or capped instead of growing the human's
+approval queue. An unapproved proposal SHALL remain visibly `proposed`
+indefinitely and SHALL never be displayed as an established conclusion.
+
+#### Scenario: Proposals surface without interrupting
+
+- **WHEN** proposals are pending
+- **THEN** they appear as a count in `kaya status` and on dossier build and
+  read, and no command blocks or prompts for approval
+
+#### Scenario: Pending proposals fit one session-close
+
+- **WHEN** pending proposals exceed what one session-close can approve
+- **THEN** generation ranks or caps proposals instead of increasing the
+  human's approval queue
+
+#### Scenario: Proposals never expire or settle silently
+
+- **WHEN** a proposal is unapproved
+- **THEN** it stays visibly `proposed` indefinitely and is never displayed
+  as an established conclusion
+
 ### Requirement: Property coverage mirror
 
 Every property row in the layer sidecar SHALL be verified by exactly one
@@ -105,3 +133,10 @@ dedicated scenario.
 - **WHEN** an assertion is written without status, author, or event references
 - **THEN** the write refuses naming the missing fields
 - **VERIFIES** [[kaya.promotion.proposal_channel]]
+
+#### Scenario: pending_proposals_bounded
+
+- **WHEN** pending proposals exceed one session-close's approval budget
+- **THEN** generation ranks or caps them, the approval queue does not grow,
+  and the human is never prompted to approve more
+- **VERIFIES** [[kaya.promotion.pending_proposals_bounded_checked]]

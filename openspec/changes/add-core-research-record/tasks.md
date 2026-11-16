@@ -23,6 +23,9 @@ contract-test shape. bd ticket mapping noted per phase.
 - [ ] 1.6 Adapter fixtures: wai artifact tree → events (kaya-aw3); git +
       test-runner → events (kaya-dnk); failure writes nothing; every event
       carries provenance. (kaya-aw3, kaya-dnk)
+- [ ] 1.7 Promotion budget fixtures: pending-proposal count surfaces
+      without interruption; over-cap generation ranks/caps; unapproved
+      proposals never expire or settle. (kaya-5ea)
 
 ## 2. Green — make the tests pass
 
@@ -35,6 +38,8 @@ contract-test shape. bd ticket mapping noted per phase.
       generation, authored preservation, stale flagging (kaya-e9s, kaya-5cg).
 - [ ] 2.6 Promotion gate: category transitions with approval provenance
       (kaya-5cg).
+- [ ] 2.7 Promotion budget: pending-proposal count in status and dossier
+      build, ranked/capped generation. (kaya-5ea)
 
 ## 3. Refactor — separate commit
 
