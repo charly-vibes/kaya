@@ -13,7 +13,7 @@
 > from the tools used during development (wai, dont, whisper, specodelic, git,
 > test runners) and compiles them into documentation projections — so the
 > record grows out of the work instead of stopping it.
-> **Status:** [experimental](docs/src/status.md) · design phase, pre-MVP · [Motivation & design](docs/src/index.md)
+> **Status:** [experimental](docs/src/status.md) · MVP-1 CLI implemented · [Motivation & design](docs/src/index.md)
 
 Part of the [charly-vibes](https://github.com/charly-vibes) toolshed.
 
@@ -59,14 +59,51 @@ The full motivation, architecture, design decisions and milestones live in
 
 ## Status
 
-Design phase — the architecture and the six core capabilities are specified
-in [`openspec/changes/add-core-research-record/`](openspec/changes/add-core-research-record/proposal.md)
-(event, ledger, model, projection, promotion, adapters); the CLI is not
-implemented yet. The roadmap: the
-[change tasks](openspec/changes/add-core-research-record/tasks.md) plus the
-beads tickets (`bd ready` in a clone), starting with MVP 1 — a static
-research compiler that reconstructs a useful dossier from existing
-wai/git/test artifacts.
+MVP-1, the static research compiler, is implemented: kaya imports observations
+from artifacts a repository already has, appends them to an append-only
+ledger, and recompiles a research dossier from that ledger.
+
+```sh
+kaya init                          # create .kaya/ledger.jsonl if absent
+kaya status                        # event count, byte size, digest, pending proposals
+kaya import wai                    # observe the .wai/ artifact tree
+kaya import git                    # observe recent commits
+kaya import test --report <path>   # observe one libtest JSONL run
+kaya build                         # compile docs/research (index + experiment reports)
+kaya build --expect-digest <hex>   # refuse to build unless the ledger matches
+kaya promote <assertion> --actor <name>
+kaya challenge <conclusion> --events <id>... --actor <name>
+```
+
+- The ledger lives at `.kaya/ledger.jsonl`: one `kaya.event/v0` record per
+  line, append-only, plain JSONL that survives in git.
+- `kaya build` compiles `docs/research/index.md` and one
+  `docs/research/experiments/<key>.md` per experiment, rewriting only its own
+  generated blocks and preserving authored bytes verbatim.
+- Promotion is human-approved and pull-based: `promote` and `challenge`
+  require `--actor`, and pending counts surface in `status`/`build` output
+  instead of as prompts. Events are not conclusions.
+- Every executed command prints exactly one JSON envelope to stdout, success
+  or failure; `--help` and `--version` print clap's own text.
+
+The behavioral specification remains the openspec change
+[`add-core-research-record`](openspec/changes/add-core-research-record/proposal.md)
+(event, ledger, model, projection, promotion, adapters). Remaining milestones
+are tracked in the
+[change tasks](openspec/changes/add-core-research-record/tasks.md) and in
+beads (`bd ready` in a clone). This repository already dogfoods the compiler:
+[docs/research/](docs/research/index.md) is kaya's own compiled dossier.
+
+## Install
+
+The CLI is installed from this repository with a stable Rust toolchain
+(1.88 or newer):
+
+```sh
+cargo install --git https://github.com/charly-vibes/kaya kaya
+```
+
+Publication to crates.io is deferred; install from git until then.
 
 ## FAQ
 
@@ -96,14 +133,16 @@ bytes are never touched — acknowledgment is a human act.
 ## Development
 
 ```sh
-just ci        # gates: ah check, pretender, spk lint (via lefthook)
+just ci        # cargo test, fmt + clippy, mdbook build, ah check, spk lint, openspec validate
+just build     # cargo build
+just test      # cargo test
+mdbook build   # docs only (book.toml at root)
 ddl status     # fleet tooling health
 ddl doctor     # detailed diagnostics
-mdbook build   # docs (book.toml at root)
 ```
 
-No install section yet — there is no binary; the standard install block
-lands with the first release.
+`just ci` is the single source of truth: `.github/workflows/ci.yml` runs that
+exact command, and lefthook gates the same spec checks on commit and push.
 
 ## Docs / status / license
 

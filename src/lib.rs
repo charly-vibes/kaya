@@ -1,8 +1,9 @@
 //! kaya — a living record of exploration.
 //!
-//! The library surface of the kaya research compiler. This MVP exposes only
-//! the genesis-style CLI envelope; the event, ledger, model, promotion,
-//! adapter, and projection modules arrive with later milestones.
+//! The library surface of the kaya research compiler: the genesis-style CLI
+//! envelope, the `kaya.event/v0` record, the append-only ledger, the research
+//! graph, capture adapters, documentation projections, and the promotion
+//! gate.
 
 pub mod adapters;
 pub mod envelope;

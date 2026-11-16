@@ -6,34 +6,59 @@ The behavioral specification is the openspec change
 [`add-core-research-record`](../../openspec/changes/add-core-research-record/proposal.md)
 — six capabilities (event, ledger, model, projection, promotion, adapters),
 each with lint-clean specodelic layers and scenario-level red-test shapes.
+MVP-1 implements those capabilities end to end as a static research compiler.
 
 | Area | Status | Notes |
 |---|---|---|
-| Architecture | specified | Four subsystems: capture adapters, research ledger, research model, documentation projections |
-| Event format | [specified (draft)](../../openspec/changes/add-core-research-record/specs/kaya-event/spec.md) | `kaya.event/v0` — closed 9-field schema, append-only JSONL, provenance-preserving, observation-only |
-| Research vocabulary | [specified (draft)](../../openspec/changes/add-core-research-record/specs/kaya-model/spec.md) | 13 entities, 9 typed direction-fixed relationships; relationships over entity count |
-| CLI | not implemented | Planned: `kaya init/status/note/question/decision/finding/build/check` plus promotion commands (`approve`, `challenge`); the list grows with the specs |
-| Integrations | [specified](../../openspec/changes/add-core-research-record/specs/kaya-adapters/spec.md), not implemented | wai, dont, whisper (turu bundle), specodelic (parse IR), git, test runners |
-| Docs | buildable | `book.toml` + `theme/charly.css` at root; `docs.yml` deploy workflow lands with [kaya-vt9](https://github.com/charly-vibes/kaya) (CI setup) |
-| CI | gates only | lefthook pre-commit/pre-push (`ah check`, `pretender`, `spk lint`); no build yet |
+| Architecture | implemented (MVP-1) | Four subsystems: capture adapters (`src/adapters`), research ledger (`src/ledger.rs`), research model (`src/model.rs`), documentation projections (`src/projection`) |
+| Event format | [implemented (draft)](../../openspec/changes/add-core-research-record/specs/kaya-event/spec.md) | `kaya.event/v0` — closed 9-field schema, append-only JSONL, provenance-preserving, observation-only |
+| Research vocabulary | [implemented](../../openspec/changes/add-core-research-record/specs/kaya-model/spec.md) | 13 entities, 9 typed direction-fixed relationships; relationships over entity count |
+| CLI | implemented | `kaya init`, `kaya status`, `kaya import` (wai, git, test), `kaya build [--out] [--expect-digest]`, `kaya promote`, `kaya challenge` |
+| Integrations | wai, git, test runner implemented; dont, whisper (turu), specodelic [specified](../../openspec/changes/add-core-research-record/specs/kaya-adapters/spec.md), not implemented | Adapters translate tool outputs into `kaya.event/v0`; the remaining sources have encoded specs but no adapter |
+| Docs | buildable, deploy workflow present | `book.toml` + `theme/charly.css` at root; `.github/workflows/docs.yml` builds the book and deploys it to GitHub Pages on push to `main` |
+| CI | implemented | `just ci` (cargo test, fmt + clippy, mdbook build, `ah check`, `spk lint`, `openspec validate --strict`) run by `.github/workflows/ci.yml`; lefthook gates `ah check`, `spk lint`, and `pretender` on commit |
 
 ## Implemented
 
-Nothing yet — see the beads tracker for the MVP 1 breakdown
-(`bd ready` in a clone).
+- `kaya init` — creates `.kaya/ledger.jsonl`, refusing a path that is not a
+  regular file.
+- `kaya status` — reports event count, byte size, digest, and pending
+  proposals; a missing ledger fails as `missing-ledger`.
+- `kaya import wai|git|test` — captures observations from the `.wai/`
+  artifact tree, recent repository commits, and one libtest JSONL run.
+- `kaya build [--out DIR] [--expect-digest HEX]` — compiles
+  `docs/research/index.md` and one `docs/research/experiments/<key>.md` per
+  experiment; only `kaya:`-owned blocks are rewritten, and `--expect-digest`
+  refuses to build from bytes other than the recorded ones.
+- `kaya promote <assertion> --actor <name>` and
+  `kaya challenge <conclusion> --events <ids...> --actor <name>` — the
+  human-only door into the record: proposals become conclusions, conclusions
+  gain counter-evidence, and neither happens automatically.
+- Library modules: event parsing, append-only ledger with digest anchoring,
+  crash-truncated tail recovery and supersede resolution, the research model,
+  deterministic projections with authored-block preservation and stale
+  detection, and promotion state replay.
+- Every executed command prints exactly one JSON envelope to stdout, success
+  or failure; `--help` and `--version` print clap's own text.
 
 ## In progress
 
-- MVP 1: static research compilation (dossier from existing wai/git/test artifacts).
+MVP-2 seams — continuous capture, agent traces, deduplication, relationship
+linking, missing-evidence detection, and incremental regeneration. The
+`dont`, whisper (turu), and specodelic adapters are specified but not
+written.
 
 ## Dogfooding
 
-- Nothing consumes kaya yet — it is a consumer of the ecosystem.
+- kaya's own dossier is compiled by kaya: the ledger at
+  `.kaya/ledger.jsonl` and the projections under `docs/research/`
+  (`index.md`, `experiments/add-core-research-record.md`) are checked in and
+  rebuilt by `kaya build`.
 - Reverse dogfooding: kaya's own specs are written in specodelic format and
   gate-checked by `spk lint` on every commit, and the change validates under
-  `openspec validate --strict` — kaya is specified with the tools it will read.
+  `openspec validate --strict` — kaya is specified with the tools it reads.
 
 ## Notes
 
-- No README install section: there is no binary yet; the standard install
-  block lands with the first release.
+- Install: `cargo install --git https://github.com/charly-vibes/kaya kaya`.
+  crates.io publication is deferred.

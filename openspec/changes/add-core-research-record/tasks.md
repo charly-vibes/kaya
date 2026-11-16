@@ -5,13 +5,13 @@ contract-test shape. bd ticket mapping noted per phase.
 
 ## 1. Red — failing tests first
 
-- [ ] 1.1 Event fixtures: valid `kaya.event/v0` record; unknown-schema
+- [x] 1.1 Event fixtures: valid `kaya.event/v0` record; unknown-schema
       refused; missing provenance refused; id reuse refused; extra field
       refused. (kaya-10k)
-- [ ] 1.2 Ledger fixtures: append-only byte check; supersede round trip;
+- [x] 1.2 Ledger fixtures: append-only byte check; supersede round trip;
       idempotent replay; digest stability; crash-tail (partial last line)
       recovery. (kaya-10k)
-- [ ] 1.3 Model fixtures: unknown entity refused; unknown relationship
+- [x] 1.3 Model fixtures: unknown entity refused; unknown relationship
       refused; dangling reference refused; influence cycle refused.
       (kaya-f2f)
 - [ ] 1.4 Projection fixtures: authored block byte-preserved across
@@ -23,22 +23,22 @@ contract-test shape. bd ticket mapping noted per phase.
 - [ ] 1.6 Adapter fixtures: wai artifact tree → events (kaya-aw3); git +
       test-runner → events (kaya-dnk); failure writes nothing; every event
       carries provenance. (kaya-aw3, kaya-dnk)
-- [ ] 1.7 Promotion budget fixtures: pending-proposal count surfaces
+- [x] 1.7 Promotion budget fixtures: pending-proposal count surfaces
       without interruption; over-cap generation ranks/caps; unapproved
       proposals never expire or settle. (kaya-5ea)
 
 ## 2. Green — make the tests pass
 
-- [ ] 2.1 Scaffold the Rust crate; CLI `kaya init`/`status` skeleton
+- [x] 2.1 Scaffold the Rust crate; CLI `kaya init`/`status` skeleton
       (kaya-lb2).
-- [ ] 2.2 Event parser/validator + ledger store (kaya-10k).
+- [x] 2.2 Event parser/validator + ledger store (kaya-10k).
 - [ ] 2.3 Adapters: wai (kaya-aw3), git + test-runner (kaya-dnk).
-- [ ] 2.4 Research graph builder over the closed vocabulary (kaya-f2f).
+- [x] 2.4 Research graph builder over the closed vocabulary (kaya-f2f).
 - [ ] 2.5 Projection compiler: managed-block grammar, deterministic
       generation, authored preservation, stale flagging (kaya-e9s, kaya-5cg).
 - [ ] 2.6 Promotion gate: category transitions with approval provenance
       (kaya-5cg).
-- [ ] 2.7 Promotion budget: pending-proposal count in status and on
+- [x] 2.7 Promotion budget: pending-proposal count in status and on
       dossier build/read, ranked/capped generation. (kaya-5ea)
 
 ## 3. Refactor — separate commit
