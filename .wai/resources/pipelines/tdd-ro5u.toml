@@ -200,7 +200,7 @@ Changed:
 - files and purpose
 
 Verified:
-- commands run and result (`cargo test`, `ah check`, `openspec validate --strict`)
+- commands run and result (`cargo test`, `ah check --run-tests`, `openspec validate --strict`)
 
 Review:
 - RO5U status and remaining findings
