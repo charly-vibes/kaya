@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "adapter-writes-nothing-to-its-source"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "capture_writes_nothing_to_the_source_tree"}]

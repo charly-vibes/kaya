@@ -104,6 +104,26 @@ fn agent_assertion_lands_proposed_and_machine_flagged() {
 }
 
 #[test]
+fn human_assertion_lands_proposed_with_author_and_event_references() {
+    let recorded = propose(
+        &human("alice"),
+        "this result contradicts H-001",
+        &["ev-1".to_string()],
+    )
+    .expect("humans may propose");
+    assert_eq!(recorded.r#type, "promotion.assertion.recorded");
+    assert_eq!(recorded.data["status"], "proposed");
+    assert_eq!(recorded.data["event_ids"], json!(["ev-1"]));
+    assert_eq!(recorded.data["machine_proposed"].as_bool(), Some(false));
+
+    let state = PromotionState::from_events(&[recorded]).expect("a proposal replays");
+    let assertion = &state.assertions[0];
+    assert_eq!(assertion.status, Status::Proposed);
+    assert_eq!(assertion.author, "alice");
+    assert_eq!(assertion.event_ids, vec!["ev-1".to_string()]);
+}
+
+#[test]
 fn approval_requires_human_and_records_provenance() {
     let recorded = propose(&agent(), "counts fell", &["ev-1".to_string()]).expect("agent proposes");
     let assertion_id = recorded.subject.id.clone();

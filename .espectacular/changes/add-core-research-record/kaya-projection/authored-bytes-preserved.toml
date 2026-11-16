@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "authored-bytes-preserved"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "authored_bytes_and_foreign_blocks_survive_rebuild"}]

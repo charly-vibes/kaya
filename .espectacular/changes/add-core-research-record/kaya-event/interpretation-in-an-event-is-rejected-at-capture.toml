@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "interpretation-in-an-event-is-rejected-at-capture"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "interpretation_fields_are_refused_pointing_at_promotion"}]

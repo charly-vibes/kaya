@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "incremental-minimality"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "changed_graph_recomputes_the_report"}]

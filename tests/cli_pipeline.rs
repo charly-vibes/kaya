@@ -218,6 +218,37 @@ fn import_without_a_ledger_is_a_missing_ledger_error() {
 }
 
 #[test]
+fn failed_import_writes_no_events_to_the_ledger() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_wai_design(&dir, "x.md");
+
+    let unparsable = dir
+        .path()
+        .join(".wai/projects/kaya/research/undated-binary.md");
+    fs::create_dir_all(unparsable.parent().expect("research dir")).unwrap();
+    fs::write(&unparsable, [0xff_u8, 0xfe]).unwrap();
+
+    let envelope = assert_failure(&import_wai(&dir));
+    assert_eq!(
+        envelope["error"]["label"],
+        json!("kaya.adapters.failure_atomic")
+    );
+    let message = envelope["error"]["message"]
+        .as_str()
+        .expect("error envelopes carry a message");
+    assert!(message.contains("wai"), "names the source: {message}");
+    assert!(
+        message.contains("undated-binary.md"),
+        "names the record: {message}"
+    );
+    assert!(
+        ledger_lines(&dir).is_empty(),
+        "a failed adapter run appends no events"
+    );
+}
+
+#[test]
 fn build_writes_index_with_generated_block_and_artifact() {
     let dir = tempfile::tempdir().unwrap();
     init(&dir);

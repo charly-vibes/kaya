@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "tampered-ledger-refused"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "tampered_line_is_refused_naming_the_line_number"}]

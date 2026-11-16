@@ -1,0 +1,8 @@
+tool_version = "0.12.2"
+
+id = "turu-bundle-consumed-via-shared-store-contract"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"

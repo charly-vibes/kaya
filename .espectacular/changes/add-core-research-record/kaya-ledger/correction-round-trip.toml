@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "correction-round-trip"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "corrections_supersede_without_rewriting_the_original_line"}]

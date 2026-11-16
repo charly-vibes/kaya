@@ -584,3 +584,57 @@ fn anchor_byte_len_round_trips_through_verification() {
     assert_eq!(events, vec![first, second]);
     assert_eq!(recovery, Recovery::default());
 }
+
+#[test]
+fn committed_ledger_diff_shows_only_additions() {
+    use std::process::Command;
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let git = |args: &[&str]| {
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(dir.path())
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .env("GIT_AUTHOR_NAME", "kaya test")
+            .env("GIT_AUTHOR_EMAIL", "test@example.invalid")
+            .env("GIT_COMMITTER_NAME", "kaya test")
+            .env("GIT_COMMITTER_EMAIL", "test@example.invalid")
+            .env("GIT_AUTHOR_DATE", "2026-11-16T00:00:00+00:00")
+            .env("GIT_COMMITTER_DATE", "2026-11-16T00:00:00+00:00")
+            .args(args)
+            .output()
+            .expect("git runs");
+        assert!(
+            out.status.success(),
+            "git {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+
+    git(&["init", "--quiet"]);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    ledger.append(&first).unwrap();
+    git(&["add", "ledger.jsonl"]);
+    git(&["commit", "--quiet", "--message", "seed the ledger"]);
+
+    let second = experiment_event(SECOND, "experiment.run.completed", json!({"passed": 4}));
+    ledger.append(&second).unwrap();
+
+    let diff = git(&["diff", "--unified=0", "--", "ledger.jsonl"]);
+    let removed: Vec<&str> = diff
+        .lines()
+        .filter(|line| line.starts_with('-') && !line.starts_with("---"))
+        .collect();
+    assert!(
+        removed.is_empty(),
+        "append-only diff has no removals: {removed:?}"
+    );
+    assert!(
+        diff.lines().any(|line| line.starts_with('+')),
+        "the appended line appears in the diff: {diff}"
+    );
+}

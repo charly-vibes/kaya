@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "proposals-never-expire-or-settle-silently"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "proposals_never_expire_or_settle_silently"}]

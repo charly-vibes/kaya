@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "pending-proposals-fit-one-session-close"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "cap_proposals_ranks_then_caps_at_budget"}]

@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "unknown-entity-refused"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "unknown_entity_type_refused_naming_the_type_and_closed_set"}]

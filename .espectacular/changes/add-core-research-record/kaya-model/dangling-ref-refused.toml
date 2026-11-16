@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "dangling-ref-refused"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "dangling_claim_to_finding_refused_naming_the_endpoint"}]

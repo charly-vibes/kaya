@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "influence-cycle-refused"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "influence_cycle_refused_naming_its_members"}]

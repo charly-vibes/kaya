@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "ai-interpretation-flagged"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "agent_assertion_lands_proposed_and_machine_flagged"}]

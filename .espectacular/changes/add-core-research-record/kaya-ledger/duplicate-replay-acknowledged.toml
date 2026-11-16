@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "duplicate-replay-acknowledged"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "identical_replay_is_a_byte_identical_no_op"}]

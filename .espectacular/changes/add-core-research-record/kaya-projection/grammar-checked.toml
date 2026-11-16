@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "grammar-checked"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "unterminated_generated_block_refuses_naming_it_and_leaves_file_untouched"}]

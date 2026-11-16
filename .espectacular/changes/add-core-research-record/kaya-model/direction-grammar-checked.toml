@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "direction-grammar-checked"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "reversed_executes_refused_naming_the_direction_rule"}]

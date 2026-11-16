@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "same-inputs-same-bytes"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "identical_graphs_build_byte_identical_files"}]

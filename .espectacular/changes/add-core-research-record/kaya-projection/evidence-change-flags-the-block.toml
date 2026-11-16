@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "evidence-change-flags-the-block"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "stale_authored_names_block_and_evidence_without_touching_bytes"}]

@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "git-diffable"
+description = "A committed ledger grows by appended lines only: git diff shows additions, never edits."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "committed_ledger_diff_shows_only_additions"}]
