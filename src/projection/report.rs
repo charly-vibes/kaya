@@ -34,9 +34,10 @@ const LABEL_IO: &str = "kaya.projection.io";
 /// Reads the document when present, renders the deterministic
 /// `experiment-report` body, and rewrites only that generated block. An
 /// unchanged body means no write: the summary records the projection under
-/// `unchanged`; a changed body is written and recorded under `recomputed`.
-/// The source map traces every rendered node and interpretation back to its
-/// node or event ids.
+/// `experiment-report:<experiment-id>`; a changed body is written and
+/// recorded under the same name. Namespacing keeps reports for different
+/// experiments distinct when summaries merge. The source map traces every
+/// rendered node and interpretation back to its node or event ids.
 pub fn build(
     graph: &Graph,
     experiment_id: &str,
@@ -51,28 +52,32 @@ pub fn build(
     }
 
     let rendered = render(graph, experiment_id, promotion);
+    let name = summary_name(experiment_id);
     let mut summary = Summary::default();
-    summary
-        .sources
-        .insert(REPORT_BLOCK.to_string(), rendered.sources);
+    summary.sources.insert(name.clone(), rendered.sources);
 
     match read_existing(path)? {
         None => {
             let document = replace_generated("", REPORT_BLOCK, &rendered.body)?;
             write(path, &document)?;
-            summary.recomputed.push(REPORT_BLOCK.to_string());
+            summary.recomputed.push(name);
         }
         Some(document) => {
             if generated_body(&document)?.as_deref() == Some(rendered.body.as_str()) {
-                summary.unchanged.push(REPORT_BLOCK.to_string());
+                summary.unchanged.push(name);
             } else {
                 let updated = replace_generated(&document, REPORT_BLOCK, &rendered.body)?;
                 write(path, &updated)?;
-                summary.recomputed.push(REPORT_BLOCK.to_string());
+                summary.recomputed.push(name);
             }
         }
     }
     Ok(summary)
+}
+
+/// Summary entry naming one experiment's report block.
+fn summary_name(experiment_id: &str) -> String {
+    format!("{REPORT_BLOCK}:{experiment_id}")
 }
 
 fn generated_body(document: &str) -> Result<Option<String>, ProjectionError> {

@@ -7,6 +7,7 @@
 use assert_cmd::Command;
 use serde_json::{Value, json};
 use std::fs;
+use std::process::Command as StdCommand;
 use tempfile::TempDir;
 
 const LEDGER: &str = ".kaya/ledger.jsonl";
@@ -157,6 +158,58 @@ fn experiment_event(event_id: &str, node_id: &str, title: &str) -> Value {
     })
 }
 
+fn run_event(event_id: &str, run_id: &str, passed: u64) -> Value {
+    json!({
+        "id": event_id,
+        "schema": "kaya.event/v0",
+        "type": "experiment.run.completed",
+        "timestamp": "2026-11-16T10:00:00Z",
+        "actor": { "type": "tool", "name": "test-runner" },
+        "subject": { "type": "Run", "id": run_id },
+        "data": { "passed": passed, "failed": 0, "ignored": 0, "total": passed },
+        "provenance": {
+            "tool": "test-runner",
+            "version": "libtest-json",
+            "reference": "target/run.jsonl"
+        },
+        "artifacts": [],
+    })
+}
+
+fn run_correction(event_id: &str, run_id: &str, supersedes: &str, passed: u64) -> Value {
+    let mut event = run_event(event_id, run_id, passed);
+    event["data"]["supersedes"] = json!(supersedes);
+    event
+}
+
+fn git(dir: &TempDir, args: &[&str]) {
+    let output = StdCommand::new("git")
+        .current_dir(dir.path())
+        .args(args)
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CONFIG_SYSTEM", "/dev/null")
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env_remove("GIT_INDEX_FILE")
+        .env("GIT_AUTHOR_NAME", "kaya")
+        .env("GIT_AUTHOR_EMAIL", "kaya@example.com")
+        .env("GIT_COMMITTER_NAME", "kaya")
+        .env("GIT_COMMITTER_EMAIL", "kaya@example.com")
+        .output()
+        .expect("git runs");
+    assert!(
+        output.status.success(),
+        "git {args:?} failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn commit_ledger(dir: &TempDir) {
+    git(dir, &["init", "--quiet"]);
+    git(dir, &["add", LEDGER]);
+    git(dir, &["commit", "--quiet", "--message", "record ledger"]);
+}
+
 fn record_assertion(dir: &TempDir, id: &str, text: &str, cites: &[&str]) {
     let line = event_line(&assertion_event(id, text, cites));
     write_ledger(dir, &[line]);
@@ -255,7 +308,7 @@ fn build_writes_index_with_generated_block_and_artifact() {
     write_wai_design(&dir, "x.md");
     assert_success(&import_wai(&dir));
 
-    let built = assert_success(&run(&dir, &["build"]));
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
     assert_eq!(built["envelope_kind"], json!("build"));
     assert_eq!(built["data"]["out"], json!("docs/research"));
     assert_eq!(built["data"]["pending_proposals"], json!(0));
@@ -282,7 +335,7 @@ fn build_writes_index_with_generated_block_and_artifact() {
         "index lists the observed artifact: {index}"
     );
 
-    let again = assert_success(&run(&dir, &["build"]));
+    let again = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
     let unchanged = again["data"]["unchanged"]
         .as_array()
         .expect("unchanged is a list");
@@ -306,28 +359,56 @@ fn build_writes_one_report_per_experiment() {
         "kaya/Experiment/exp-one",
         "Exp One",
     ));
-    write_ledger(&dir, &[experiment]);
+    let other_project = event_line(&experiment_event(
+        "entity-2",
+        "alpha/Experiment/exp-one",
+        "Other Exp One",
+    ));
+    write_ledger(&dir, &[experiment, other_project]);
 
-    let built = assert_success(&run(&dir, &["build"]));
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
     let recomputed = built["data"]["recomputed"]
         .as_array()
         .expect("recomputed is a list");
-    assert!(
-        recomputed.iter().any(|name| name == "experiment-report"),
-        "an experiment report is recomputed: {recomputed:?}"
-    );
+    for name in [
+        "experiment-report:kaya/Experiment/exp-one",
+        "experiment-report:alpha/Experiment/exp-one",
+    ] {
+        assert!(
+            recomputed.iter().any(|candidate| candidate == name),
+            "each report has a distinct summary name ({name}): {recomputed:?}"
+        );
+    }
 
-    let report = fs::read_to_string(dir.path().join("docs/research/experiments/exp-one.md"))
-        .expect("the report key is the last id segment");
+    for path in [
+        "docs/research/experiments/kaya-Experiment-exp-one.md",
+        "docs/research/experiments/alpha-Experiment-exp-one.md",
+    ] {
+        let report = fs::read_to_string(dir.path().join(path))
+            .unwrap_or_else(|err| panic!("the report path sanitizes every id for {path}: {err}"));
+        assert!(
+            report.contains("<!-- kaya:begin generated:experiment-report -->"),
+            "report carries the generated block marker: {report}"
+        );
+    }
+
+    let sources = built["data"]["sources"]
+        .as_object()
+        .expect("build exposes the merged source map");
     assert!(
-        report.contains("<!-- kaya:begin generated:experiment-report -->"),
-        "report carries the generated block marker: {report}"
+        sources.contains_key("experiment-report:kaya/Experiment/exp-one")
+            && sources.contains_key("experiment-report:alpha/Experiment/exp-one"),
+        "each report has its own source-map entry: {sources:?}"
     );
 
     let index = fs::read_to_string(dir.path().join(INDEX)).expect("index exists");
     assert!(
-        index.contains("kaya/Experiment/exp-one"),
-        "index lists the experiment: {index}"
+        index.contains("kaya/Experiment/exp-one") && index.contains("alpha/Experiment/exp-one"),
+        "index lists both experiments: {index}"
+    );
+    assert!(
+        index.contains("_2 nodes from 2 events._"),
+        "the index summary counts rendered nodes and ledger events: {index}"
     );
 }
 
@@ -338,7 +419,7 @@ fn build_expect_digest_pins_the_ledger() {
     write_wai_design(&dir, "x.md");
     assert_success(&import_wai(&dir));
 
-    let built = assert_success(&run(&dir, &["build"]));
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
     let digest = built["data"]["ledger_digest"]
         .as_str()
         .expect("build reports its ledger digest")
@@ -362,6 +443,120 @@ fn build_expect_digest_pins_the_ledger() {
         json!("kaya.ledger.digest_mismatch"),
         "an unpinned ledger is refused, not served"
     );
+}
+
+#[test]
+fn build_flags_authored_citations_superseded_by_a_correction() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    let authored = "# Notes\n\n\
+        <!-- kaya:authored -->\n\
+        The run was fast.\n\
+        <!-- kaya:cites run-1 -->\n\
+        <!-- kaya:end authored -->\n";
+    fs::create_dir_all(dir.path().join("docs/research")).unwrap();
+    fs::write(dir.path().join(INDEX), authored).unwrap();
+
+    let run_line = event_line(&run_event("run-1", "kaya/Run/run-1", 1));
+    let correction = event_line(&run_correction(
+        "correction-1",
+        "kaya/Run/run-1",
+        "run-1",
+        2,
+    ));
+    write_ledger(&dir, &[run_line, correction]);
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    assert_eq!(
+        built["data"]["stale"],
+        json!([{ "block": "authored-1", "evidence": ["run-1"] }]),
+        "the correction moved evidence cited by authored prose"
+    );
+
+    let after = fs::read_to_string(dir.path().join(INDEX)).expect("index exists");
+    assert!(
+        after.starts_with(authored),
+        "authored bytes are never rewritten: {after}"
+    );
+    assert!(
+        after.contains("_1 nodes from 2 events._"),
+        "the summary counts rendered nodes and all ledger events: {after}"
+    );
+}
+
+#[test]
+fn build_refuses_an_in_place_edit_of_committed_ledger_history() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    let first = event_line(&run_event("run-1", "kaya/Run/run-1", 1));
+    write_ledger(&dir, &[first]);
+    commit_ledger(&dir);
+
+    let path = dir.path().join(LEDGER);
+    let committed = fs::read_to_string(&path).expect("ledger is readable");
+    fs::write(&path, committed.replacen("\"run-1\"", "\"run-edited\"", 1)).unwrap();
+
+    let envelope = assert_failure(&run(&dir, &["build", "--allow-uncommitted"]));
+    assert_eq!(
+        envelope["error"]["label"],
+        json!("kaya.ledger.uncommitted_history"),
+        "rewritten committed bytes are never served, even with --allow-uncommitted"
+    );
+    let message = envelope["error"]["message"]
+        .as_str()
+        .expect("error envelopes carry a message");
+    assert!(
+        message.contains("line 1"),
+        "the refusal names the first unverified line: {message}"
+    );
+}
+
+#[test]
+fn build_accepts_committed_ledger_growth_with_complete_lines() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    let first = event_line(&run_event("run-1", "kaya/Run/run-1", 1));
+    write_ledger(&dir, std::slice::from_ref(&first));
+    commit_ledger(&dir);
+
+    let second = event_line(&run_event("run-2", "kaya/Run/run-2", 2));
+    write_ledger(&dir, &[first, second]);
+
+    let built = assert_success(&run(&dir, &["build"]));
+    assert!(
+        built["data"]["recomputed"]
+            .as_array()
+            .expect("recomputed is a list")
+            .iter()
+            .any(|name| name == "research-index"),
+        "a complete committed-growth suffix is verified and built: {built}"
+    );
+}
+
+#[test]
+fn build_accepts_an_untracked_ledger_only_when_allowed_or_pinned() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_ledger(
+        &dir,
+        &[event_line(&run_event("run-1", "kaya/Run/run-1", 1))],
+    );
+
+    let refused = assert_failure(&run(&dir, &["build"]));
+    assert_eq!(
+        refused["error"]["label"],
+        json!("kaya.ledger.uncommitted_history")
+    );
+    let message = refused["error"]["message"]
+        .as_str()
+        .expect("error envelopes carry a message");
+    assert!(
+        message.contains("--expect-digest") && message.contains("--allow-uncommitted"),
+        "the refusal explains how to pin or accept the ledger: {message}"
+    );
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    assert_eq!(built["data"]["pending_proposals"], json!(0));
 }
 
 #[test]

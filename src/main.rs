@@ -9,10 +9,11 @@
 //! `build-io`, `not-a-file`) or the label raised by the library that refused
 //! the run.
 
+use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{ErrorKind, Read};
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use std::process::{Command as ProcessCommand, ExitCode};
 
 use clap::error::ErrorKind as ClapErrorKind;
 use clap::{Parser, Subcommand};
@@ -22,7 +23,7 @@ use sha2::{Digest, Sha256};
 use kaya::adapters::{AdapterError, git, testrunner, wai};
 use kaya::envelope::Envelope;
 use kaya::event::{Actor, ActorType, Event, parse_line};
-use kaya::ledger::{Anchor, AppendOutcome, Ledger, LedgerError};
+use kaya::ledger::{AppendOutcome, Ledger, LedgerError, changed_event_ids, sha256_hex};
 use kaya::model::{self, EntityType, ModelError};
 use kaya::projection::{ProjectionError, StaleBlock, Summary, index, report};
 use kaya::promotion::{self, PromotionError, PromotionState};
@@ -69,6 +70,9 @@ enum Command {
         /// Refuse to build unless the ledger's digest is exactly this hex value
         #[arg(long, value_name = "HEX")]
         expect_digest: Option<String>,
+        /// Accept an untracked ledger whose history git cannot verify
+        #[arg(long)]
+        allow_uncommitted: bool,
     },
     /// Approve a proposed assertion as a conclusion
     Promote {
@@ -98,7 +102,7 @@ enum ImportSource {
         /// Directory containing the `.wai/` tree
         #[arg(long, default_value = ".", value_name = "DIR")]
         root: PathBuf,
-        /// Project namespace prefixed to subject ids
+        /// Project namespace recorded in the event identity
         #[arg(long, default_value = "kaya", value_name = "NAME")]
         project: String,
     },
@@ -107,7 +111,7 @@ enum ImportSource {
         /// Repository root to read history from
         #[arg(long, default_value = ".", value_name = "DIR")]
         root: PathBuf,
-        /// Project namespace prefixed to subject ids
+        /// Project namespace recorded in the event identity
         #[arg(long, default_value = "kaya", value_name = "NAME")]
         project: String,
         /// Maximum number of recent commits to observe
@@ -119,7 +123,7 @@ enum ImportSource {
         /// Path to the machine-readable run report
         #[arg(long, value_name = "PATH")]
         report: PathBuf,
-        /// Project namespace prefixed to subject ids
+        /// Project namespace recorded in the event identity
         #[arg(long, default_value = "kaya", value_name = "NAME")]
         project: String,
     },
@@ -137,7 +141,11 @@ fn main() -> ExitCode {
         Command::Init => cmd_init(),
         Command::Status => cmd_status(),
         Command::Import { source } => cmd_import(source),
-        Command::Build { out, expect_digest } => cmd_build(&out, expect_digest.as_deref()),
+        Command::Build {
+            out,
+            expect_digest,
+            allow_uncommitted,
+        } => cmd_build(&out, expect_digest.as_deref(), allow_uncommitted),
         Command::Promote {
             assertion_id,
             actor,
@@ -383,9 +391,13 @@ fn cmd_import(source: ImportSource) -> Result<Envelope, Failure> {
     ))
 }
 
-fn cmd_build(out: &Path, expect_digest: Option<&str>) -> Result<Envelope, Failure> {
-    let ledger = open_ledger()?;
-    let (events, ledger_digest) = read_build_ledger(&ledger, expect_digest)?;
+fn cmd_build(
+    out: &Path,
+    expect_digest: Option<&str>,
+    allow_uncommitted: bool,
+) -> Result<Envelope, Failure> {
+    let (events, ledger_digest) = read_build_ledger(expect_digest, allow_uncommitted)?;
+    let changed_ids = changed_event_ids(&events);
 
     let graph = model::build(&events).map_err(model_failure)?;
     let state = PromotionState::from_events(&events).map_err(promotion_failure)?;
@@ -396,7 +408,10 @@ fn cmd_build(out: &Path, expect_digest: Option<&str>) -> Result<Envelope, Failur
             format!("failed to create {}: {err}", out.display()),
         )
     })?;
-    let mut summary = index::build(&graph, &out.join("index.md")).map_err(projection_failure)?;
+    let index_path = out.join("index.md");
+    let mut summary =
+        index::build(&graph, &index_path, events.len()).map_err(projection_failure)?;
+    flag_stale_authored(&mut summary, &index_path, &changed_ids)?;
 
     let experiments: Vec<String> = graph
         .nodes()
@@ -412,18 +427,12 @@ fn cmd_build(out: &Path, expect_digest: Option<&str>) -> Result<Envelope, Failur
             )
         })?;
         for experiment_id in experiments {
-            let key = experiment_id
-                .rsplit('/')
-                .next()
-                .unwrap_or(experiment_id.as_str());
-            let report_summary = report::build(
-                &graph,
-                &experiment_id,
-                &experiments_dir.join(format!("{key}.md")),
-                &state,
-            )
-            .map_err(projection_failure)?;
+            let file_name = format!("{}.md", experiment_id.replace('/', "-"));
+            let report_path = experiments_dir.join(file_name);
+            let report_summary = report::build(&graph, &experiment_id, &report_path, &state)
+                .map_err(projection_failure)?;
             merge_summary(&mut summary, report_summary);
+            flag_stale_authored(&mut summary, &report_path, &changed_ids)?;
         }
     }
 
@@ -444,6 +453,11 @@ fn cmd_build(out: &Path, expect_digest: Option<&str>) -> Result<Envelope, Failur
         .into_iter()
         .map(|block| json!({ "block": block.block, "evidence": block.evidence }))
         .collect();
+    let mut sources = summary.sources;
+    for ids in sources.values_mut() {
+        ids.sort();
+        ids.dedup();
+    }
 
     Ok(Envelope::ok(
         "build",
@@ -452,46 +466,201 @@ fn cmd_build(out: &Path, expect_digest: Option<&str>) -> Result<Envelope, Failur
             "recomputed": recomputed,
             "unchanged": unchanged,
             "stale": stale,
+            "sources": sources,
             "pending_proposals": state.pending_count(),
             "ledger_digest": ledger_digest,
         }),
     ))
 }
 
-/// Read the ledger for a build, optionally pinned to an expected digest.
+/// Flag authored blocks in one compiled document whose cited evidence moved.
 ///
-/// The bootstrap path repairs a crash-truncated tail; when the caller pins a
-/// digest, the anchor is built from the recovered bytes so the verified read
-/// refuses any ledger whose bytes differ from what the caller recorded.
-fn read_build_ledger(
-    ledger: &Ledger,
-    expect_digest: Option<&str>,
-) -> Result<(Vec<Event>, String), Failure> {
-    let (events, _recovery) = ledger.read_recovered().map_err(ledger_failure)?;
-    let bytes = fs::read(LEDGER_PATH)
-        .map_err(|err| failure("ledger-io", format!("failed to read {LEDGER_PATH}: {err}")))?;
-    let anchor = Anchor::of(&bytes);
+/// The document is read back after compilation, never rewritten, so authored
+/// bytes stay exactly as the human left them.
+fn flag_stale_authored(
+    summary: &mut Summary,
+    path: &Path,
+    changed_ids: &[String],
+) -> Result<(), Failure> {
+    if changed_ids.is_empty() {
+        return Ok(());
+    }
+    let document = fs::read_to_string(path).map_err(|err| {
+        failure(
+            "build-io",
+            format!("failed to read {}: {err}", path.display()),
+        )
+    })?;
+    summary.stale.extend(report::stale_authored(
+        &document,
+        changed_ids,
+        &BTreeMap::new(),
+    ));
+    Ok(())
+}
 
-    let Some(expected) = expect_digest else {
-        return Ok((events, anchor.digest));
-    };
-    if anchor.digest != expected {
+/// Read and verify the ledger for a build, without a second read.
+///
+/// The bytes are read exactly once. When git tracks the ledger, the committed
+/// `HEAD` bytes must be a prefix and every added byte must complete a
+/// newline-terminated line, so only ledger history git already recorded is
+/// served. An untracked ledger has no such history: it is accepted only when
+/// the caller pins its digest or explicitly allows uncommitted history.
+fn read_build_ledger(
+    expect_digest: Option<&str>,
+    allow_uncommitted: bool,
+) -> Result<(Vec<Event>, String), Failure> {
+    let bytes = fs::read(LEDGER_PATH).map_err(|err| match err.kind() {
+        ErrorKind::NotFound => failure(
+            "missing-ledger",
+            format!("missing ledger {LEDGER_PATH}: run `kaya init` to create it"),
+        ),
+        _ => failure("ledger-io", format!("failed to read {LEDGER_PATH}: {err}")),
+    })?;
+
+    match committed_ledger()? {
+        Some(committed) => verify_committed_ledger(&committed, &bytes)?,
+        None => {
+            if expect_digest.is_none() && !allow_uncommitted {
+                return Err(failure(
+                    "kaya.ledger.uncommitted_history",
+                    format!(
+                        "ledger {LEDGER_PATH} is untracked, so git cannot verify its history; \
+                         rerun with --expect-digest <hex> to pin its exact bytes or \
+                         --allow-uncommitted to accept them as recorded"
+                    ),
+                ));
+            }
+        }
+    }
+
+    let events = parse_ledger_bytes(&bytes)?;
+    let digest = sha256_hex(&bytes);
+    if let Some(expected) = expect_digest
+        && digest != expected
+    {
         return Err(failure(
             "kaya.ledger.digest_mismatch",
             format!(
-                "ledger {LEDGER_PATH} does not match the expected digest {expected}: the recovered bytes digest {}",
-                anchor.digest
+                "ledger {LEDGER_PATH} does not match the expected digest {expected}: the verified bytes digest {digest}"
             ),
         ));
     }
-    let (verified, _recovery) = ledger.read_verified(&anchor).map_err(ledger_failure)?;
-    Ok((verified, anchor.digest))
+    Ok((events, digest))
+}
+
+/// The committed `HEAD` bytes of the ledger, when git tracks it.
+///
+/// `None` means the file is untracked or the working tree is not a git
+/// repository; a tracked file absent from `HEAD` is a refusal, because there
+/// is no committed history to verify against.
+fn committed_ledger() -> Result<Option<Vec<u8>>, Failure> {
+    let tracked = ProcessCommand::new("git")
+        .args(["ls-files", "--error-unmatch", LEDGER_PATH])
+        .output();
+    match tracked {
+        Ok(output) if output.status.success() => {}
+        Ok(_) | Err(_) => return Ok(None),
+    }
+
+    let spec = format!("HEAD:{LEDGER_PATH}");
+    let committed = ProcessCommand::new("git")
+        .args(["show", &spec])
+        .output()
+        .map_err(|err| {
+            failure(
+                "kaya.ledger.uncommitted_history",
+                format!(
+                    "ledger {LEDGER_PATH} is tracked but `git show {spec}` could not run: {err}"
+                ),
+            )
+        })?;
+    if !committed.status.success() {
+        return Err(failure(
+            "kaya.ledger.uncommitted_history",
+            format!(
+                "ledger {LEDGER_PATH} is tracked but HEAD carries no committed copy; \
+                 commit the ledger before building"
+            ),
+        ));
+    }
+    Ok(Some(committed.stdout))
+}
+
+/// Require committed bytes to prefix the current ledger and complete its lines.
+fn verify_committed_ledger(committed: &[u8], current: &[u8]) -> Result<(), Failure> {
+    let prefix_ok =
+        current.starts_with(committed) && (committed.is_empty() || committed.ends_with(b"\n"));
+    let growth_ok = current.len() == committed.len()
+        || current[committed.len().min(current.len())..].ends_with(b"\n");
+    if prefix_ok && growth_ok {
+        return Ok(());
+    }
+    let line = first_unverified_line(committed, current);
+    Err(failure(
+        "kaya.ledger.uncommitted_history",
+        format!(
+            "ledger {LEDGER_PATH} does not extend its committed HEAD history: line {line} is unverified; \
+             commit the ledger, pin the exact bytes with --expect-digest <hex>, or accept them with --allow-uncommitted"
+        ),
+    ))
+}
+
+/// 1-based line number of the first byte git did not commit.
+fn first_unverified_line(committed: &[u8], current: &[u8]) -> usize {
+    let shared = committed.len().min(current.len());
+    let offset = committed[..shared]
+        .iter()
+        .zip(&current[..shared])
+        .position(|(left, right)| left != right)
+        .unwrap_or(shared);
+    current[..offset]
+        .iter()
+        .filter(|byte| **byte == b'\n')
+        .count()
+        + 1
+}
+
+/// Parse the exact verified buffer, one event per newline-terminated line.
+fn parse_ledger_bytes(bytes: &[u8]) -> Result<Vec<Event>, Failure> {
+    let mut events = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    for (index, raw) in bytes.split_inclusive(|byte| *byte == b'\n').enumerate() {
+        let line = index + 1;
+        let content = raw.strip_suffix(b"\n").unwrap_or(raw);
+        let text = std::str::from_utf8(content).map_err(|err| {
+            failure(
+                "kaya.ledger.record_invalid",
+                format!("{LEDGER_PATH} line {line} is not UTF-8: {err}"),
+            )
+        })?;
+        let event = parse_line(text).map_err(|err| {
+            failure(
+                err.label,
+                format!("{LEDGER_PATH} line {line}: {}", err.message),
+            )
+        })?;
+        if !seen.insert(event.id.clone()) {
+            return Err(failure(
+                "kaya.ledger.id_reuse",
+                format!(
+                    "{LEDGER_PATH} line {line} reuses event id \"{}\"; ids are never reused — record a correction naming the id in data.supersedes",
+                    event.id
+                ),
+            ));
+        }
+        events.push(event);
+    }
+    Ok(events)
 }
 
 fn merge_summary(into: &mut Summary, from: Summary) {
     into.recomputed.extend(from.recomputed);
     into.unchanged.extend(from.unchanged);
     into.stale.extend(from.stale);
+    for (block, ids) in from.sources {
+        into.sources.entry(block).or_default().extend(ids);
+    }
 }
 
 fn cmd_promote(assertion_id: &str, actor_name: &str) -> Result<Envelope, Failure> {

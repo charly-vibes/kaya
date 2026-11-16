@@ -34,9 +34,11 @@ const INDEX_ENTITIES: [EntityType; 5] = [
 /// block already equals the file's block, nothing is written and the block
 /// is reported in [`Summary::unchanged`]; otherwise the block is replaced
 /// and reported in [`Summary::recomputed`]. [`Summary::sources`] maps the
-/// block name to every rendered node id.
-pub fn build(graph: &Graph, path: &Path) -> Result<Summary, ProjectionError> {
-    let (rendered, sources) = render(graph);
+/// block name to every rendered node id. The trailing summary line reports
+/// `event_count` events, the number of ledger records the graph was built
+/// from.
+pub fn build(graph: &Graph, path: &Path, event_count: usize) -> Result<Summary, ProjectionError> {
+    let (rendered, sources) = render(graph, event_count);
     let mut summary = Summary::default();
     summary.sources.insert(INDEX_BLOCK.to_owned(), sources);
 
@@ -61,10 +63,10 @@ pub fn build(graph: &Graph, path: &Path) -> Result<Summary, ProjectionError> {
 }
 
 /// Render the generated body and collect the node ids backing its lines.
-fn render(graph: &Graph) -> (String, Vec<String>) {
+fn render(graph: &Graph, event_count: usize) -> (String, Vec<String>) {
     let mut body = String::new();
     let mut sources = Vec::new();
-    let mut listed = 0usize;
+    let mut rendered_nodes = 0usize;
 
     for node in graph.nodes() {
         if !INDEX_ENTITIES.contains(&node.entity) {
@@ -78,10 +80,8 @@ fn render(graph: &Graph) -> (String, Vec<String>) {
         body.push_str(&title_or_key(node));
         body.push('\n');
         sources.push(node.id.clone());
-        listed += 1;
+        rendered_nodes += 1;
     }
-
-    let events = graph.nodes.len() + graph.edges.len();
 
     let artifacts = artifact_section(graph);
     if !artifacts.is_empty() {
@@ -93,6 +93,7 @@ fn render(graph: &Graph) -> (String, Vec<String>) {
             .filter(|node| node.entity == EntityType::Artifact)
         {
             sources.push(node.id.clone());
+            rendered_nodes += 1;
         }
     }
 
@@ -103,11 +104,14 @@ fn render(graph: &Graph) -> (String, Vec<String>) {
         body.push_str(&runs);
         for node in graph.nodes().filter(|node| node.entity == EntityType::Run) {
             sources.push(node.id.clone());
+            rendered_nodes += 1;
         }
     }
 
     body.push('\n');
-    body.push_str(&format!("_{listed} nodes from {events} events._\n"));
+    body.push_str(&format!(
+        "_{rendered_nodes} nodes from {event_count} events._\n"
+    ));
 
     sources.sort();
     sources.dedup();

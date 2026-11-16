@@ -395,6 +395,29 @@ pub fn resolve(events: &[Event]) -> Vec<&Event> {
         .collect()
 }
 
+/// Ids whose stored data is superseded by a correction that changes it.
+///
+/// A correction whose effective payload is byte-for-byte equal to the stored
+/// target payload supersedes the record without changing any observed fact,
+/// so it does not appear here. Results follow ledger order; correction events
+/// themselves are instructions, not observations, and are never returned.
+pub fn changed_event_ids(events: &[Event]) -> Vec<String> {
+    let effective = resolve_effective(events);
+    let effective_data: HashMap<&str, &serde_json::Value> = effective
+        .iter()
+        .map(|event| (event.id.as_str(), &event.data))
+        .collect();
+    events
+        .iter()
+        .filter(|event| {
+            effective_data
+                .get(event.id.as_str())
+                .is_some_and(|data| *data != &event.data)
+        })
+        .map(|event| event.id.clone())
+        .collect()
+}
+
 /// Apply corrections to the events they supersede, preserving target identity.
 ///
 /// Each event naming a target in `data.supersedes` patches that target's
