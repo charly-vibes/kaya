@@ -1,0 +1,80 @@
+# CI workflow — runs the same commands as local development
+#
+# `just ci` is the single source of truth: if CI fails, run `just ci` locally
+# to reproduce. Tool versions are pinned in versions.ddl.toml — never `latest`,
+# so a broken upstream release cannot break this repo's CI.
+#
+# Security (SEC-06): third-party actions are pinned to a full reviewed commit
+# SHA where known, and the bd bootstrap tarball is checksum-verified against a
+# pinned SHA-256 digest before it is extracted or executed.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Install just
+        uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6 # v2.0.0
+
+      # `just ci` runs the `docs` recipe (mdbook build) — the book must build
+      # in CI too, otherwise a docs-only breakage ships unnoticed.
+      - name: Install mdBook
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook
+
+      - name: Install ecosystem tools (versions.ddl.toml, pinned)
+        run: |
+          cargo install --locked pretender@0.7.0 wai-cli@2026.10.10 dont-cli@0.2.2 espectacular@0.12.2 specodelic@0.14.0
+          npm install -g @fission-ai/openspec@0.19.0
+
+      - name: Install bd (beads, pinned, checksum-verified)
+        run: |
+          tmp=$(mktemp -d)
+          curl -fsSL https://github.com/gastownhall/beads/releases/download/v1.3.0/beads_1.3.0_linux_amd64.tar.gz -o "$tmp/bd.tgz"
+          # SEC-06: verify the archive against a pinned SHA-256 digest BEFORE
+          # extracting or executing anything from it. A tampered or truncated
+          # download must fail here, not run.
+          echo "2f92b904ecf35b607e44dc5c39229173af69c54f1183e8d709f1773540cdcf3b  $tmp/bd.tgz" | sha256sum -c -
+          # extract only the binary — the tarball also ships README/LICENSE/CHANGELOG
+          # which must not clobber the repo checkout
+          tar -xzf "$tmp/bd.tgz" -C "$tmp" bd
+          sudo mv "$tmp/bd" /usr/local/bin/bd
+
+      # Installed tools must run, not just install.
+      - name: Smoke pinned tools
+        run: bd --version && ah --version && spk --version && openspec validate add-core-research-record --strict
+
+      # Run the exact same command as local development
+      - name: Run CI pipeline
+        run: just ci
