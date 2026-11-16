@@ -13,7 +13,7 @@ contract-test shape. bd ticket mapping noted per phase.
       recovery. (kaya-10k)
 - [ ] 1.3 Model fixtures: unknown entity refused; unknown relationship
       refused; dangling reference refused; influence cycle refused.
-      (kaya-10k)
+      (kaya-f2f)
 - [ ] 1.4 Projection fixtures: authored block byte-preserved across
       regeneration; deterministic bytes; incremental rebuild scope; stale
       flag on evidence change. (kaya-e9s, kaya-5cg)
@@ -30,7 +30,7 @@ contract-test shape. bd ticket mapping noted per phase.
       (kaya-lb2).
 - [ ] 2.2 Event parser/validator + ledger store (kaya-10k).
 - [ ] 2.3 Adapters: wai (kaya-aw3), git + test-runner (kaya-dnk).
-- [ ] 2.4 Research graph builder over the closed vocabulary (kaya-10k).
+- [ ] 2.4 Research graph builder over the closed vocabulary (kaya-f2f).
 - [ ] 2.5 Projection compiler: managed-block grammar, deterministic
       generation, authored preservation, stale flagging (kaya-e9s, kaya-5cg).
 - [ ] 2.6 Promotion gate: category transitions with approval provenance
