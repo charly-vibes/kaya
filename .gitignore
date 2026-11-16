@@ -6,6 +6,9 @@
 .ddl/doctor-cache.json
 .ddl/compatibility-cache.json
 
+# Rust build output
+/target/
+
 # tool data dirs (managed by `ddl init --gates`)
 .testaruda/
 .pretender/
