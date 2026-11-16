@@ -2,13 +2,7 @@
 
 ### Requirement: Managed block grammar
 
-Documents mix generated and authored content through two block forms:
-`<!-- kaya:begin generated:<name> -->` … `<!-- kaya:end generated:<name> -->`
-for compiler-owned sections and `<!-- kaya:authored -->` … `<!-- kaya:end
-authored -->` for human-maintained sections. The compiler SHALL regenerate
-only the content inside generated blocks and SHALL byte-preserve everything
-outside them, including authored blocks, uncategorized prose, and foreign
-managed blocks (for example other tools').
+Documents SHALL mix generated and authored content through two block forms: `<!-- kaya:begin generated:<name> -->` … `<!-- kaya:end generated:<name> -->` for compiler-owned sections and `<!-- kaya:authored -->` … `<!-- kaya:end authored -->` for human-maintained sections. The compiler SHALL regenerate only the content inside generated blocks and SHALL byte-preserve everything outside them, including authored blocks, uncategorized prose, and foreign managed blocks (for example other tools').
 
 #### Scenario: Authored bytes preserved
 
@@ -26,10 +20,7 @@ managed blocks (for example other tools').
 
 ### Requirement: Deterministic generation
 
-For identical ledger, graph, and template state, a projection's generated
-sections SHALL be byte-identical across runs and machines — no timestamps of
-generation, no map iteration order, no locale-dependent formatting inside
-generated blocks.
+A projection SHALL generate byte-identical sections across runs and machines for identical ledger, graph, and template state — no timestamps of generation, no map iteration order, no locale-dependent formatting inside generated blocks.
 
 #### Scenario: Same inputs, same bytes
 
@@ -50,10 +41,7 @@ are unchanged SHALL keep their previous bytes without recomputation.
 
 ### Requirement: Stale-authored flagging
 
-When an authored block's cited evidence changes after its last
-acknowledgment, the compiler SHALL report the block as stale in the build
-summary — naming the changed evidence ids — and SHALL NOT alter the block's
-bytes. Acknowledgment is a human act recorded as an event.
+When an authored block's cited evidence changes after its last acknowledgment, the compiler SHALL report the block as stale in the build summary — naming the changed evidence ids — and SHALL NOT alter the block's bytes. Acknowledgment is a human act recorded as an event.
 
 #### Scenario: Evidence change flags the block
 
