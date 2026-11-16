@@ -1,13 +1,13 @@
 //! kaya — a living record of exploration.
 //!
 //! The MVP-1 CLI: `init` bootstraps the ledger, `status` reports its shape and
-//! pending proposals, `import` pulls observations from a source adapter,
-//! `build` compiles the docs projections, and `promote`/`challenge` append
-//! human promotion events. Every invocation prints exactly one genesis-style
-//! JSON envelope to stdout; failures print an error envelope labeled with the
-//! failure class — a CLI class (`usage`, `missing-ledger`, `ledger-io`,
-//! `build-io`, `not-a-file`) or the label raised by the library that refused
-//! the run.
+//! pending proposals, `import` pulls observations from a source adapter or
+//! model events from a seed file, `build` compiles the docs projections, and
+//! `promote`/`challenge` append human promotion events. Every invocation prints
+//! exactly one genesis-style JSON envelope to stdout; failures print an error
+//! envelope labeled with the failure class — a CLI class (`usage`,
+//! `missing-ledger`, `ledger-io`, `build-io`, `not-a-file`) or the label raised
+//! by the library that refused the run.
 
 use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, File, OpenOptions};
@@ -126,6 +126,12 @@ enum ImportSource {
         /// Project namespace recorded in the event identity
         #[arg(long, default_value = "kaya", value_name = "NAME")]
         project: String,
+    },
+    /// Import model events from a JSONL seed file
+    Model {
+        /// Path to the JSONL file of `model.*` records
+        #[arg(long, value_name = "PATH")]
+        file: PathBuf,
     },
 }
 
@@ -368,6 +374,7 @@ fn cmd_import(source: ImportSource) -> Result<Envelope, Failure> {
             "test-runner",
             vec![testrunner::capture(&report, &project).map_err(adapter_failure)?],
         ),
+        ImportSource::Model { file } => ("model", read_model_events(&file)?),
     };
 
     let mut appended = 0usize;
@@ -389,6 +396,57 @@ fn cmd_import(source: ImportSource) -> Result<Envelope, Failure> {
             "ledger": LEDGER_PATH,
         }),
     ))
+}
+
+/// Read every `model.*` record from a JSONL seed file.
+///
+/// The whole file is validated before any event is returned, so a refusal
+/// appends nothing. Each line must parse as one `kaya.event/v0` object and
+/// name a `model.` type; every refusal names the 1-based line.
+fn read_model_events(path: &Path) -> Result<Vec<Event>, Failure> {
+    let bytes = fs::read(path).map_err(|err| {
+        failure(
+            "kaya.adapters.failure_atomic",
+            format!("model: record {}: read: {err}", path.display()),
+        )
+    })?;
+
+    let mut events = Vec::new();
+    for (index, raw) in bytes.split_inclusive(|byte| *byte == b'\n').enumerate() {
+        let line = index + 1;
+        let content = raw.strip_suffix(b"\n").unwrap_or(raw);
+        let text = std::str::from_utf8(content).map_err(|err| {
+            failure(
+                "kaya.adapters.failure_atomic",
+                format!(
+                    "model: record {line} in {}: line is not UTF-8: {err}",
+                    path.display()
+                ),
+            )
+        })?;
+        let event = parse_line(text).map_err(|err| {
+            failure(
+                "kaya.adapters.failure_atomic",
+                format!(
+                    "model: record {line} in {}: {}",
+                    path.display(),
+                    err.message
+                ),
+            )
+        })?;
+        if !event.r#type.starts_with("model.") {
+            return Err(failure(
+                "kaya.adapters.failure_atomic",
+                format!(
+                    "model: record {line} in {}: type \"{}\" is not a model event; only model.* records are importable",
+                    path.display(),
+                    event.r#type
+                ),
+            ));
+        }
+        events.push(event);
+    }
+    Ok(events)
 }
 
 fn cmd_build(

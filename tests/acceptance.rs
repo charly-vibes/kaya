@@ -1,10 +1,11 @@
 //! MVP-1 acceptance: the three-question dossier on kaya's own record.
 //!
-//! The test copies kaya's committed wai artifact tree and the checked-in
-//! dossier into a temporary workspace, commits them, seeds the research model
-//! with three events, then runs the built binary the way a user would:
-//! `kaya import wai`, `kaya import git --limit 5`, `kaya build`, a second
-//! `kaya build`, and `kaya status`.
+//! The first test copies kaya's committed wai artifact tree, model seed, and
+//! checked-in dossier into a temporary workspace, commits them, imports the
+//! seed through `kaya import model`, then runs the built binary the way a user
+//! would: `kaya import wai`, `kaya import git --limit 5`, `kaya build
+//! --allow-uncommitted`, a second build, and `kaya status`. The second test
+//! commits the ledger before building and omits the flag.
 //!
 //! It gates two things: the three acceptance questions are answerable from the
 //! generated dossier with provenance, and compilation appends/rewrites only
@@ -19,14 +20,17 @@ use assert_cmd::Command as AssertCommand;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use kaya::event::parse_line;
-use kaya::ledger::{AppendOutcome, Ledger};
-
 const EXPERIMENT: &str = "kaya/Experiment/add-core-research-record";
 const QUESTION: &str = "kaya/Question/mvp-1-acceptance";
+const HYPOTHESIS: &str = "kaya/Hypothesis/H-001";
 const LEDGER: &str = ".kaya/ledger.jsonl";
+const SEED: &str = ".kaya/seeds/add-core-research-record.jsonl";
 const INDEX: &str = "docs/research/index.md";
-const REPORT: &str = "docs/research/experiments/add-core-research-record.md";
+const REPORT: &str = "docs/research/experiments/kaya-Experiment-add-core-research-record.md";
+const CHECKED_IN_REPORT: &str = "docs/research/experiments/add-core-research-record.md";
+const REPORT_NAME: &str = "experiment-report:kaya/Experiment/add-core-research-record";
+const SEED_EVENTS: u64 = 13;
+const SOURCE_COMMIT: &str = "43b606f";
 
 const AUTHORED_BEGIN: &str = "<!-- kaya:authored -->";
 const AUTHORED_END: &str = "<!-- kaya:end authored -->";
@@ -51,6 +55,16 @@ const PROVENANCE_CITATIONS: [&str; 6] = [
     ".wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md",
     "docs/src/index.md",
     "f39a1fd",
+];
+
+/// Repo files pinned as Source entities in the committed model seed.
+const SOURCE_PATHS: [&str; 6] = [
+    "openspec/changes/add-core-research-record/proposal.md",
+    "openspec/changes/add-core-research-record/specs/kaya-event/layer.md",
+    "openspec/changes/add-core-research-record/specs/kaya-adapters/spec.md",
+    ".wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md",
+    "docs/src/index.md",
+    "openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md",
 ];
 
 fn manifest_dir() -> PathBuf {
@@ -135,6 +149,15 @@ fn copy_checked_in(source: &Path, destination: &Path) {
         .expect("write pre-build dossier document");
 }
 
+/// Copy the committed model seed into the workspace so the binary imports it.
+fn copy_seed(workspace: &Path, manifest: &Path) -> PathBuf {
+    let seed = workspace.join(SEED);
+    let parent = seed.parent().expect("seed path has a parent");
+    fs::create_dir_all(parent).expect("create seed directory");
+    fs::copy(manifest.join(SEED), &seed).expect("copy committed model seed");
+    seed
+}
+
 /// Remove kaya generated blocks, keeping authored and foreign bytes intact.
 fn strip_generated_blocks(document: &str) -> String {
     let mut kept = String::new();
@@ -182,66 +205,6 @@ fn git(workspace: &Path, args: &[&str]) {
     );
 }
 
-fn seed_event(
-    id: &str,
-    event_type: &str,
-    subject_type: &str,
-    subject_id: &str,
-    data: Value,
-) -> Value {
-    json!({
-        "id": id,
-        "schema": "kaya.event/v0",
-        "type": event_type,
-        "timestamp": "2026-11-16T00:00:00Z",
-        "actor": {"type": "human", "name": "acceptance-test"},
-        "subject": {"type": subject_type, "id": subject_id},
-        "data": data,
-        "provenance": {
-            "tool": "acceptance",
-            "version": "0.1",
-            "reference": "tests/acceptance.rs"
-        },
-        "artifacts": []
-    })
-}
-
-/// Admit the Experiment, the Question, and the investigating edge.
-fn seed_model(workspace: &Path) {
-    let mut ledger = Ledger::open(workspace.join(LEDGER)).expect("kaya init created the ledger");
-    let records = [
-        seed_event(
-            "acceptance-experiment",
-            "model.entity.created",
-            "Experiment",
-            EXPERIMENT,
-            json!({"attributes": {"title": "add-core-research-record"}}),
-        ),
-        seed_event(
-            "acceptance-question",
-            "model.entity.created",
-            "Question",
-            QUESTION,
-            json!({"attributes": {"title": "MVP-1 acceptance: three-question dossier"}}),
-        ),
-        seed_event(
-            "acceptance-investigates",
-            "model.relationship.asserted",
-            "Experiment",
-            EXPERIMENT,
-            json!({"relationship": "investigates", "from": QUESTION, "to": EXPERIMENT}),
-        ),
-    ];
-    for record in records {
-        let line = serde_json::to_string(&record).expect("seed event serializes");
-        let event = parse_line(&line).expect("seed line is a valid kaya.event/v0 record");
-        assert_eq!(
-            ledger.append(&event).expect("seed event appends"),
-            AppendOutcome::Appended
-        );
-    }
-}
-
 #[test]
 fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     let workspace = TempDir::new().expect("temp workspace");
@@ -249,12 +212,11 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     let manifest = manifest_dir();
 
     // The report the build must compile names its experiment by construction:
-    // `docs/research/experiments/<key>.md` for `kaya/Experiment/<key>`.
-    let experiment_key = EXPERIMENT
-        .rsplit('/')
-        .next()
-        .expect("experiment id has a key");
-    let expected_report = format!("docs/research/experiments/{experiment_key}.md");
+    // `docs/research/experiments/<namespace-qualified id with / as ->.md`.
+    let expected_report = format!(
+        "docs/research/experiments/{}.md",
+        EXPERIMENT.replace('/', "-")
+    );
     assert_eq!(REPORT, expected_report.as_str());
 
     let artifacts = root.join(".wai/projects/kaya");
@@ -268,7 +230,8 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     let index_path = root.join(INDEX);
     let report_path = root.join(REPORT);
     copy_checked_in(&manifest.join(INDEX), &index_path);
-    copy_checked_in(&manifest.join(REPORT), &report_path);
+    copy_checked_in(&manifest.join(CHECKED_IN_REPORT), &report_path);
+    copy_seed(root, &manifest);
 
     git(root, &["init", "--quiet"]);
     git(root, &["add", "--all"]);
@@ -284,7 +247,16 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
 
     let init = run_kaya(root, &["init"]);
     assert_eq!(init["envelope_kind"], json!("init"));
-    seed_model(root);
+
+    let model = run_kaya(root, &["import", "model", "--file", SEED]);
+    assert_eq!(model["data"]["source"], json!("model"));
+    assert_eq!(
+        model["data"]["events"],
+        json!(SEED_EVENTS),
+        "the committed seed carries every seeded model event: {model}"
+    );
+    assert_eq!(model["data"]["appended"], json!(SEED_EVENTS));
+    assert_eq!(model["data"]["duplicates"], json!(0));
 
     let wai = run_kaya(root, &["import", "wai"]);
     assert_eq!(wai["data"]["source"], json!("wai"));
@@ -316,7 +288,7 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
         "the checked-in report carries no generated block; the first build appends it"
     );
 
-    let build = run_kaya(root, &["build"]);
+    let build = run_kaya(root, &["build", "--allow-uncommitted"]);
     assert_eq!(build["envelope_kind"], json!("build"));
     let recomputed = names(&build, "recomputed");
     assert!(
@@ -324,7 +296,7 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
         "first build compiles the index: {build}"
     );
     assert!(
-        lists(&recomputed, "experiment-report"),
+        lists(&recomputed, REPORT_NAME),
         "first build compiles the experiment report: {build}"
     );
 
@@ -337,32 +309,59 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     let index_after = String::from_utf8(index_after_bytes.clone()).expect("index is UTF-8");
     assert!(index_after.contains(INDEX_BLOCK_BEGIN), "{index_after}");
     assert!(index_after.contains(INDEX_BLOCK_END), "{index_after}");
+    let generated_index = between(&index_after, INDEX_BLOCK_BEGIN, INDEX_BLOCK_END);
     assert!(
-        index_after.contains(EXPERIMENT),
-        "index lists the experiment"
+        generated_index.contains(EXPERIMENT),
+        "the generated index lists the experiment"
     );
-    assert!(index_after.contains(QUESTION), "index lists the question");
+    assert!(
+        generated_index.contains(QUESTION),
+        "the generated index lists the question"
+    );
+    assert!(
+        generated_index.contains(HYPOTHESIS),
+        "the generated index lists the hypothesis"
+    );
+    assert!(
+        generated_index.contains("### Sources\n"),
+        "the generated index renders Sources: {generated_index}"
+    );
+    for path in SOURCE_PATHS {
+        let pinned = format!("{path}@{SOURCE_COMMIT}");
+        assert!(
+            generated_index.contains(&pinned),
+            "the generated index pins source {pinned}: {generated_index}"
+        );
+    }
     assert!(
         index_after.contains(foreign_block),
         "the foreign managed block survives the rebuild byte for byte"
     );
 
-    // The wai adapter walks direct children of each kind directory.
-    let mut designs: Vec<PathBuf> = fs::read_dir(artifacts.join("designs"))
-        .expect("copied design directory")
-        .map(|entry| entry.expect("design entry").path())
-        .filter(|path| path.is_file())
-        .collect();
-    designs.sort();
-    assert!(!designs.is_empty(), "the wai design tree was copied");
-    for design in &designs {
-        let relative = design
+    // The wai adapter walks direct children of each kind directory, and the
+    // generated index must name every artifact it captured.
+    let mut wai_artifacts: Vec<PathBuf> = Vec::new();
+    for kind in ["designs", "research"] {
+        let mut captured: Vec<PathBuf> = fs::read_dir(artifacts.join(kind))
+            .expect("copied artifact directory")
+            .map(|entry| entry.expect("artifact entry").path())
+            .filter(|path| path.is_file())
+            .collect();
+        captured.sort();
+        wai_artifacts.extend(captured);
+    }
+    assert!(
+        !wai_artifacts.is_empty(),
+        "the wai artifact tree was copied"
+    );
+    for artifact in &wai_artifacts {
+        let relative = artifact
             .strip_prefix(root)
-            .expect("design artifact path is inside the workspace");
+            .expect("artifact path is inside the workspace");
         let rendered = relative.to_string_lossy().replace('\\', "/");
         assert!(
-            index_after.contains(&rendered),
-            "index lists design artifact {rendered}"
+            generated_index.contains(&rendered),
+            "the generated index lists wai artifact {rendered}"
         );
     }
 
@@ -376,10 +375,29 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     assert!(report_after.contains(REPORT_BLOCK_BEGIN), "{report_after}");
     assert!(report_after.contains(REPORT_BLOCK_END), "{report_after}");
     let generated = between(&report_after, REPORT_BLOCK_BEGIN, REPORT_BLOCK_END);
-    assert!(generated.contains("## Question"), "{generated}");
+    for heading in [
+        "## Question",
+        "## Hypothesis",
+        "## Runs",
+        "## Observations",
+        "## Findings",
+    ] {
+        assert!(
+            generated.contains(heading),
+            "the generated report renders {heading}: {generated}"
+        );
+    }
     assert!(
         generated.contains(QUESTION),
         "the generated report names the investigated question: {generated}"
+    );
+    assert!(
+        generated.contains(HYPOTHESIS),
+        "the generated report names the predicted hypothesis: {generated}"
+    );
+    assert!(
+        generated.contains("## Interpretations"),
+        "the generated report names the interpretation channel: {generated}"
     );
     assert!(
         report_after.contains(EXPERIMENT),
@@ -403,7 +421,7 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     }
 
     // A second build must be a no-op on both projections.
-    let rebuild = run_kaya(root, &["build"]);
+    let rebuild = run_kaya(root, &["build", "--allow-uncommitted"]);
     assert!(
         names(&rebuild, "recomputed").is_empty(),
         "second build recomputes nothing: {rebuild}"
@@ -414,7 +432,7 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
         "second build reports the index unchanged: {rebuild}"
     );
     assert!(
-        lists(&unchanged, "experiment-report"),
+        lists(&unchanged, REPORT_NAME),
         "second build reports the report unchanged: {rebuild}"
     );
     assert_eq!(
@@ -437,4 +455,64 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
         pending, 0,
         "no promotion events were seeded, so nothing is pending"
     );
+}
+
+#[test]
+fn committed_ledger_builds_without_the_uncommitted_flag() {
+    let workspace = TempDir::new().expect("temp workspace");
+    let root = workspace.path();
+    let manifest = manifest_dir();
+
+    git(root, &["init", "--quiet"]);
+    let init = run_kaya(root, &["init"]);
+    assert_eq!(init["envelope_kind"], json!("init"));
+    copy_seed(root, &manifest);
+
+    let model = run_kaya(root, &["import", "model", "--file", SEED]);
+    assert_eq!(model["data"]["appended"], json!(SEED_EVENTS));
+    assert!(
+        root.join(LEDGER).is_file(),
+        "the ledger records the imported seed"
+    );
+
+    git(root, &["add", LEDGER, SEED]);
+    git(
+        root,
+        &[
+            "commit",
+            "--quiet",
+            "--message",
+            "record the model seed before building",
+        ],
+    );
+
+    // No flag: the ledger is committed, so git can verify the built bytes.
+    let build = run_kaya(root, &["build"]);
+    assert_eq!(build["envelope_kind"], json!("build"));
+    let recomputed = names(&build, "recomputed");
+    assert!(
+        lists(&recomputed, "research-index"),
+        "committed build compiles the index: {build}"
+    );
+    assert!(
+        lists(&recomputed, REPORT_NAME),
+        "committed build compiles the experiment report: {build}"
+    );
+
+    let report = fs::read_to_string(root.join(REPORT)).expect("build wrote the report");
+    let generated = between(&report, REPORT_BLOCK_BEGIN, REPORT_BLOCK_END);
+    assert!(
+        generated.contains(QUESTION) && generated.contains(HYPOTHESIS),
+        "the generated report cites its question and hypothesis: {generated}"
+    );
+
+    let index = fs::read_to_string(root.join(INDEX)).expect("build wrote the index");
+    let generated_index = between(&index, INDEX_BLOCK_BEGIN, INDEX_BLOCK_END);
+    for path in SOURCE_PATHS {
+        let pinned = format!("{path}@{SOURCE_COMMIT}");
+        assert!(
+            generated_index.contains(&pinned),
+            "the generated index pins source {pinned}: {generated_index}"
+        );
+    }
 }

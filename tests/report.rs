@@ -174,7 +174,10 @@ fn authored_bytes_and_foreign_blocks_survive_rebuild() {
     fs::write(&path, AUTHORED_DOC).expect("seed report");
 
     let summary = build(&graph(), "p/Experiment/exp1", &path, &promotion()).expect("report builds");
-    assert_eq!(summary.recomputed, vec!["experiment-report".to_string()]);
+    assert_eq!(
+        summary.recomputed,
+        vec!["experiment-report:p/Experiment/exp1".to_string()]
+    );
 
     let after = read(&path);
     assert!(
@@ -219,7 +222,10 @@ fn second_build_with_unchanged_inputs_keeps_bytes() {
     let before = read(&path);
 
     let summary = build(&graph(), "p/Experiment/exp1", &path, &promotion()).expect("second build");
-    assert_eq!(summary.unchanged, vec!["experiment-report".to_string()]);
+    assert_eq!(
+        summary.unchanged,
+        vec!["experiment-report:p/Experiment/exp1".to_string()]
+    );
     assert!(summary.recomputed.is_empty());
     assert_eq!(read(&path), before, "unchanged body means no rewrite");
 }
@@ -239,7 +245,10 @@ fn changed_graph_recomputes_the_report() {
         &promotion(),
     )
     .expect("rebuild after a run lands");
-    assert_eq!(summary.recomputed, vec!["experiment-report".to_string()]);
+    assert_eq!(
+        summary.recomputed,
+        vec!["experiment-report:p/Experiment/exp1".to_string()]
+    );
     assert!(summary.unchanged.is_empty());
     assert!(read(&path).contains("p/Run/r3"));
 }
@@ -252,7 +261,7 @@ fn source_map_names_every_rendered_fact() {
     let summary = build(&graph(), "p/Experiment/exp1", &path, &promotion()).expect("report builds");
     let sources = summary
         .sources
-        .get("experiment-report")
+        .get("experiment-report:p/Experiment/exp1")
         .expect("report has a source map");
 
     for id in [

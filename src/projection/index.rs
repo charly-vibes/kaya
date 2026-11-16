@@ -1,12 +1,12 @@
 //! The deterministic research index projection.
 //!
 //! [`build`] renders every Question, Hypothesis, Experiment, Finding and
-//! Decision node as one Markdown line, then appends Artifact and Run
-//! sections from their attributes, inside the `research-index` generated
-//! block. Only that block's bytes move: authored sections, foreign managed
-//! blocks, and uncategorized prose are preserved byte for byte. A rebuild
-//! whose rendered body already matches reports the block `unchanged` and
-//! leaves the file untouched.
+//! Decision node as one Markdown line, then appends Artifact, Run, and
+//! Source sections from their attributes, inside the `research-index`
+//! generated block. Only that block's bytes move: authored sections, foreign
+//! managed blocks, and uncategorized prose are preserved byte for byte. A
+//! rebuild whose rendered body already matches reports the block `unchanged`
+//! and leaves the file untouched.
 
 use std::io::ErrorKind;
 use std::path::Path;
@@ -108,6 +108,20 @@ fn render(graph: &Graph, event_count: usize) -> (String, Vec<String>) {
         }
     }
 
+    let cited = source_section(graph);
+    if !cited.is_empty() {
+        body.push('\n');
+        body.push_str("### Sources\n");
+        body.push_str(&cited);
+        for node in graph
+            .nodes()
+            .filter(|node| node.entity == EntityType::Source)
+        {
+            sources.push(node.id.clone());
+            rendered_nodes += 1;
+        }
+    }
+
     body.push('\n');
     body.push_str(&format!(
         "_{rendered_nodes} nodes from {event_count} events._\n"
@@ -144,6 +158,24 @@ fn run_section(graph: &Graph) -> String {
         section.push_str(&count(node, "failed"));
         section.push_str(", ignored ");
         section.push_str(&count(node, "ignored"));
+        section.push('\n');
+    }
+    section
+}
+
+/// Render repo files as `path@commit`, pinned to the recorded commit.
+fn source_section(graph: &Graph) -> String {
+    let mut section = String::new();
+    for node in graph
+        .nodes()
+        .filter(|node| node.entity == EntityType::Source)
+    {
+        section.push_str("- ");
+        section.push_str(&node.id);
+        section.push_str(" — ");
+        section.push_str(&attribute(node, "path").unwrap_or_default());
+        section.push('@');
+        section.push_str(&attribute(node, "commit").unwrap_or_default());
         section.push('\n');
     }
     section

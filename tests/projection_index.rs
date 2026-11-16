@@ -49,7 +49,7 @@ fn authored_and_foreign_bytes_survive_recomputation() {
         EntityType::Question,
         json!({"title": "Why?"}),
     )]);
-    let summary = index::build(&graph, &path).unwrap();
+    let summary = index::build(&graph, &path, 3).unwrap();
     assert_eq!(summary.recomputed, vec!["research-index".to_owned()]);
 
     let rebuilt = read(&path);
@@ -92,8 +92,8 @@ fn identical_graphs_build_byte_identical_files() {
         ),
     ]);
 
-    index::build(&graph, &first).unwrap();
-    index::build(&graph, &second).unwrap();
+    index::build(&graph, &first, 3).unwrap();
+    index::build(&graph, &second, 3).unwrap();
 
     assert_eq!(read(&first), read(&second));
 }
@@ -108,12 +108,12 @@ fn second_build_reports_unchanged_and_does_not_rewrite() {
         json!({"title": "Choose A"}),
     )]);
 
-    let first = index::build(&graph, &path).unwrap();
+    let first = index::build(&graph, &path, 3).unwrap();
     assert_eq!(first.recomputed, vec!["research-index".to_owned()]);
     let bytes = read(&path);
     let modified = fs::metadata(&path).unwrap().modified().unwrap();
 
-    let second = index::build(&graph, &path).unwrap();
+    let second = index::build(&graph, &path, 3).unwrap();
     assert!(second.recomputed.is_empty());
     assert_eq!(second.unchanged, vec!["research-index".to_owned()]);
     assert_eq!(read(&path), bytes);
@@ -130,7 +130,7 @@ fn new_node_recomputes_only_the_generated_block() {
         EntityType::Question,
         json!({"title": "First"}),
     )]);
-    index::build(&first_graph, &path).unwrap();
+    index::build(&first_graph, &path, 3).unwrap();
     let first = read(&path);
     let begin = first.find(BEGIN_PREFIX).unwrap();
     let end = first.find(END_BLOCK).unwrap();
@@ -149,7 +149,7 @@ fn new_node_recomputes_only_the_generated_block() {
             json!({"title": "Second"}),
         ),
     ]);
-    let summary = index::build(&second_graph, &path).unwrap();
+    let summary = index::build(&second_graph, &path, 4).unwrap();
     assert_eq!(summary.recomputed, vec!["research-index".to_owned()]);
     assert!(summary.unchanged.is_empty());
 
@@ -169,7 +169,7 @@ fn unterminated_generated_block_refuses_naming_it_and_leaves_file_untouched() {
     fs::write(&path, &original).unwrap();
 
     let graph = graph_of(&[("p/Question/Q-1", EntityType::Question, json!({}))]);
-    let error = index::build(&graph, &path).unwrap_err();
+    let error = index::build(&graph, &path, 3).unwrap_err();
 
     assert_eq!(error.label, "kaya.projection.managed_grammar");
     assert!(
@@ -203,7 +203,7 @@ fn sources_name_every_rendered_node_and_order_is_deterministic() {
         ),
     ]);
 
-    let summary = index::build(&graph, &path).unwrap();
+    let summary = index::build(&graph, &path, 3).unwrap();
     let document = read(&path);
     let rendered: Vec<&str> = document
         .lines()
@@ -248,7 +248,7 @@ fn artifact_and_run_sections_render_attributes_and_feed_sources() {
         ("p/Artifact/A-3", EntityType::Artifact, json!({})),
     ]);
 
-    let summary = index::build(&graph, &path).unwrap();
+    let summary = index::build(&graph, &path, 3).unwrap();
     let document = read(&path);
 
     assert!(document.contains("### Artifacts\n"));
@@ -257,6 +257,10 @@ fn artifact_and_run_sections_render_attributes_and_feed_sources() {
     assert!(document.contains("- p/Artifact/A-3 — A-3"));
     assert!(document.contains("### Runs\n"));
     assert!(document.contains("- p/Run/R-1 — passed 4, failed 1, ignored 2"));
+    assert!(
+        document.contains("_4 nodes from 3 events._"),
+        "all rendered nodes, including artifacts and runs, are counted"
+    );
 
     let sources = &summary.sources["research-index"];
     for id in [
@@ -282,7 +286,7 @@ fn empty_artifact_and_run_sections_are_skipped() {
         json!({"title": "Why?"}),
     )]);
 
-    index::build(&graph, &path).unwrap();
+    index::build(&graph, &path, 3).unwrap();
     let document = read(&path);
     assert!(!document.contains("### Artifacts"));
     assert!(!document.contains("### Runs"));
