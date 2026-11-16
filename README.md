@@ -3,6 +3,9 @@
 
 # kaya
 
+[![tracked with wai](https://img.shields.io/badge/tracked%20with-wai-blue)](https://github.com/charly-vibes/wai)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 > A living record of exploration — kaya turns the artifacts a project already
 > produces into continuously generated, human-owned documentation.
 > **Why:** documentation drifts because it is written separately from the work
