@@ -5,3 +5,6 @@
 //! adapter, and projection modules arrive with later milestones.
 
 pub mod envelope;
+pub mod event;
+pub mod ledger;
+pub mod model;
