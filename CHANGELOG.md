@@ -15,10 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   projection, promotion, adapters) — dual-format openspec deltas + specodelic
   layers, lint-clean, strict-validated.
 - mdBook scaffolding (`book.toml`, `theme/charly.css`, `SUMMARY.md`).
-- Rust CLI `kaya` (clap derive): `init`, `status`, `import wai|git|test`,
-  `build [--out] [--expect-digest]`, `promote`, `challenge`; each executed
-  command prints one genesis-style JSON envelope and failures carry a labeled
-  class.
+- Rust CLI `kaya` (clap derive): `init`, `status`, `import wai|git|test|model`,
+  `build [--out] [--expect-digest] [--allow-uncommitted]`, `promote`,
+  `challenge`; each executed command prints one genesis-style JSON envelope
+  and failures carry a labeled class.
 - Event layer: `kaya.event/v0` parsing, the closed 9-field schema, actor and
   provenance handling (`src/event.rs`).
 - Ledger: append-only JSONL with SHA-256 digest anchors, verified reads,

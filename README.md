@@ -69,6 +69,7 @@ kaya status                        # event count, byte size, digest, pending pro
 kaya import wai                    # observe the .wai/ artifact tree
 kaya import git                    # observe recent commits
 kaya import test --report <path>   # observe one libtest JSONL run
+kaya import model --file <seed>    # record research-structure events from JSONL
 kaya build                         # compile docs/research (index + experiment reports)
 kaya build --expect-digest <hex>   # refuse to build unless the ledger matches
 kaya promote <assertion> --actor <name>

@@ -24,12 +24,15 @@ MVP-1 implements those capabilities end to end as a static research compiler.
   regular file.
 - `kaya status` — reports event count, byte size, digest, and pending
   proposals; a missing ledger fails as `missing-ledger`.
-- `kaya import wai|git|test` — captures observations from the `.wai/`
-  artifact tree, recent repository commits, and one libtest JSONL run.
-- `kaya build [--out DIR] [--expect-digest HEX]` — compiles
-  `docs/research/index.md` and one `docs/research/experiments/<key>.md` per
-  experiment; only `kaya:`-owned blocks are rewritten, and `--expect-digest`
-  refuses to build from bytes other than the recorded ones.
+- `kaya import wai|git|test|model` — captures observations from the `.wai/`
+  artifact tree, recent repository commits, one libtest JSONL run, and a
+  JSONL file of research-structure events (validated `model.*` records only).
+- `kaya build [--out DIR] [--expect-digest HEX] [--allow-uncommitted]` —
+  compiles `docs/research/index.md` and one
+  `docs/research/experiments/<key>.md` per experiment; only `kaya:`-owned
+  blocks are rewritten, the ledger is verified against its committed
+  history, and `--expect-digest` refuses to build from bytes other than the
+  recorded ones.
 - `kaya promote <assertion> --actor <name>` and
   `kaya challenge <conclusion> --events <ids...> --actor <name>` — the
   human-only door into the record: proposals become conclusions, conclusions

@@ -14,13 +14,13 @@ contract-test shape. bd ticket mapping noted per phase.
 - [x] 1.3 Model fixtures: unknown entity refused; unknown relationship
       refused; dangling reference refused; influence cycle refused.
       (kaya-f2f)
-- [ ] 1.4 Projection fixtures: authored block byte-preserved across
+- [x] 1.4 Projection fixtures: authored block byte-preserved across
       regeneration; deterministic bytes; incremental rebuild scope; stale
       flag on evidence change. (kaya-e9s, kaya-5cg)
-- [ ] 1.5 Promotion fixtures: tool actor cannot create assertion/conclusion;
+- [x] 1.5 Promotion fixtures: tool actor cannot create assertion/conclusion;
       unapproved conclusion refused; AI interpretation lands `proposed`;
       approval records human actor. (kaya-5cg)
-- [ ] 1.6 Adapter fixtures: wai artifact tree → events (kaya-aw3); git +
+- [x] 1.6 Adapter fixtures: wai artifact tree → events (kaya-aw3); git +
       test-runner → events (kaya-dnk); failure writes nothing; every event
       carries provenance. (kaya-aw3, kaya-dnk)
 - [x] 1.7 Promotion budget fixtures: pending-proposal count surfaces
@@ -32,21 +32,21 @@ contract-test shape. bd ticket mapping noted per phase.
 - [x] 2.1 Scaffold the Rust crate; CLI `kaya init`/`status` skeleton
       (kaya-lb2).
 - [x] 2.2 Event parser/validator + ledger store (kaya-10k).
-- [ ] 2.3 Adapters: wai (kaya-aw3), git + test-runner (kaya-dnk).
+- [x] 2.3 Adapters: wai (kaya-aw3), git + test-runner (kaya-dnk).
 - [x] 2.4 Research graph builder over the closed vocabulary (kaya-f2f).
-- [ ] 2.5 Projection compiler: managed-block grammar, deterministic
+- [x] 2.5 Projection compiler: managed-block grammar, deterministic
       generation, authored preservation, stale flagging (kaya-e9s, kaya-5cg).
-- [ ] 2.6 Promotion gate: category transitions with approval provenance
+- [x] 2.6 Promotion gate: category transitions with approval provenance
       (kaya-5cg).
 - [x] 2.7 Promotion budget: pending-proposal count in status and on
       dossier build/read, ranked/capped generation. (kaya-5ea)
 
 ## 3. Refactor — separate commit
 
-- [ ] 3.1 Genesis-envelope seam: CLI I/O envelopes vs ledger events —
+- [x] 3.1 Genesis-envelope seam: CLI I/O envelopes vs ledger events —
       revisit the `envelope_independence` extension point once the first
       dossier compiles end to end.
-- [ ] 3.2 `just ci` green; MVP-1 validation: a useful dossier from existing
+- [x] 3.2 `just ci` green; MVP-1 validation: a useful dossier from existing
       kaya repo artifacts (self-hosting proof).
 
 ## Archive checklist
