@@ -1,7 +1,7 @@
 ---
 id: kaya.promotion.layer
 kind: intent
-statement: "WHEN a record's epistemic category changes, THE kaya.promotion capability SHALL restrict tools to events, land AI interpretation only as proposed assertions, require a recorded human actor for every promotion to conclusion, and demote challenged conclusions to a challenged status without deleting their records."
+statement: "WHEN a record's epistemic category changes, THE kaya.promotion capability SHALL restrict tools to events, land AI interpretation only as proposed assertions, require a recorded human actor for every promotion to conclusion, surface pending proposals pull-only as counts at the point of use, rate-cap proposal generation to fit one session-close without expiry or masquerade as settled, and demote challenged conclusions to a challenged status without deleting their records."
 ---
 
 # kaya.promotion — dual-format layer (sidecar)
@@ -27,6 +27,7 @@ producing plausible research narratives from incomplete evidence".
 | approval_provenance          | invariant | `every promotion event names its approver and the promoted assertion id and persists in the ledger`                                                       | [[kaya.promotion.layer]] |
 | challenge_without_deletion   | invariant | `a counter-assertion citing counter-events demotes a conclusion's displayed status to challenged; the conclusion's record remains byte-intact`            | [[kaya.promotion.layer]] |
 | pending_proposals_bounded    | invariant | `pending proposals fit one session-close; over-cap proposal generation is ranked/capped, never pushed onto the human; proposals never expire and never masquerade as settled` | [[kaya.promotion.layer]] |
+| proposal_surfacing_pulled    | invariant | `pending proposals surface only as counts at the point of use (kaya status, dossier build, dossier read) and no command blocks on or prompts for approval` | [[kaya.promotion.layer]] |
 
 ## Model
 
@@ -57,6 +58,7 @@ producing plausible research narratives from incomplete evidence".
 | category_closed_checked       | unit | [[kaya.promotion.layer.category_closed]]  | `record_with_foreign_category()`      | `ingest ⇒ refusal naming the closed categories`               |
 | proposal_channel_checked      | unit | [[kaya.promotion.layer.proposal_channel]] | `assertion_without_status_author()`   | `write ⇒ refusal naming status ∧ author ∧ event references`   |
 | pending_proposals_bounded_checked | unit | [[kaya.promotion.layer.pending_proposals_bounded]] | `proposal_burst_over_one_session_close()` | `over-cap ⇒ generation ranks/caps ∧ approval queue not grown ∧ human never prompted to approve more` |
+| proposal_surfacing_pulled_checked | unit | [[kaya.promotion.layer.proposal_surfacing_pulled]] | `pending_proposals_at_session_close()` | `counts visible ∧ no blocking prompt ∧ human not asked to approve` |
 
 ## Requirements
 ### Requirement: Layer sidecar contract

@@ -134,9 +134,17 @@ dedicated scenario.
 - **THEN** the write refuses naming the missing fields
 - **VERIFIES** [[kaya.promotion.proposal_channel]]
 
-#### Scenario: pending_proposals_bounded
+#### Scenario: pending_proposals_bounded_checked
 
 - **WHEN** pending proposals exceed one session-close's approval budget
 - **THEN** generation ranks or caps them, the approval queue does not grow,
   and the human is never prompted to approve more
 - **VERIFIES** [[kaya.promotion.pending_proposals_bounded_checked]]
+
+#### Scenario: proposal_surfacing_pulled_checked
+
+- **WHEN** proposals are pending at `kaya status`, dossier build, or dossier
+  read
+- **THEN** they surface only as counts, no command blocks or prompts for
+  approval, and the human is never asked to approve
+- **VERIFIES** [[kaya.promotion.proposal_surfacing_pulled_checked]]

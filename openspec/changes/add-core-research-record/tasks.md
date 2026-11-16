@@ -38,8 +38,8 @@ contract-test shape. bd ticket mapping noted per phase.
       generation, authored preservation, stale flagging (kaya-e9s, kaya-5cg).
 - [ ] 2.6 Promotion gate: category transitions with approval provenance
       (kaya-5cg).
-- [ ] 2.7 Promotion budget: pending-proposal count in status and dossier
-      build, ranked/capped generation. (kaya-5ea)
+- [ ] 2.7 Promotion budget: pending-proposal count in status and on
+      dossier build/read, ranked/capped generation. (kaya-5ea)
 
 ## 3. Refactor — separate commit
 
