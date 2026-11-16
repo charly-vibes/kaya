@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-16-kaya-10k-event-ledger
+pipeline: tdd-ro5u
+topic: kaya-10k event ledger
+created_at: '2026-11-16T18:33:35.167208556+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-16T18:33:36.116369515+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-16-kaya-5ea-promotion-budget
+pipeline: tdd-ro5u
+topic: kaya-5ea promotion budget
+created_at: '2026-11-16T18:33:28.749825399+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-16T18:33:29.627563287+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

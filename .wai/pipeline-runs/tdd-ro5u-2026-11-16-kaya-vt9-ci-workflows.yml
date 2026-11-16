@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-16-kaya-vt9-ci-workflows
+pipeline: tdd-ro5u
+topic: kaya-vt9 CI workflows
+created_at: '2026-11-16T18:34:05.595181808+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-16T18:34:07.492167298+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

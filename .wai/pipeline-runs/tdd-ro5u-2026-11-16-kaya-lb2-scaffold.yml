@@ -2,8 +2,9 @@ run_id: tdd-ro5u-2026-11-16-kaya-lb2-scaffold
 pipeline: tdd-ro5u
 topic: kaya-lb2 scaffold
 created_at: '2026-11-16T18:04:28.059448114+00:00'
-current_step: 3
-approvals: {}
+current_step: 9
+approvals:
+  ship-close: '2026-11-16T18:32:49.835555837+00:00'
 epic: null
 child_issues: []
 child_runs: []
