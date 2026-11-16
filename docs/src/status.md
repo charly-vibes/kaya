@@ -17,6 +17,7 @@ MVP-1 implements those capabilities end to end as a static research compiler.
 | Integrations | wai, git, test runner implemented; dont, whisper (turu), specodelic [specified](../../openspec/changes/add-core-research-record/specs/kaya-adapters/spec.md), not implemented | Adapters translate tool outputs into `kaya.event/v0`; the remaining sources have encoded specs but no adapter |
 | Docs | buildable, deploy workflow present | `book.toml` + `theme/charly.css` at root; `.github/workflows/docs.yml` builds the book and deploys it to GitHub Pages on push to `main` |
 | CI | implemented | `just ci` (cargo test, fmt + clippy, mdbook build, `ah check`, `spk lint`, `openspec validate --strict`) run by `.github/workflows/ci.yml`; lefthook gates `ah check`, `spk lint`, and `pretender` on commit |
+| Release | workflow implemented, no release tagged | `.github/workflows/release.yml` builds the five standard targets on a `v*` tag, publishes the canonical archives plus `checksums.txt` and `provenance.json`, and updates the homebrew-charly tap and scoop-charly bucket. Deviation (§1): the crates.io channel is token-gated and currently disabled — publishing requires explicit authorization (`kaya-dgz`), and no GitHub Release exists yet, so prebuilt binaries are not the install path until the first tag. Until then the only install path is building from source |
 
 ## Implemented
 

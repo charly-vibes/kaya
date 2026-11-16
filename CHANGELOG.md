@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI workflows: `ci.yml` runs `just ci` with pinned tools; `docs.yml` builds
   the mdBook and deploys it to GitHub Pages; `justfile` recipes for
   build/test/lint/docs/spec gates.
+- `release.yml`: tag-triggered five-target build (linux/darwin amd64+arm64,
+  windows amd64), canonical `kaya_{VERSION}_{os}_{arch}` archives,
+  `checksums.txt`, and `provenance.json`; gated on the tagged commit's tests;
+  updates the homebrew-charly tap and scoop-charly bucket through
+  `scripts/update-homebrew.py` and `scripts/update-scoop.py` (idempotent,
+  retried, reported). The crates.io channel is token-gated and disabled until
+  publish authorization (`kaya-dgz`).
 - Dogfooded dossier: `.kaya/ledger.jsonl` plus the `docs/research/`
   projections (`index.md`, `experiments/add-core-research-record.md`) are
   checked in and rebuilt by `kaya build`.

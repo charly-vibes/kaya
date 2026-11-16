@@ -9,6 +9,10 @@
 # Rust build output
 /target/
 
+# release workflow artifacts (downloaded binaries + packaged archives)
+/bins/
+/dist/
+
 # mdBook output
 /book/
 

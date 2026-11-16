@@ -5,6 +5,7 @@
 # kaya
 
 [![tracked with wai](https://img.shields.io/badge/tracked%20with-wai-blue)](https://github.com/charly-vibes/wai)
+[![Release](https://github.com/charly-vibes/kaya/actions/workflows/release.yml/badge.svg)](https://github.com/charly-vibes/kaya/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 > A living record of exploration — kaya turns the artifacts a project already

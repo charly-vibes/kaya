@@ -1,0 +1,461 @@
+# Release workflow — fleet standardization §1 release slot
+# (dulce-de-leche docs/standardization.md): tag-triggered five-target binary
+# matrix with canonical asset naming ({tool}_{VERSION}_{os}_{arch}), one
+# checksums.txt, provenance.json, a GitHub Release, and channel propagation to
+# the homebrew-charly tap and scoop-charly bucket. Modeled on the ddl and wai
+# reference workflows.
+#
+# Security model (SEC-06 / DDL-bas):
+#   * Workflow-level permissions are `contents: read`; only `publish` is granted
+#     `contents: write`, so no build job can touch releases.
+#   * `publish` needs the build jobs and `test`, so a failed/skipped/cancelled
+#     test run on the tagged commit blocks publication entirely.
+#   * Every third-party action is pinned to a full reviewed commit SHA.
+#   * No credential is available to build jobs; CARGO_REGISTRY_TOKEN and
+#     TAP_GITHUB_TOKEN are referenced only inside `publish` steps.
+#
+# Credential scopes:
+#   GITHUB_TOKEN         (publish) — contents:write for this repository only,
+#                                    used to create the release and upload assets
+#   CARGO_REGISTRY_TOKEN (publish) — crates.io token for this crate only; absent
+#                                    token disables the crates.io channel (see below)
+#   TAP_GITHUB_TOKEN     (publish) — PAT with contents:write on homebrew-charly
+#                                    and scoop-charly only
+#
+# crates.io publish is token-gated because publish authorization is still
+# outstanding (beads kaya-dgz): a missing token is reported as a disabled
+# channel, never as a failed release. Tagging and pushing a tag are release
+# actions and require explicit human authorization.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          targets: x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: linux
+
+      - name: Install aarch64 cross-compile toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build x86_64 Linux
+        run: cargo build --release --locked --target x86_64-unknown-linux-gnu
+
+      - name: Build aarch64 Linux
+        run: cargo build --release --locked --target aarch64-unknown-linux-gnu
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - name: Stage binaries
+        run: |
+          mkdir -p bins/linux_amd64 bins/linux_arm64
+          cp target/x86_64-unknown-linux-gnu/release/kaya bins/linux_amd64/kaya
+          cp target/aarch64-unknown-linux-gnu/release/kaya bins/linux_arm64/kaya
+
+      - name: Upload Linux binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bins-linux
+          path: bins/
+          retention-days: 1
+
+  build-darwin:
+    name: Build macOS
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: darwin
+
+      - name: Build x86_64 macOS
+        run: cargo build --release --locked --target x86_64-apple-darwin
+
+      - name: Build aarch64 macOS
+        run: cargo build --release --locked --target aarch64-apple-darwin
+
+      - name: Stage binaries
+        run: |
+          mkdir -p bins/darwin_amd64 bins/darwin_arm64
+          cp target/x86_64-apple-darwin/release/kaya bins/darwin_amd64/kaya
+          cp target/aarch64-apple-darwin/release/kaya bins/darwin_arm64/kaya
+
+      - name: Upload macOS binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bins-darwin
+          path: bins/
+          retention-days: 1
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: windows
+
+      - name: Build x86_64 Windows
+        run: cargo build --release --locked --target x86_64-pc-windows-msvc
+
+      - name: Stage binaries
+        shell: bash
+        run: |
+          mkdir -p bins/windows_amd64
+          cp target/x86_64-pc-windows-msvc/release/kaya.exe bins/windows_amd64/kaya.exe
+
+      - name: Upload Windows binaries
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bins-windows
+          path: bins/
+          retention-days: 1
+
+  # Gates publication on the tagged commit (GITHUB_SHA). Failed, skipped or
+  # cancelled runs block `publish` through its `needs` list.
+  test:
+    name: Test tagged commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: test
+
+      - name: Run full test suite
+        run: cargo test --locked
+
+  publish:
+    name: Publish Release
+    needs: [build-linux, build-darwin, build-windows, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+
+      - name: Download binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: bins-*
+          path: bins/
+          merge-multiple: true
+
+      - name: Verify tag matches crate version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          CRATE_VERSION="$(cargo metadata --no-deps --format-version 1 \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["packages"][0]["version"])')"
+          if [ "v${CRATE_VERSION}" != "${TAG}" ]; then
+            echo "::error::tag ${TAG} does not match Cargo.toml version v${CRATE_VERSION}; refusing to publish."
+            exit 1
+          fi
+
+      - name: Package archives and checksums
+        id: pkg
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          mkdir -p dist
+          # upload-artifact does not preserve file permissions across the
+          # artifact roundtrip — restore the exec bit or the archives ship
+          # 644 binaries and `curl | tar xz` installs are not runnable (DDL-3av).
+          chmod +x -- bins/*/*
+          tar -czf "dist/kaya_${VERSION}_linux_amd64.tar.gz"  -C bins/linux_amd64  kaya
+          tar -czf "dist/kaya_${VERSION}_linux_arm64.tar.gz"  -C bins/linux_arm64  kaya
+          tar -czf "dist/kaya_${VERSION}_darwin_amd64.tar.gz" -C bins/darwin_amd64 kaya
+          tar -czf "dist/kaya_${VERSION}_darwin_arm64.tar.gz" -C bins/darwin_arm64 kaya
+          (cd bins/windows_amd64 && zip "../../dist/kaya_${VERSION}_windows_amd64.zip" kaya.exe)
+          cd dist && sha256sum ./*.tar.gz ./*.zip > checksums.txt
+
+      # DDL-wof (SEC-03/06): provenance.json binds each published artifact's
+      # sha256 to the publisher/build identity (repository, workflow, tag).
+      # ddl's installer rejects downloads whose manifest names an unexpected
+      # identity or whose bytes diverge from the listed digest; provenance.json
+      # is excluded from its own artifact map because a file cannot contain its
+      # own digest.
+      - name: Generate provenance manifest
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'EOF'
+          import hashlib, json, os
+          dist = "dist"
+          artifacts = {}
+          for name in sorted(os.listdir(dist)):
+              if name == "provenance.json":
+                  continue
+              path = os.path.join(dist, name)
+              if not os.path.isfile(path):
+                  continue
+              h = hashlib.sha256()
+              with open(path, "rb") as f:
+                  for chunk in iter(lambda: f.read(1 << 20), b""):
+                      h.update(chunk)
+              artifacts[name] = h.hexdigest()
+          provenance = {
+              "repository": os.environ["REPO"],
+              "workflow": "Release",
+              "tag": os.environ["TAG"],
+              "artifacts": artifacts,
+          }
+          with open(os.path.join(dist, "provenance.json"), "w") as f:
+              json.dump(provenance, f, indent=2, sort_keys=True)
+              f.write("\n")
+          EOF
+
+      # A re-run after a partial failure must be able to repair channels: if the
+      # release already exists, refresh its assets instead of aborting
+      # (`gh release create` exits non-zero for a known tag, which would skip
+      # every channel step below).
+      - name: Create GitHub release
+        id: release
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${{ steps.pkg.outputs.version }}"
+          ASSETS=(
+            "dist/kaya_${VERSION}_linux_amd64.tar.gz"
+            "dist/kaya_${VERSION}_linux_arm64.tar.gz"
+            "dist/kaya_${VERSION}_darwin_amd64.tar.gz"
+            "dist/kaya_${VERSION}_darwin_arm64.tar.gz"
+            "dist/kaya_${VERSION}_windows_amd64.zip"
+            "dist/checksums.txt"
+            "dist/provenance.json"
+          )
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "${ASSETS[@]}" --clobber
+          else
+            PRERELEASE=""
+            [[ "${TAG}" == *-* ]] && PRERELEASE="--prerelease"
+            gh release create "${TAG}" \
+              --title "${TAG}" \
+              --generate-notes \
+              $PRERELEASE \
+              "${ASSETS[@]}"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Channel propagation is not silently best-effort (DDL-9e7): a missing
+      # TAP_GITHUB_TOKEN is reported as an intentional disabled channel, a real
+      # failure is retried idempotently (the update scripts refuse to write
+      # unless version/tag/checksums correspond, and re-rendering an
+      # already-updated tap/bucket is a no-op), and the outcome is recorded.
+      # Channels are independent: each one runs as long as the release exists,
+      # so a crates.io failure cannot suppress tap/bucket propagation.
+      - name: Update Homebrew tap
+        id: channel-homebrew
+        if: ${{ !cancelled() && steps.release.outcome == 'success' }}
+        env:
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${{ steps.pkg.outputs.version }}"
+          CHANNEL_STATUS=/tmp/channel-homebrew.status
+          MAX_ATTEMPTS=3
+          if [ -z "${TAP_GITHUB_TOKEN}" ]; then
+            echo "disabled" > "${CHANNEL_STATUS}"
+            echo "::notice::Homebrew tap update is disabled (TAP_GITHUB_TOKEN not set); the release will be marked accordingly."
+            exit 0
+          fi
+          ok=0
+          attempt=1
+          while [ "${attempt}" -le "${MAX_ATTEMPTS}" ]; do
+            rm -rf /tmp/tap
+            if git clone --depth 1 "https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/charly-vibes/homebrew-charly.git" /tmp/tap \
+              && python3 scripts/update-homebrew.py \
+                   /tmp/tap/Formula/kaya.rb \
+                   "${VERSION}" "${TAG}" dist/checksums.txt; then
+              git -C /tmp/tap config user.email "github-actions@github.com"
+              git -C /tmp/tap config user.name "GitHub Actions"
+              git -C /tmp/tap add Formula/kaya.rb
+              if git -C /tmp/tap diff --staged --quiet; then
+                echo "unchanged" > "${CHANNEL_STATUS}"
+                ok=1
+                break
+              fi
+              if git -C /tmp/tap commit -m "Update kaya to ${VERSION}" \
+                && git -C /tmp/tap push; then
+                echo "updated" > "${CHANNEL_STATUS}"
+                ok=1
+                break
+              fi
+            fi
+            echo "::warning::Homebrew tap update attempt ${attempt}/${MAX_ATTEMPTS} failed; retrying."
+            attempt=$((attempt + 1))
+            sleep 5
+          done
+          if [ "${ok}" -ne 1 ]; then
+            echo "failed" > "${CHANNEL_STATUS}"
+            echo "::error::Homebrew tap update failed after ${MAX_ATTEMPTS} attempts."
+          fi
+
+      - name: Update Scoop bucket
+        id: channel-scoop
+        if: ${{ !cancelled() && steps.release.outcome == 'success' }}
+        env:
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${{ steps.pkg.outputs.version }}"
+          CHANNEL_STATUS=/tmp/channel-scoop.status
+          MAX_ATTEMPTS=3
+          if [ -z "${TAP_GITHUB_TOKEN}" ]; then
+            echo "disabled" > "${CHANNEL_STATUS}"
+            echo "::notice::Scoop bucket update is disabled (TAP_GITHUB_TOKEN not set); the release will be marked accordingly."
+            exit 0
+          fi
+          ok=0
+          attempt=1
+          while [ "${attempt}" -le "${MAX_ATTEMPTS}" ]; do
+            rm -rf /tmp/scoop
+            if git clone --depth 1 "https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/charly-vibes/scoop-charly.git" /tmp/scoop \
+              && python3 scripts/update-scoop.py \
+                   /tmp/scoop/bucket/kaya.json \
+                   "${VERSION}" "${TAG}" dist/checksums.txt; then
+              git -C /tmp/scoop config user.email "github-actions@github.com"
+              git -C /tmp/scoop config user.name "GitHub Actions"
+              git -C /tmp/scoop add bucket/kaya.json
+              if git -C /tmp/scoop diff --staged --quiet; then
+                echo "unchanged" > "${CHANNEL_STATUS}"
+                ok=1
+                break
+              fi
+              if git -C /tmp/scoop commit -m "Update kaya to ${VERSION}" \
+                && git -C /tmp/scoop push; then
+                echo "updated" > "${CHANNEL_STATUS}"
+                ok=1
+                break
+              fi
+            fi
+            echo "::warning::Scoop bucket update attempt ${attempt}/${MAX_ATTEMPTS} failed; retrying."
+            attempt=$((attempt + 1))
+            sleep 5
+          done
+          if [ "${ok}" -ne 1 ]; then
+            echo "failed" > "${CHANNEL_STATUS}"
+            echo "::error::Scoop bucket update failed after ${MAX_ATTEMPTS} attempts."
+          fi
+
+      # crates.io publish is disabled until publish authorization lands
+      # (kaya-dgz). A missing token is an intentional disabled channel: report
+      # it, do not fail the release. `--allow-dirty` is required because the
+      # job itself created the untracked `bins/` and `dist/` trees (both are
+      # gitignored so they never enter the crate tarball).
+      - name: Publish to crates.io
+        id: channel-crates
+        if: ${{ !cancelled() && steps.release.outcome == 'success' }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [ -z "${CARGO_REGISTRY_TOKEN}" ]; then
+            echo "disabled" > /tmp/channel-crates.status
+            echo "::notice::crates.io publish is disabled (CARGO_REGISTRY_TOKEN not set); publish authorization is tracked in kaya-dgz."
+            exit 0
+          fi
+          cargo publish --allow-dirty --locked
+          echo "updated" > /tmp/channel-crates.status
+
+      # DDL-9e7 (SEC-07): the run must not look successful while a
+      # distribution channel lags. Aggregates recorded outcomes into the job
+      # summary and fails on any `failed` channel. Disabled channels are
+      # reported as such, not as failures. `always()` keeps the report even
+      # when an earlier step already failed.
+      - name: Release health (channel propagation)
+        if: always()
+        run: |
+          {
+            echo "## Release channel propagation"
+            echo ""
+            echo "| Channel | Outcome |"
+            echo "| --- | --- |"
+            for ch in crates homebrew scoop; do
+              f="/tmp/channel-${ch}.status"
+              if [ ! -f "${f}" ]; then
+                outcome="not-run (earlier step failed or skipped)"
+              else
+                outcome="$(cat "${f}")"
+              fi
+              echo "| ${ch} | ${outcome} |"
+              if [ "${outcome}" = "failed" ]; then
+                echo "::error::Release distribution is INCOMPLETE: the ${ch} channel update failed."
+              fi
+            done
+            echo ""
+            echo "Outcome legend: updated / unchanged (idempotent retry) / disabled (token absent, intentional) / failed (incomplete distribution)."
+          } >> "${GITHUB_STEP_SUMMARY}"
+          if grep -qs "^| crates | failed" "${GITHUB_STEP_SUMMARY}" \
+            || grep -qs "^| homebrew | failed" "${GITHUB_STEP_SUMMARY}" \
+            || grep -qs "^| scoop | failed" "${GITHUB_STEP_SUMMARY}"; then
+            echo "::error::At least one distribution channel failed; the release is incomplete."
+            exit 1
+          fi
