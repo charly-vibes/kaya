@@ -1,9 +1,10 @@
 //! The research graph over kaya's closed vocabulary.
 //!
 //! `kaya.model` turns admitted `model.entity.created` and
-//! `model.relationship.asserted` events into a typed graph. The entity and
-//! relationship sets are closed, node ids are namespace-qualified as
-//! `<project>/<TYPE>/<key>`, every edge endpoint must resolve, relationship
+//! `model.relationship.asserted` events into a typed graph. Corrections are
+//! resolved first, so a corrected event contributes its corrected payload.
+//! The entity and relationship sets are closed, node ids are namespace-qualified
+//! as `<project>/<TYPE>/<key>`, every edge endpoint must resolve, relationship
 //! direction follows a fixed grammar, and the influence/derives subgraph
 //! stays acyclic. Every violation is a labeled [`ModelError`].
 
@@ -195,6 +196,20 @@ impl Relationship {
         }
     }
 
+    /// Whether [`Self::fixed_direction`] admits only the exact pair.
+    ///
+    /// The four structural relationships name a specific source and target
+    /// entity and refuse every other pair. `influences` keeps reversal-only
+    /// semantics: only the exact reverse pair is refused, so a
+    /// `Decision -> Decision` influence stays representable and acyclicity —
+    /// not direction — refuses the resulting cycle.
+    fn requires_exact_pair(self) -> bool {
+        matches!(
+            self,
+            Self::Executes | Self::Observes | Self::Derives | Self::Realizes
+        )
+    }
+
     /// Whether the relationship participates in the acyclic subgraph.
     fn is_acyclic_edge(self) -> bool {
         matches!(self, Self::Influences | Self::Derives)
@@ -295,6 +310,10 @@ impl GraphBuilder {
 
     /// Admit a node. The id must be namespace-qualified and its `TYPE`
     /// segment must name `entity`.
+    ///
+    /// Defining an id again merges attributes when both the existing and new
+    /// values are JSON objects (new keys win); any non-object attribute value
+    /// replaces the previous one.
     pub fn entity(
         &mut self,
         id: impl Into<String>,
@@ -311,14 +330,21 @@ impl GraphBuilder {
                 ),
             ));
         }
-        self.nodes.insert(
-            id.clone(),
-            Node {
-                id,
-                entity,
-                attributes,
-            },
-        );
+        match self.nodes.entry(id) {
+            std::collections::btree_map::Entry::Occupied(mut entry) => {
+                let node = entry.get_mut();
+                let merged = merge_attributes(&node.attributes, attributes);
+                node.attributes = merged;
+            }
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                let node_id = entry.key().clone();
+                entry.insert(Node {
+                    id: node_id,
+                    entity,
+                    attributes,
+                });
+            }
+        }
         Ok(self)
     }
 
@@ -375,7 +401,10 @@ impl GraphBuilder {
 
 /// Build a graph from ledger events.
 ///
-/// `model.entity.created` events create nodes and
+/// Corrections are resolved first: [`crate::ledger::resolve_effective`] applies
+/// every event whose `data.supersedes` names another event, so the builder
+/// sees one effective event per record and a corrected event contributes its
+/// corrected payload. `model.entity.created` events create nodes and
 /// `model.relationship.asserted` events add edges. Adapter capture events
 /// (`capture.artifact.observed`, `capture.commit.observed`, and
 /// `experiment.run.completed`) create the Artifact and Run nodes they
@@ -383,8 +412,9 @@ impl GraphBuilder {
 /// ignored — the model interprets only the events that describe its own
 /// structure.
 pub fn build(events: &[Event]) -> Result<Graph, ModelError> {
+    let effective = crate::ledger::resolve_effective(events);
     let mut builder = GraphBuilder::new();
-    for event in events {
+    for event in &effective {
         match event.r#type.as_str() {
             ENTITY_CREATED_EVENT => entity_from_event(event, &mut builder)?,
             RELATIONSHIP_ASSERTED_EVENT => relationship_from_event(event, &mut builder)?,
@@ -524,18 +554,33 @@ fn check_direction(
     to_id: &str,
     to_entity: EntityType,
 ) -> Result<(), ModelError> {
-    if let Some((required_from, required_to)) = relationship.fixed_direction()
-        && (from_entity, to_entity) == (required_to, required_from)
-    {
-        return Err(ModelError::new(
-            "kaya.model.direction_fixed",
-            format!(
-                "relationship {} is directed {} -> {}; edge \"{from_id}\" -> \"{to_id}\" runs it backwards",
-                relationship.as_str(),
-                required_from.as_str(),
-                required_to.as_str()
-            ),
-        ));
+    if let Some((required_from, required_to)) = relationship.fixed_direction() {
+        let pair = (from_entity, to_entity);
+        if relationship.requires_exact_pair() {
+            if pair != (required_from, required_to) {
+                return Err(ModelError::new(
+                    "kaya.model.direction_fixed",
+                    format!(
+                        "relationship {} is directed {} -> {}; edge \"{from_id}\" -> \"{to_id}\" is {} -> {}, which the fixed direction refuses",
+                        relationship.as_str(),
+                        required_from.as_str(),
+                        required_to.as_str(),
+                        from_entity.as_str(),
+                        to_entity.as_str()
+                    ),
+                ));
+            }
+        } else if pair == (required_to, required_from) {
+            return Err(ModelError::new(
+                "kaya.model.direction_fixed",
+                format!(
+                    "relationship {} is directed {} -> {}; edge \"{from_id}\" -> \"{to_id}\" runs it backwards",
+                    relationship.as_str(),
+                    required_from.as_str(),
+                    required_to.as_str()
+                ),
+            ));
+        }
     }
     Ok(())
 }
@@ -621,6 +666,23 @@ fn check_acyclic(edges: &[Edge]) -> Result<(), ModelError> {
         }
     }
     Ok(())
+}
+
+/// Merge a repeated definition's attributes into the node's existing value.
+///
+/// Two JSON objects merge with the newer keys winning; any other combination
+/// replaces the old value with the new one.
+fn merge_attributes(existing: &Value, incoming: Value) -> Value {
+    match (existing, incoming) {
+        (Value::Object(existing), Value::Object(incoming)) => {
+            let mut merged = existing.clone();
+            for (key, value) in incoming {
+                merged.insert(key, value);
+            }
+            Value::Object(merged)
+        }
+        (_, incoming) => incoming,
+    }
 }
 
 fn value_type(value: &Value) -> &'static str {

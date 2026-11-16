@@ -3,6 +3,7 @@
 //! qualified ids.
 
 use kaya::event::{Actor, ActorType, Event, Provenance, Subject};
+use kaya::ledger::Ledger;
 use kaya::model::{EntityType, Graph, GraphBuilder, ModelError, Relationship, build};
 use serde_json::{Value, json};
 
@@ -472,4 +473,257 @@ fn ids_must_be_namespaced_and_match_the_entity_type() {
         "{}",
         mismatched.message
     );
+}
+
+#[test]
+fn wrong_entity_pairs_refused_for_each_exact_pair_relationship() {
+    let cases = [
+        (
+            "executes",
+            "Run",
+            "alpha/Run/RUN-R1",
+            "Run",
+            "alpha/Run/RUN-R2",
+            "Run -> Experiment",
+        ),
+        (
+            "executes",
+            "Hypothesis",
+            "alpha/Hypothesis/HYP-001",
+            "Experiment",
+            "alpha/Experiment/EXP-001",
+            "Run -> Experiment",
+        ),
+        (
+            "observes",
+            "Claim",
+            "alpha/Claim/CLM-001",
+            "Run",
+            "alpha/Run/RUN-001",
+            "Observation -> Run",
+        ),
+        (
+            "derives",
+            "Finding",
+            "alpha/Finding/FND-1",
+            "Finding",
+            "alpha/Finding/FND-2",
+            "Finding -> Observation",
+        ),
+        (
+            "realizes",
+            "Run",
+            "alpha/Run/RUN-001",
+            "Hypothesis",
+            "alpha/Hypothesis/HYP-001",
+            "Model -> Hypothesis",
+        ),
+    ];
+
+    for (relationship, from_type, from_id, to_type, to_id, rule) in cases {
+        let events = [
+            entity_event(from_type, from_id, json!({}), 1),
+            entity_event(to_type, to_id, json!({}), 2),
+            relationship_event(relationship, from_id, to_id, 3),
+        ];
+
+        let error = expect_refusal(build(&events));
+
+        assert_eq!(
+            error.label, "kaya.model.direction_fixed",
+            "{relationship} {from_type} -> {to_type} must be refused"
+        );
+        assert!(error.message.contains(relationship), "{}", error.message);
+        assert!(error.message.contains(rule), "{}", error.message);
+        assert!(error.message.contains(from_id), "{}", error.message);
+        assert!(error.message.contains(to_id), "{}", error.message);
+    }
+}
+
+#[test]
+fn self_loop_influence_refused_by_acyclicity_not_direction() {
+    let decision = "alpha/Decision/DEC-001";
+    let events = [
+        entity_event("Decision", decision, json!({}), 1),
+        relationship_event("influences", decision, decision, 2),
+    ];
+
+    let error = expect_refusal(build(&events));
+
+    assert_eq!(error.label, "kaya.model.influence_acyclic");
+    assert!(error.message.contains(decision), "{}", error.message);
+}
+
+#[test]
+fn mixed_derives_and_influence_cycle_refused() {
+    let decision = "alpha/Decision/DEC-001";
+    let finding = "alpha/Finding/FND-001";
+    let observation = "alpha/Observation/OBS-001";
+    let events = [
+        entity_event("Decision", decision, json!({}), 1),
+        entity_event("Finding", finding, json!({}), 2),
+        entity_event("Observation", observation, json!({}), 3),
+        // Decision influences Finding, Finding derives Observation, and
+        // Observation influences Decision closes a mixed relationship cycle.
+        relationship_event("influences", decision, finding, 4),
+        relationship_event("derives", finding, observation, 5),
+        relationship_event("influences", observation, decision, 6),
+    ];
+
+    let error = expect_refusal(build(&events));
+
+    assert_eq!(error.label, "kaya.model.influence_acyclic");
+    for id in [decision, finding, observation] {
+        assert!(error.message.contains(id), "{}", error.message);
+    }
+}
+
+#[test]
+fn forward_relationship_assertion_resolves_once_entities_arrive() {
+    // Direction can only be checked once both endpoints are known, so a
+    // relationship asserted before its entities is held and resolved at
+    // build time rather than refused at assertion time.
+    let run = "alpha/Run/RUN-001";
+    let experiment = "alpha/Experiment/EXP-001";
+    let events = [
+        relationship_event("executes", run, experiment, 1),
+        entity_event("Experiment", experiment, json!({}), 2),
+        entity_event("Run", run, json!({}), 3),
+    ];
+
+    let graph = expect_graph(build(&events));
+
+    assert_eq!(graph.edges().count(), 1);
+    let edge = graph.edges().next().expect("edge present");
+    assert_eq!(edge.relationship, Relationship::Executes);
+    assert_eq!(edge.from, run);
+    assert_eq!(edge.to, experiment);
+}
+
+#[test]
+fn repeated_entity_definitions_merge_object_attributes() {
+    let run = "alpha/Run/RUN-001";
+    let events = [
+        entity_event("Run", run, json!({ "attempt": 1 }), 1),
+        event(
+            "experiment.run.completed",
+            "Run",
+            run,
+            json!({ "passed": 10, "failed": 0, "ignored": 0, "total": 10 }),
+            2,
+        ),
+    ];
+
+    let graph = expect_graph(build(&events));
+
+    let node = graph.node(run).expect("run node present");
+    assert_eq!(
+        node.attributes,
+        json!({ "attempt": 1, "passed": 10, "failed": 0, "ignored": 0, "total": 10 })
+    );
+}
+
+#[test]
+fn non_object_attributes_replace_rather_than_merge() {
+    let run = "alpha/Run/RUN-001";
+    let mut builder = GraphBuilder::new();
+
+    builder
+        .entity(run, EntityType::Run, json!({ "attempt": 1 }))
+        .expect("entity")
+        .entity(run, EntityType::Run, json!("replaced"))
+        .expect("entity replacement")
+        .entity(run, EntityType::Run, json!({ "attempt": 2 }))
+        .expect("entity replacement");
+
+    let graph = expect_graph(builder.build());
+    assert_eq!(
+        graph.node(run).expect("run node present").attributes,
+        json!({ "attempt": 2 })
+    );
+}
+
+#[test]
+fn corrected_run_counts_reach_the_model_through_the_ledger() {
+    let run = "kaya/Run/RUN-001";
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("ledger.jsonl");
+    let mut ledger = Ledger::new(&path);
+
+    let original = event(
+        "experiment.run.completed",
+        "Run",
+        run,
+        json!({ "passed": 3, "failed": 1, "ignored": 0, "total": 4 }),
+        1,
+    );
+    let correction = event(
+        "experiment.run.corrected",
+        "Run",
+        run,
+        json!({
+            "passed": 4,
+            "failed": 0,
+            "ignored": 1,
+            "total": 5,
+            "supersedes": original.id.clone(),
+        }),
+        2,
+    );
+
+    ledger.append(&original).expect("append original");
+    ledger.append(&correction).expect("append correction");
+    let (events, _recovery) = ledger.read_recovered().expect("read ledger");
+
+    let graph = expect_graph(build(&events));
+
+    let node = graph.node(run).expect("run node present");
+    assert_eq!(
+        node.attributes,
+        json!({ "passed": 4, "failed": 0, "ignored": 1, "total": 5 })
+    );
+}
+
+#[test]
+fn corrected_relationship_event_updates_the_edge() {
+    let run = "alpha/Run/RUN-001";
+    let first = "alpha/Experiment/EXP-001";
+    let second = "alpha/Experiment/EXP-002";
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("ledger.jsonl");
+    let mut ledger = Ledger::new(&path);
+
+    let original = relationship_event("executes", run, first, 1);
+    let correction = event(
+        "model.relationship.corrected",
+        "Relationship",
+        run,
+        json!({
+            "relationship": "executes",
+            "from": run,
+            "to": second,
+            "supersedes": original.id.clone(),
+        }),
+        2,
+    );
+
+    ledger.append(&original).expect("append original");
+    ledger.append(&correction).expect("append correction");
+    let (events, _recovery) = ledger.read_recovered().expect("read ledger");
+
+    let entities = [
+        entity_event("Run", run, json!({}), 3),
+        entity_event("Experiment", first, json!({}), 4),
+        entity_event("Experiment", second, json!({}), 5),
+    ];
+    let mut ledger_events = entities.to_vec();
+    ledger_events.extend(events);
+
+    let graph = expect_graph(build(&ledger_events));
+
+    assert_eq!(graph.edges().count(), 1);
+    let edge = graph.edges().next().expect("edge present");
+    assert_eq!(edge.relationship, Relationship::Executes);
+    assert_eq!(edge.from, run);
+    assert_eq!(edge.to, second);
 }

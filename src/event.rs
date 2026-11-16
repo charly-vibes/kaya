@@ -225,7 +225,7 @@ pub fn parse_line(line: &str) -> Result<Event, EventError> {
 
     let actor = parse_actor(map.get("actor"))?;
     let subject = parse_subject(map.get("subject"))?;
-    let data = parse_data(map.get("data"))?;
+    let data = parse_data(map.get("data"), event_type)?;
     let provenance = parse_provenance(map.get("provenance"))?;
     let artifacts = parse_artifacts(map.get("artifacts"))?;
 
@@ -378,7 +378,7 @@ fn parse_provenance(value: Option<&Value>) -> Result<Provenance, EventError> {
     })
 }
 
-fn parse_data(value: Option<&Value>) -> Result<Value, EventError> {
+fn parse_data(value: Option<&Value>, event_type: &str) -> Result<Value, EventError> {
     let Some(Value::Object(map)) = value else {
         return Err(EventError::new(
             LABEL_DATA,
@@ -388,14 +388,19 @@ fn parse_data(value: Option<&Value>) -> Result<Value, EventError> {
             ),
         ));
     };
-    for key in INTERPRETATION_KEYS {
-        if map.contains_key(key) {
-            return Err(EventError::new(
-                LABEL_OBSERVATION,
-                format!(
-                    "data.{key} records an interpretation; kaya.event/v0 events carry observations only — record conclusions and hypothesis verdicts with the kaya.promotion command"
-                ),
-            ));
+    // `promotion.*` records are the sanctioned interpretation channel; the
+    // observation-only guard applies to capture events, which must never
+    // carry a verdict.
+    if !event_type.starts_with("promotion.") {
+        for key in INTERPRETATION_KEYS {
+            if map.contains_key(key) {
+                return Err(EventError::new(
+                    LABEL_OBSERVATION,
+                    format!(
+                        "data.{key} records an interpretation; kaya.event/v0 events carry observations only — record conclusions and hypothesis verdicts with the kaya.promotion command"
+                    ),
+                ));
+            }
         }
     }
     Ok(Value::Object(map.clone()))

@@ -13,7 +13,7 @@ fn record_with(data: &str) -> String {
             "\"type\":\"experiment.run.completed\",",
             "\"timestamp\":\"2026-11-16T10:00:00Z\",",
             "\"actor\":{{\"type\":\"tool\",\"name\":\"cargo-test\"}},",
-            "\"subject\":{{\"type\":\"Experiment\",\"id\":\"kaya/Experiment/EXP-001\"}},",
+            "\"subject\":{{\"type\":\"Run\",\"id\":\"kaya/Run/RUN-001\"}},",
             "\"data\":{data},",
             "\"provenance\":{{\"tool\":\"kaya\",\"version\":\"0.1.0\",\"reference\":\"commit:abc123\"}},",
             "\"artifacts\":[\"reports/run.json\"]}}\n",
@@ -65,8 +65,8 @@ fn well_formed_record_validates_every_field() {
     assert_eq!(event.timestamp, "2026-11-16T10:00:00Z");
     assert_eq!(event.actor.r#type, ActorType::Tool);
     assert_eq!(event.actor.name, "cargo-test");
-    assert_eq!(event.subject.r#type, "Experiment");
-    assert_eq!(event.subject.id, "kaya/Experiment/EXP-001");
+    assert_eq!(event.subject.r#type, "Run");
+    assert_eq!(event.subject.id, "kaya/Run/RUN-001");
     assert_eq!(event.data, json!({"passed": 3}));
     assert_eq!(event.provenance.tool, "kaya");
     assert_eq!(event.provenance.version, "0.1.0");
@@ -196,6 +196,26 @@ fn interpretation_fields_are_refused_pointing_at_promotion() {
         assert!(err.message.contains(key), "{}", err.message);
         assert!(err.message.contains("kaya.promotion"), "{}", err.message);
     }
+}
+
+#[test]
+fn promotion_records_may_carry_interpretation_fields() {
+    let line = concat!(
+        "{\"id\":\"conclusion-1\",\"schema\":\"kaya.event/v0\",",
+        "\"type\":\"promotion.conclusion.established\",",
+        "\"timestamp\":\"2026-11-16T10:00:00Z\",",
+        "\"actor\":{\"type\":\"human\",\"name\":\"alice\"},",
+        "\"subject\":{\"type\":\"conclusion\",\"id\":\"assertion-1\"},",
+        "\"data\":{\"assertion\":\"assertion-1\",\"conclusion\":\"H-001 partially supported\",\"approver\":\"alice\"},",
+        "\"provenance\":{\"tool\":\"kaya\",\"version\":\"0.1.0\",\"reference\":\"assertion-1\"},",
+        "\"artifacts\":[]}\n"
+    );
+    let event = parse_line(line).expect("promotion records are the interpretation channel");
+    assert_eq!(event.r#type, "promotion.conclusion.established");
+    assert_eq!(
+        event.data["conclusion"],
+        serde_json::json!("H-001 partially supported")
+    );
 }
 
 #[test]

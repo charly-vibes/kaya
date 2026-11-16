@@ -4,7 +4,9 @@ use std::fs;
 use std::io::Write as _;
 
 use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, to_line};
-use kaya::ledger::{Anchor, AppendOutcome, Ledger, Recovery, resolve, sha256_hex};
+use kaya::ledger::{
+    Anchor, AppendOutcome, Ledger, Recovery, resolve, resolve_effective, sha256_hex,
+};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
@@ -25,8 +27,8 @@ fn experiment_event(id: &str, event_type: &str, data: Value) -> Event {
             name: "cargo-test".to_owned(),
         },
         subject: Subject {
-            r#type: "Experiment".to_owned(),
-            id: "kaya/Experiment/EXP-001".to_owned(),
+            r#type: "Run".to_owned(),
+            id: "kaya/Run/RUN-001".to_owned(),
         },
         data,
         provenance: Provenance {
@@ -124,7 +126,13 @@ fn corrections_supersede_without_rewriting_the_original_line() {
     );
 
     let (events, recovery) = ledger.read_recovered().unwrap();
-    assert_eq!(recovery, Recovery { truncated_bytes: 0 });
+    assert_eq!(
+        recovery,
+        Recovery {
+            truncated_bytes: 0,
+            appended_newline: false,
+        }
+    );
     assert_eq!(events, vec![original, correction.clone()]);
 
     let resolved = resolve(&events);
@@ -147,14 +155,22 @@ fn digests_are_stable_across_reads() {
     let anchor = Anchor::of(&bytes);
     assert_eq!(anchor, Anchor::of(&fs::read(&path).unwrap()));
     assert_eq!(anchor.digest, sha256_hex(&bytes));
+    assert_eq!(anchor.byte_len, bytes.len());
     assert_eq!(anchor.line_digests.len(), 2);
 
     let (events, recovery) = ledger.read_recovered().unwrap();
-    assert_eq!(recovery, Recovery { truncated_bytes: 0 });
+    assert_eq!(
+        recovery,
+        Recovery {
+            truncated_bytes: 0,
+            appended_newline: false,
+        }
+    );
     assert_eq!(events.len(), 2);
     assert_eq!(Anchor::of(&fs::read(&path).unwrap()), anchor);
-    assert_eq!(ledger.read_verified(Some(&anchor)).unwrap().len(), 2);
-    assert_eq!(ledger.read_verified(None).unwrap().len(), 2);
+    let (verified, recovery) = ledger.read_verified(&anchor).unwrap();
+    assert_eq!(verified.len(), 2);
+    assert_eq!(recovery, Recovery::default());
 }
 
 #[test]
@@ -178,13 +194,13 @@ fn tampered_line_is_refused_naming_the_line_number() {
     rewritten.push('\n');
     fs::write(&path, rewritten).unwrap();
 
-    let err = ledger.read_verified(Some(&anchor)).unwrap_err();
+    let err = ledger.read_verified(&anchor).unwrap_err();
     assert_eq!(err.label, "kaya.ledger.digest_mismatch");
     assert!(err.message.contains("line 2"), "{}", err.message);
     assert_eq!(err.to_string(), format!("{}: {}", err.label, err.message));
 
-    // Without an anchor the same bytes still parse; verification is what refuses.
-    assert_eq!(ledger.read_verified(None).unwrap().len(), 3);
+    // The unverified path still parses the bytes; verification is what refuses.
+    assert_eq!(ledger.read_recovered().unwrap().0.len(), 3);
 }
 
 #[test]
@@ -210,13 +226,14 @@ fn crash_tail_is_recovered_and_reported() {
     assert_eq!(
         recovery,
         Recovery {
-            truncated_bytes: partial.len()
+            truncated_bytes: partial.len(),
+            appended_newline: false,
         }
     );
     assert_eq!(fs::read(&path).unwrap(), clean);
 
     let (events, recovery) = ledger.read_recovered().unwrap();
-    assert_eq!(recovery, Recovery { truncated_bytes: 0 });
+    assert_eq!(recovery, Recovery::default());
     assert_eq!(events.len(), 2);
 
     let third = experiment_event(THIRD, "experiment.run.completed", json!({"passed": 5}));
@@ -235,13 +252,16 @@ fn empty_ledger_digest_is_sha256_of_no_bytes() {
 
     let (events, recovery) = ledger.read_recovered().unwrap();
     assert!(events.is_empty());
-    assert_eq!(recovery, Recovery { truncated_bytes: 0 });
+    assert_eq!(recovery, Recovery::default());
 
     let anchor = Anchor::of(&fs::read(&path).unwrap());
     assert_eq!(anchor.digest, EMPTY_SHA256);
     assert_eq!(anchor.digest, sha256_hex(b""));
+    assert_eq!(anchor.byte_len, 0);
     assert!(anchor.line_digests.is_empty());
-    assert!(ledger.read_verified(Some(&anchor)).unwrap().is_empty());
+    let (events, recovery) = ledger.read_verified(&anchor).unwrap();
+    assert!(events.is_empty());
+    assert_eq!(recovery, Recovery::default());
 }
 
 #[test]
@@ -290,4 +310,277 @@ fn resolve_drops_only_events_superseded_later() {
     let resolved = resolve(&events);
     let ids: Vec<&str> = resolved.iter().map(|event| event.id.as_str()).collect();
     assert_eq!(ids, vec![SECOND, THIRD]);
+}
+
+#[test]
+fn verified_read_accepts_growth_after_the_anchor() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    let second = experiment_event(SECOND, "experiment.run.completed", json!({"passed": 4}));
+
+    ledger.append(&first).unwrap();
+    let anchor = Anchor::of(&fs::read(&path).unwrap());
+    assert_eq!(anchor.byte_len, to_line(&first).len());
+
+    ledger.append(&second).unwrap();
+    let (events, recovery) = ledger.read_verified(&anchor).unwrap();
+    assert_eq!(events, vec![first.clone(), second]);
+    assert_eq!(recovery, Recovery::default());
+
+    let bytes = fs::read(&path).unwrap();
+    assert_eq!(&bytes[..anchor.byte_len], to_line(&first).as_bytes());
+}
+
+#[test]
+fn verified_read_reports_a_crash_tail_after_the_anchor() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    ledger.append(&first).unwrap();
+    let anchored = fs::read(&path).unwrap();
+    let anchor = Anchor::of(&anchored);
+
+    let partial = br#"{"id":"01JAV3Z0Y6W4Z5X8B7C6D5E4"#;
+    {
+        let mut file = fs::OpenOptions::new().append(true).open(&path).unwrap();
+        file.write_all(partial).unwrap();
+    }
+
+    let (events, recovery) = ledger.read_verified(&anchor).unwrap();
+    assert_eq!(events, vec![first]);
+    assert_eq!(
+        recovery,
+        Recovery {
+            truncated_bytes: partial.len(),
+            appended_newline: false,
+        }
+    );
+    assert_eq!(fs::read(&path).unwrap(), anchored);
+}
+
+#[test]
+fn complete_unterminated_line_is_preserved_by_appending_a_newline() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    let second = experiment_event(SECOND, "experiment.run.completed", json!({"passed": 4}));
+    ledger.append(&first).unwrap();
+    ledger.append(&second).unwrap();
+
+    let clean = fs::read(&path).unwrap();
+    let unterminated = &clean[..clean.len() - 1];
+    fs::write(&path, unterminated).unwrap();
+
+    let (events, recovery) = ledger.read_recovered().unwrap();
+    assert_eq!(events, vec![first, second]);
+    assert_eq!(
+        recovery,
+        Recovery {
+            truncated_bytes: 0,
+            appended_newline: true,
+        }
+    );
+    assert_eq!(fs::read(&path).unwrap(), clean);
+}
+
+#[test]
+fn verified_read_reports_an_appended_newline_on_growth() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    let second = experiment_event(SECOND, "experiment.run.completed", json!({"passed": 4}));
+    ledger.append(&first).unwrap();
+    let anchored = fs::read(&path).unwrap();
+    let anchor = Anchor::of(&anchored);
+
+    let second_line = to_line(&second);
+    let mut unterminated = [anchored.clone(), second_line.clone().into_bytes()].concat();
+    assert_eq!(unterminated.pop(), Some(b'\n'));
+    fs::write(&path, &unterminated).unwrap();
+
+    let (events, recovery) = ledger.read_verified(&anchor).unwrap();
+    assert_eq!(events, vec![first, second.clone()]);
+    assert_eq!(
+        recovery,
+        Recovery {
+            truncated_bytes: 0,
+            appended_newline: true,
+        }
+    );
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        [anchored, second_line.into_bytes()].concat()
+    );
+}
+
+#[test]
+fn duplicate_identical_lines_are_refused_naming_both_lines() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let event = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    ledger.append(&event).unwrap();
+
+    let line = fs::read(&path).unwrap();
+    fs::write(&path, [line.clone(), line].concat()).unwrap();
+
+    let err = ledger.read_recovered().unwrap_err();
+    assert_eq!(err.label, "kaya.ledger.id_reuse");
+    assert!(err.message.contains(FIRST), "{}", err.message);
+    assert!(err.message.contains("lines 1 and 2"), "{}", err.message);
+}
+
+#[test]
+fn duplicate_ids_with_changed_bytes_are_refused_on_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let original = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    let mut changed = original.clone();
+    changed.data = json!({"passed": 9});
+    ledger.append(&original).unwrap();
+
+    fs::write(
+        &path,
+        [
+            to_line(&original).into_bytes(),
+            to_line(&changed).into_bytes(),
+        ]
+        .concat(),
+    )
+    .unwrap();
+
+    let err = ledger.read_recovered().unwrap_err();
+    assert_eq!(err.label, "kaya.ledger.id_reuse");
+    assert!(err.message.contains(FIRST), "{}", err.message);
+    assert!(err.message.contains("lines 1 and 2"), "{}", err.message);
+}
+
+#[test]
+fn resolve_effective_applies_a_run_counts_correction() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let original = experiment_event(
+        FIRST,
+        "experiment.run.completed",
+        json!({"passed": 3, "failed": 1, "ignored": 0, "total": 4}),
+    );
+    let correction = experiment_event(
+        SECOND,
+        "experiment.run.corrected",
+        json!({"supersedes": FIRST, "passed": 4, "failed": 0, "ignored": 0, "total": 4}),
+    );
+
+    ledger.append(&original).unwrap();
+    let original_line = to_line(&original).into_bytes();
+    let before = fs::read(&path).unwrap();
+    ledger.append(&correction).unwrap();
+    let after = fs::read(&path).unwrap();
+    assert_eq!(&after[..before.len()], &before[..]);
+    assert_eq!(&after[..original_line.len()], &original_line[..]);
+
+    let (events, _) = ledger.read_recovered().unwrap();
+    let effective = resolve_effective(&events);
+    assert_eq!(effective.len(), 1);
+
+    let event = &effective[0];
+    assert_eq!(event.id, FIRST);
+    assert_eq!(event.r#type, "experiment.run.completed");
+    assert_eq!(event.subject, original.subject);
+    assert_eq!(event.timestamp, original.timestamp);
+    assert_eq!(
+        event.data,
+        json!({"passed": 4, "failed": 0, "ignored": 0, "total": 4})
+    );
+    assert!(event.data.get("supersedes").is_none());
+    assert_eq!(fs::read(&path).unwrap(), after);
+}
+
+#[test]
+fn resolve_effective_lets_later_corrections_win() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let original = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    let first_correction = experiment_event(
+        SECOND,
+        "experiment.run.corrected",
+        json!({"supersedes": FIRST, "passed": 4}),
+    );
+    let second_correction = experiment_event(
+        THIRD,
+        "experiment.run.corrected",
+        json!({"supersedes": [FIRST], "passed": 5}),
+    );
+    ledger.append(&original).unwrap();
+    ledger.append(&first_correction).unwrap();
+    ledger.append(&second_correction).unwrap();
+
+    let (events, _) = ledger.read_recovered().unwrap();
+    let effective = resolve_effective(&events);
+    assert_eq!(effective.len(), 1);
+    assert_eq!(effective[0].id, FIRST);
+    assert_eq!(effective[0].data, json!({"passed": 5}));
+}
+
+#[test]
+fn stale_anchor_for_a_shorter_ledger_is_refused_naming_the_missing_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    let second = experiment_event(SECOND, "experiment.run.completed", json!({"passed": 4}));
+    ledger.append(&first).unwrap();
+    ledger.append(&second).unwrap();
+
+    let anchor = Anchor::of(&fs::read(&path).unwrap());
+    fs::write(&path, to_line(&first)).unwrap();
+
+    let err = ledger.read_verified(&anchor).unwrap_err();
+    assert_eq!(err.label, "kaya.ledger.digest_mismatch");
+    assert!(err.message.contains("line 2"), "{}", err.message);
+}
+
+#[test]
+fn non_line_aligned_anchor_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    ledger.append(&first).unwrap();
+
+    let bytes = fs::read(&path).unwrap();
+    let anchor = Anchor::of(&bytes[..bytes.len() - 2]);
+    assert!(anchor.line_digests.is_empty());
+
+    let err = ledger.read_verified(&anchor).unwrap_err();
+    assert_eq!(err.label, "kaya.ledger.digest_mismatch");
+    assert!(err.message.contains("line 1"), "{}", err.message);
+}
+
+#[test]
+fn anchor_byte_len_round_trips_through_verification() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    let second = experiment_event(SECOND, "experiment.run.completed", json!({"passed": 4}));
+    ledger.append(&first).unwrap();
+    ledger.append(&second).unwrap();
+
+    let bytes = fs::read(&path).unwrap();
+    let anchor = Anchor::of(&bytes);
+    assert_eq!(anchor.byte_len, bytes.len());
+    assert_eq!(anchor.line_digests.len(), 2);
+    assert_eq!(anchor, Anchor::of(&bytes));
+
+    let (events, recovery) = ledger.read_verified(&anchor).unwrap();
+    assert_eq!(events, vec![first, second]);
+    assert_eq!(recovery, Recovery::default());
 }

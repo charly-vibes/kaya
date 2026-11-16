@@ -9,6 +9,9 @@
 # Rust build output
 /target/
 
+# mdBook output
+/book/
+
 # tool data dirs (managed by `ddl init --gates`)
 .testaruda/
 .pretender/

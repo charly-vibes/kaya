@@ -4,6 +4,8 @@
 //! derives from.
 //! Responsibilities: crash-tail recovery, idempotent append, id-reuse
 //! refusal, digest-anchored reads, and supersede-aware resolution.
+//! Recovery preserves a complete final record by appending its missing
+//! newline; only bytes that cannot parse as one event are truncated.
 //! Rationale: one plain file of lines under version control needs no
 //! database, stays diffable, and — because written bytes are never rewritten
 //! — a correction must be a new event naming the superseded id.
@@ -78,11 +80,13 @@ impl Ledger {
         &self.path
     }
 
-    /// Read every stored event, repairing a truncated final line first.
+    /// Read every stored event, repairing the final line first.
     ///
-    /// A crash can leave at most one partial final line; because the ledger
-    /// is append-only, dropping that unwritten tail is the only legal
-    /// recovery. The number of bytes removed is reported.
+    /// A crash can leave at most one partial final line. If that line parses
+    /// as a complete event, recovery appends the missing newline without
+    /// touching preceding bytes; otherwise it truncates the partial line.
+    /// Either repair is reported in the returned [`Recovery`]. This is the
+    /// explicit unverified path; projections use [`Self::read_verified`].
     pub fn read_recovered(&self) -> Result<(Vec<Event>, Recovery), LedgerError> {
         let loaded = self.load()?;
         Ok((loaded.events, loaded.recovery))
@@ -90,26 +94,66 @@ impl Ledger {
 
     /// Read every stored event, then verify the ledger against `anchor`.
     ///
-    /// A mismatch refuses the whole read and names the first differing
-    /// 1-based line; projections never serve from unverifiable history.
-    pub fn read_verified(&self, anchor: Option<&Anchor>) -> Result<Vec<Event>, LedgerError> {
+    /// Recovery runs first so a crash tail is reported rather than mistaken
+    /// for tampering. Verification then requires the anchored byte prefix to
+    /// be unchanged and every byte after it to be a complete, valid line
+    /// (growth is valid, mutation is not). A mismatch refuses the whole read
+    /// and names the first differing 1-based line; projections never serve
+    /// from unverifiable history.
+    pub fn read_verified(&self, anchor: &Anchor) -> Result<(Vec<Event>, Recovery), LedgerError> {
         let loaded = self.load()?;
-        if let Some(expected) = anchor {
-            let actual = Anchor::of(&loaded.bytes);
-            if &actual != expected {
-                let line = first_differing_line(expected, &actual);
-                return Err(LedgerError::new(
-                    LABEL_DIGEST,
-                    format!(
-                        "ledger {} does not match its anchor: line {line} differs (anchor digest {}, current digest {}); refusing to serve from unverifiable history",
-                        self.path.display(),
-                        expected.digest,
-                        actual.digest
-                    ),
-                ));
-            }
+        self.verify(anchor, &loaded.bytes)?;
+        Ok((loaded.events, loaded.recovery))
+    }
+
+    /// Refuse `bytes` unless they extend the anchored prefix without changing it.
+    fn verify(&self, anchor: &Anchor, bytes: &[u8]) -> Result<(), LedgerError> {
+        if bytes.len() < anchor.byte_len {
+            let line = first_differing_line(anchor, &Anchor::of(bytes));
+            return Err(self.digest_mismatch(anchor, bytes, line));
         }
-        Ok(loaded.events)
+        let prefix = &bytes[..anchor.byte_len];
+        if sha256_hex(prefix) != anchor.digest {
+            let line = first_differing_line(anchor, &Anchor::of(prefix));
+            return Err(self.digest_mismatch(anchor, bytes, line));
+        }
+        if !prefix.is_empty() && !prefix.ends_with(b"\n") {
+            // The anchor ends in the middle of a line: the prefix itself is
+            // corrupt, so there is no complete line to attribute it to. Line
+            // 1 is the conservative first-line report.
+            return Err(self.digest_mismatch(anchor, bytes, 1));
+        }
+        if prefix.iter().filter(|byte| **byte == b'\n').count() != anchor.line_digests.len() {
+            let line = first_differing_line(anchor, &Anchor::of(prefix));
+            return Err(self.digest_mismatch(anchor, bytes, line));
+        }
+        let actual = Anchor::of(bytes);
+        if !actual.line_digests.starts_with(&anchor.line_digests) {
+            let line = first_differing_line(anchor, &actual);
+            return Err(self.digest_mismatch(anchor, bytes, line));
+        }
+        if !bytes.is_empty() && !bytes.ends_with(b"\n") {
+            // Recovery leaves only complete lines, so this is unreachable
+            // unless recovery itself was bypassed; refuse rather than serve
+            // a partial trailing record.
+            let line = actual.line_digests.len() + 1;
+            return Err(self.digest_mismatch(anchor, bytes, line));
+        }
+        Ok(())
+    }
+
+    fn digest_mismatch(&self, anchor: &Anchor, bytes: &[u8], line: usize) -> LedgerError {
+        LedgerError::new(
+            LABEL_DIGEST,
+            format!(
+                "ledger {} does not match its anchor: line {line} differs (anchor digest {} over {} bytes, current digest {} over {} bytes); refusing to serve from unverifiable history",
+                self.path.display(),
+                anchor.digest,
+                anchor.byte_len,
+                sha256_hex(bytes),
+                bytes.len()
+            ),
+        )
     }
 
     /// Append one event unless it is already stored byte-identically.
@@ -199,17 +243,15 @@ impl Ledger {
             })?;
             match first_line.get(&event.id) {
                 Some(previous) => {
-                    if line_bytes[*previous].as_slice() != raw.as_slice() {
-                        return Err(LedgerError::new(
-                            LABEL_ID_REUSE,
-                            format!(
-                                "event id \"{}\" appears on ledger lines {} and {} with different bytes; ids are never reused — record a correction naming the id in data.supersedes",
-                                event.id,
-                                previous + 1,
-                                index + 1
-                            ),
-                        ));
-                    }
+                    return Err(LedgerError::new(
+                        LABEL_ID_REUSE,
+                        format!(
+                            "event id \"{}\" appears on ledger lines {} and {}; ids are never reused — record a correction naming the id in data.supersedes",
+                            event.id,
+                            previous + 1,
+                            index + 1
+                        ),
+                    ));
                 }
                 None => {
                     first_line.insert(event.id.clone(), index);
@@ -225,24 +267,50 @@ impl Ledger {
         })
     }
 
-    /// Drop a crash-truncated final line, on disk as well as in memory.
+    /// Repair the final line, on disk as well as in memory.
+    ///
+    /// A complete event lacking only its newline is preserved: the newline is
+    /// appended and no preceding byte changes. Only a tail that cannot parse
+    /// as one event is truncated.
     fn recover(&self, bytes: &mut Vec<u8>) -> Result<Recovery, LedgerError> {
         if bytes.is_empty() || bytes.ends_with(b"\n") {
-            return Ok(Recovery { truncated_bytes: 0 });
+            return Ok(Recovery::default());
         }
-        let keep = bytes
+        let line_start = bytes
             .iter()
             .rposition(|byte| *byte == b'\n')
             .map_or(0, |index| index + 1);
-        let truncated_bytes = bytes.len() - keep;
-        bytes.truncate(keep);
+        let tail = &bytes[line_start..];
+        let tail_len = tail.len();
+        let complete = std::str::from_utf8(tail)
+            .ok()
+            .is_some_and(|text| event::parse_line(text).is_ok());
+        if complete {
+            let mut file = OpenOptions::new()
+                .append(true)
+                .open(&self.path)
+                .map_err(|err| io_error(&self.path, "append a newline to", err))?;
+            file.write_all(b"\n")
+                .map_err(|err| io_error(&self.path, "append a newline to", err))?;
+            file.flush()
+                .map_err(|err| io_error(&self.path, "flush", err))?;
+            bytes.push(b'\n');
+            return Ok(Recovery {
+                truncated_bytes: 0,
+                appended_newline: true,
+            });
+        }
+        bytes.truncate(line_start);
         let file = OpenOptions::new()
             .write(true)
             .open(&self.path)
             .map_err(|err| io_error(&self.path, "truncate the crash tail of", err))?;
-        file.set_len(keep as u64)
+        file.set_len(line_start as u64)
             .map_err(|err| io_error(&self.path, "truncate the crash tail of", err))?;
-        Ok(Recovery { truncated_bytes })
+        Ok(Recovery {
+            truncated_bytes: tail_len,
+            appended_newline: false,
+        })
     }
 }
 
@@ -255,11 +323,13 @@ pub enum AppendOutcome {
     Duplicate,
 }
 
-/// Report of a read-time crash-tail repair.
+/// Report of a read-time final-line repair.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Recovery {
-    /// Bytes removed from a truncated final line; zero means no repair.
+    /// Bytes removed from a truncated final line; zero means no truncation.
     pub truncated_bytes: usize,
+    /// Whether a complete final event lacked its newline and had one appended.
+    pub appended_newline: bool,
 }
 
 /// SHA-256 of `bytes` as lowercase hex.
@@ -270,14 +340,20 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 /// Content digest binding a ledger read to the bytes it verified.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Anchor {
-    /// SHA-256 over the whole ledger byte sequence.
+    /// SHA-256 over the anchored ledger byte sequence.
     pub digest: String,
-    /// Ordered SHA-256 of each line, newline included.
+    /// Number of anchored bytes; the ledger may grow beyond this prefix.
+    pub byte_len: usize,
+    /// Ordered SHA-256 of each newline-terminated line in the prefix.
     pub line_digests: Vec<String>,
 }
 
 impl Anchor {
     /// Compute the anchor of an exact ledger byte sequence.
+    ///
+    /// Line digests cover newline-terminated lines only; `byte_len` still
+    /// records every byte, including an unterminated tail, so verification
+    /// can refuse an anchor that does not end on a line boundary.
     pub fn of(bytes: &[u8]) -> Self {
         let mut line_digests = Vec::new();
         let mut start = 0;
@@ -287,11 +363,9 @@ impl Anchor {
                 start = index + 1;
             }
         }
-        if start < bytes.len() {
-            line_digests.push(sha256_hex(&bytes[start..]));
-        }
         Self {
             digest: sha256_hex(bytes),
+            byte_len: bytes.len(),
             line_digests,
         }
     }
@@ -319,6 +393,79 @@ pub fn resolve(events: &[Event]) -> Vec<&Event> {
         .filter(|(index, _)| !dropped[*index])
         .map(|(_, event)| event)
         .collect()
+}
+
+/// Apply corrections to the events they supersede, preserving target identity.
+///
+/// Each event naming a target in `data.supersedes` patches that target's
+/// `data` with its own data minus the `supersedes` key. The target keeps its
+/// id, type, subject, and timestamp, so a Run-counts correction remains a
+/// Run observation with corrected numbers. Later corrections win, and
+/// correction events themselves are instructions rather than observations,
+/// so they are not returned.
+pub fn resolve_effective(events: &[Event]) -> Vec<Event> {
+    let mut corrections: HashMap<&str, Vec<&str>> = HashMap::new();
+    for event in events {
+        let targets = supersede_targets(&event.data);
+        if !targets.is_empty() {
+            corrections.insert(event.id.as_str(), targets);
+        }
+    }
+    let mut effective_data: HashMap<String, serde_json::Value> = HashMap::new();
+    let mut visiting: HashSet<String> = HashSet::new();
+    for event in events {
+        let Some(targets) = corrections.get(event.id.as_str()) else {
+            continue;
+        };
+        let mut data = event.data.clone();
+        if let serde_json::Value::Object(fields) = &mut data {
+            fields.remove("supersedes");
+        }
+        for &target in targets {
+            apply_effective_data(
+                target,
+                &data,
+                &corrections,
+                &mut effective_data,
+                &mut visiting,
+            );
+        }
+    }
+    events
+        .iter()
+        .filter(|event| !corrections.contains_key(event.id.as_str()))
+        .map(|event| {
+            let mut effective = event.clone();
+            if let Some(data) = effective_data.get(&event.id) {
+                effective.data = data.clone();
+            }
+            effective
+        })
+        .collect()
+}
+
+/// Patch the ultimate target of `target`, following a correction chain.
+fn apply_effective_data(
+    target: &str,
+    data: &serde_json::Value,
+    corrections: &HashMap<&str, Vec<&str>>,
+    effective_data: &mut HashMap<String, serde_json::Value>,
+    visiting: &mut HashSet<String>,
+) {
+    if !visiting.insert(target.to_owned()) {
+        return;
+    }
+    match corrections.get(target) {
+        Some(nested_targets) => {
+            for &nested in nested_targets {
+                apply_effective_data(nested, data, corrections, effective_data, visiting);
+            }
+        }
+        None => {
+            effective_data.insert(target.to_owned(), data.clone());
+        }
+    }
+    visiting.remove(target);
 }
 
 fn supersede_targets(data: &serde_json::Value) -> Vec<&str> {
@@ -393,7 +540,7 @@ impl Loaded {
             events: Vec::new(),
             line_bytes: Vec::new(),
             bytes: Vec::new(),
-            recovery: Recovery { truncated_bytes: 0 },
+            recovery: Recovery::default(),
         }
     }
 }
