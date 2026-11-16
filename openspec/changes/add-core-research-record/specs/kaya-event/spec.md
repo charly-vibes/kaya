@@ -86,8 +86,10 @@ dedicated scenario.
 
 #### Scenario: well_formed_round_trips
 
-- **WHEN** a valid record passes ingest validation
-- **THEN** the parsed value serializes back to the identical input bytes
+- **WHEN** a canonical valid record passes ingest validation
+- **THEN** the parsed value serializes back to the identical input bytes,
+  and a non-canonical record is accepted and normalized to the canonical
+  form
 - **VERIFIES** [[kaya.event.well_formed_round_trip]]
 
 #### Scenario: timestamp_rfc3339_checked

@@ -24,7 +24,7 @@ schema-level half of the promotion rules (`kaya.promotion`).
 | timestamp_rfc3339       | invariant | `timestamp is RFC 3339 UTC — a non-conforming timestamp is a labeled refusal naming the field`                                                                                                          | [[kaya.event.layer]] |
 | provenance_present      | invariant | `provenance names the emitting source (tool or human origin) and a reference (commit, artifact path, or session id) resolvable outside the ledger`                                                     | [[kaya.event.layer]] |
 | type_namespaced         | invariant | `type is a dotted namespaced path <domain>.<subject>.<outcome> (for example experiment.run.completed) — an unnamespaced type is a labeled refusal`                                                     | [[kaya.event.layer]] |
-| observation_only        | invariant | `an event records observations (counts, paths, references, statuses as emitted by its source) and carries no interpretation field — hypothesis verdicts and conclusions are promotion's territory, not the schema's` | [[kaya.event.layer]] |
+| observation_only        | invariant | `an event records observations (counts, paths, references, statuses as emitted by its source) and carries no top-level interpretation field in data — hypothesis verdicts and conclusions are promotion's territory, not the schema's` | [[kaya.event.layer]] |
 | envelope_independence   | extension_point | `kaya.event/v0 records are ledger payloads, distinct from CLI command envelopes (genesis conventions); the seam where CLI I/O wraps events is declared here and revisited after the first end-to-end dossier` | [[kaya.event.layer]] |
 
 ## Model
@@ -49,7 +49,7 @@ schema-level half of the promotion rules (`kaya.promotion`).
 | unknown_version_refused    | unit | [[kaya.event.layer.schema_version_pinned]]  | `record_with_unknown_schema()`   | `ingest ⇒ labeled refusal ∧ no ledger write`                            |
 | missing_provenance_refused | unit | [[kaya.event.layer.provenance_present]]     | `record_without_provenance()`    | `ingest ⇒ refusal naming provenance`                                    |
 | id_reuse_refused           | unit | [[kaya.event.layer.stable_ids]]             | `stored_id_with_changed_body()`  | `ingest ⇒ refusal naming the colliding id`                              |
-| well_formed_round_trip     | unit | [[kaya.event.layer.field_set_closed]]       | `arbitrary_valid_record()`       | `parse ∘ serialize == identity on input bytes`                          |
+| well_formed_round_trip     | unit | [[kaya.event.layer.field_set_closed]]       | `arbitrary_valid_record()`       | `parse ∘ serialize == identity on canonical lines; non-canonical input is normalized to the canonical form` |
 | timestamp_rfc3339_checked   | unit | [[kaya.event.layer.timestamp_rfc3339]]      | `record_with_loose_timestamp()`  | `ingest ⇒ refusal naming timestamp`                                     |
 | field_set_closed_checked   | unit | [[kaya.event.layer.field_set_closed]]       | `record_with_extra_field()`      | `ingest ⇒ refusal naming the extra field`                               |
 | type_namespaced_checked     | unit | [[kaya.event.layer.type_namespaced]]        | `record_with_bare_type()`        | `ingest ⇒ refusal naming the type grammar`                              |
