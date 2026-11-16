@@ -206,10 +206,11 @@ fn status_without_ledger_is_a_labeled_error() {
     assert_eq!(envelope["envelope_kind"], json!("error"));
     assert_eq!(envelope["data"], Value::Null);
 
-    let label = envelope["error"]["label"]
-        .as_str()
-        .expect("error envelopes carry a label");
-    assert!(!label.is_empty(), "error label must not be empty");
+    assert_eq!(
+        envelope["error"]["label"],
+        json!("missing-ledger"),
+        "an absent ledger is the missing-ledger failure class"
+    );
 
     let message = envelope["error"]["message"]
         .as_str()
@@ -221,5 +222,87 @@ fn status_without_ledger_is_a_labeled_error() {
     assert!(
         message.contains("kaya init"),
         "error message must suggest `kaya init`: {message}"
+    );
+}
+
+#[test]
+fn init_refuses_a_directory_at_the_ledger_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let ledger_path = dir.path().join(LEDGER);
+    fs::create_dir_all(&ledger_path).unwrap();
+
+    let output = kaya(&dir).arg("init").output().unwrap();
+    assert_eq!(output.status.code(), Some(1));
+
+    let envelope = parse_envelope(&output);
+    assert_eq!(envelope["ok"], json!(false));
+    assert_eq!(envelope["envelope_kind"], json!("error"));
+    assert_eq!(envelope["data"], Value::Null);
+    assert_eq!(
+        envelope["error"]["label"],
+        json!("not-a-file"),
+        "a non-file shadowing the ledger is the not-a-file failure class"
+    );
+
+    let message = envelope["error"]["message"]
+        .as_str()
+        .expect("error envelopes carry a message");
+    assert!(
+        message.contains(LEDGER),
+        "error message must name {LEDGER}: {message}"
+    );
+    assert!(
+        message.contains("not a regular ledger file"),
+        "error message must say the path is not a regular ledger file: {message}"
+    );
+    assert!(
+        ledger_path.is_dir(),
+        "init must never replace a non-file with a ledger"
+    );
+}
+
+#[test]
+fn unknown_subcommand_is_a_labeled_usage_error() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let output = kaya(&dir).arg("frobnicate").output().unwrap();
+    assert_eq!(output.status.code(), Some(1));
+
+    let envelope = parse_envelope(&output);
+    assert_eq!(envelope["ok"], json!(false));
+    assert_eq!(envelope["envelope_kind"], json!("error"));
+    assert_eq!(envelope["data"], Value::Null);
+    assert_eq!(
+        envelope["error"]["label"],
+        json!("usage"),
+        "argparse failures are the usage failure class"
+    );
+
+    let message = envelope["error"]["message"]
+        .as_str()
+        .expect("error envelopes carry a message");
+    assert!(
+        message.contains("frobnicate"),
+        "usage message must name the offending subcommand: {message}"
+    );
+}
+
+#[test]
+fn help_and_version_stay_human_readable_and_succeed() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let help = kaya(&dir).arg("--help").output().unwrap();
+    assert_eq!(help.status.code(), Some(0));
+    let help_text = String::from_utf8_lossy(&help.stdout);
+    assert!(
+        help_text.contains("Usage"),
+        "--help must print clap's usage text, not an envelope: {help_text}"
+    );
+
+    let version = kaya(&dir).arg("--version").output().unwrap();
+    assert_eq!(version.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&version.stdout).contains(env!("CARGO_PKG_VERSION")),
+        "--version must print the version"
     );
 }

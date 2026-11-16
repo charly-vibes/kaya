@@ -1,0 +1,349 @@
+//! Documentation as a compilation: the managed-block grammar.
+//!
+//! A projection document mixes compiler-owned generated sections with
+//! human-maintained authored sections. kaya owns only its own markers:
+//! everything between `<!-- kaya:begin generated:<name> -->` and
+//! `<!-- kaya:end generated:<name> -->` may be rewritten, everything
+//! between `<!-- kaya:authored -->` and `<!-- kaya:end authored -->` is
+//! interpreted prose, and every other byte — including foreign tools'
+//! managed blocks — is preserved verbatim.
+//!
+//! [`scan`] parses a document into managed blocks and refuses a broken
+//! grammar; [`replace_generated`] rewrites exactly one generated block's
+//! body and leaves the surrounding bytes untouched.
+
+use std::collections::BTreeMap;
+
+pub mod index;
+pub mod report;
+
+/// Prefix of a generated-block begin marker.
+pub const BEGIN_PREFIX: &str = "<!-- kaya:begin generated:";
+
+const END_GENERATED_PREFIX: &str = "<!-- kaya:end generated:";
+const BEGIN_AUTHORED: &str = "<!-- kaya:authored -->";
+const END_AUTHORED: &str = "<!-- kaya:end authored -->";
+const MANAGED_GRAMMAR: &str = "kaya.projection.managed_grammar";
+
+/// A labeled refusal produced by the projection grammar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectionError {
+    /// Failure class, for example `kaya.projection.managed_grammar`.
+    pub label: String,
+    /// Human-readable explanation naming the offending block.
+    pub message: String,
+}
+
+impl ProjectionError {
+    /// Construct a labeled refusal.
+    pub fn new(label: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            message: message.into(),
+        }
+    }
+}
+
+impl std::fmt::Display for ProjectionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.label, self.message)
+    }
+}
+
+impl std::error::Error for ProjectionError {}
+
+/// Who owns a managed block's body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BlockKind {
+    /// Compiler-owned block; the string is its generated name.
+    Generated(String),
+    /// Human-maintained block.
+    Authored,
+}
+
+/// One managed block found in a document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Block {
+    /// Ownership of [`Self::body`].
+    pub kind: BlockKind,
+    /// Bytes strictly between the begin and end markers.
+    pub body: String,
+}
+
+/// An authored block whose cited evidence changed after its acknowledgment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StaleBlock {
+    /// Name of the stale block as reported in the build summary.
+    pub block: String,
+    /// Changed evidence ids backing the stale claim.
+    pub evidence: Vec<String>,
+}
+
+/// The result of rebuilding a projection.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Summary {
+    /// Block names whose bytes were newly generated.
+    pub recomputed: Vec<String>,
+    /// Block names whose bytes already matched and were left alone.
+    pub unchanged: Vec<String>,
+    /// Authored blocks whose evidence moved underneath them.
+    pub stale: Vec<StaleBlock>,
+    /// Generated block name to the sorted node ids backing its facts.
+    pub sources: BTreeMap<String, Vec<String>>,
+}
+
+/// A managed block plus the byte range of its body.
+struct Span {
+    kind: BlockKind,
+    body_start: usize,
+    body_end: usize,
+}
+
+#[derive(Debug)]
+enum Marker<'a> {
+    BeginGenerated(&'a str),
+    EndGenerated(&'a str),
+    BeginAuthored,
+    EndAuthored,
+}
+
+/// Parse every kaya-managed block in `doc`, in document order.
+///
+/// Foreign markers are ordinary prose. An unterminated block, a mismatched
+/// end marker, or a stray end marker is refused with
+/// `kaya.projection.managed_grammar` naming the block.
+pub fn scan(doc: &str) -> Result<Vec<Block>, ProjectionError> {
+    let spans = scan_spans(doc)?;
+    Ok(spans
+        .into_iter()
+        .map(|span| Block {
+            kind: span.kind,
+            body: doc[span.body_start..span.body_end].to_owned(),
+        })
+        .collect())
+}
+
+/// Replace the body of generated block `name` with `body`.
+///
+/// When the block is absent a new generated block is appended at the end of
+/// the document, preceded by one blank line. Every byte outside the named
+/// block's body is preserved exactly. A document with a broken grammar is
+/// refused without producing output.
+pub fn replace_generated(doc: &str, name: &str, body: &str) -> Result<String, ProjectionError> {
+    if !valid_name(name) {
+        return Err(ProjectionError::new(
+            MANAGED_GRAMMAR,
+            format!("invalid generated block name \"{name}\""),
+        ));
+    }
+
+    let spans = scan_spans(doc)?;
+    let mut matching = spans.iter().filter(
+        |span| matches!(&span.kind, BlockKind::Generated(existing) if existing.as_str() == name),
+    );
+
+    if let Some(span) = matching.next() {
+        if matching.next().is_some() {
+            return Err(ProjectionError::new(
+                MANAGED_GRAMMAR,
+                format!("duplicate generated block \"{name}\""),
+            ));
+        }
+        let mut out =
+            String::with_capacity(doc.len() - (span.body_end - span.body_start) + body.len());
+        out.push_str(&doc[..span.body_start]);
+        out.push_str(body);
+        out.push_str(&doc[span.body_end..]);
+        return Ok(out);
+    }
+
+    let mut out = String::with_capacity(doc.len() + body.len() + name.len() * 2 + 64);
+    out.push_str(doc);
+    if !doc.is_empty() {
+        if !doc.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push('\n');
+    }
+    out.push_str(BEGIN_PREFIX);
+    out.push_str(name);
+    out.push_str(" -->\n");
+    out.push_str(body);
+    if !body.is_empty() && !body.ends_with('\n') {
+        out.push('\n');
+    }
+    out.push_str(END_GENERATED_PREFIX);
+    out.push_str(name);
+    out.push_str(" -->\n");
+    Ok(out)
+}
+
+fn scan_spans(doc: &str) -> Result<Vec<Span>, ProjectionError> {
+    let mut lines: Vec<(usize, usize, &str)> = Vec::new();
+    let mut offset = 0;
+    for raw in doc.split_inclusive('\n') {
+        let content = raw.strip_suffix('\n').unwrap_or(raw);
+        lines.push((offset, offset + raw.len(), content));
+        offset += raw.len();
+    }
+
+    let mut spans = Vec::new();
+    let mut index = 0;
+    while index < lines.len() {
+        let marker = match parse_marker(lines[index].2) {
+            Some(marker) => marker,
+            None => {
+                if looks_like_marker(lines[index].2) {
+                    return Err(ProjectionError::new(
+                        MANAGED_GRAMMAR,
+                        format!("malformed kaya marker \"{}\"", lines[index].2.trim()),
+                    ));
+                }
+                index += 1;
+                continue;
+            }
+        };
+
+        match marker {
+            Marker::BeginGenerated(name) => {
+                let body_start = lines[index].1;
+                let mut cursor = index + 1;
+                let closed = loop {
+                    if cursor >= lines.len() {
+                        break None;
+                    }
+                    match parse_marker(lines[cursor].2) {
+                        Some(Marker::EndGenerated(end_name)) => {
+                            if end_name == name {
+                                break Some((cursor, lines[cursor].0));
+                            }
+                            return Err(mismatched_end(name, end_name));
+                        }
+                        Some(Marker::EndAuthored) => {
+                            return Err(mismatched_end(name, "authored"));
+                        }
+                        Some(Marker::BeginGenerated(_)) | Some(Marker::BeginAuthored) => {
+                            break None;
+                        }
+                        None => cursor += 1,
+                    }
+                };
+
+                let (end_line, body_end) = closed.ok_or_else(|| unterminated(name))?;
+                spans.push(Span {
+                    kind: BlockKind::Generated(name.to_owned()),
+                    body_start,
+                    body_end,
+                });
+                index = end_line + 1;
+            }
+            Marker::BeginAuthored => {
+                let body_start = lines[index].1;
+                let mut cursor = index + 1;
+                let closed = loop {
+                    if cursor >= lines.len() {
+                        break None;
+                    }
+                    match parse_marker(lines[cursor].2) {
+                        Some(Marker::EndAuthored) => break Some((cursor, lines[cursor].0)),
+                        Some(Marker::EndGenerated(end_name)) => {
+                            return Err(mismatched_end("authored", end_name));
+                        }
+                        Some(Marker::BeginGenerated(_)) | Some(Marker::BeginAuthored) => {
+                            break None;
+                        }
+                        None => cursor += 1,
+                    }
+                };
+                let (end_line, body_end) = closed.ok_or_else(|| unterminated("authored"))?;
+                spans.push(Span {
+                    kind: BlockKind::Authored,
+                    body_start,
+                    body_end,
+                });
+                index = end_line + 1;
+            }
+            Marker::EndGenerated(name) => {
+                return Err(ProjectionError::new(
+                    MANAGED_GRAMMAR,
+                    format!("end marker for generated block \"{name}\" has no begin marker"),
+                ));
+            }
+            Marker::EndAuthored => {
+                return Err(ProjectionError::new(
+                    MANAGED_GRAMMAR,
+                    "end marker for authored block has no begin marker",
+                ));
+            }
+        }
+    }
+
+    Ok(spans)
+}
+
+fn parse_marker(line: &str) -> Option<Marker<'_>> {
+    let trimmed = line.trim();
+    if trimmed == BEGIN_AUTHORED {
+        return Some(Marker::BeginAuthored);
+    }
+    if trimmed == END_AUTHORED {
+        return Some(Marker::EndAuthored);
+    }
+    if let Some(rest) = trimmed.strip_prefix(BEGIN_PREFIX) {
+        if let Some(name) = rest.strip_suffix(" -->")
+            && valid_name(name)
+        {
+            return Some(Marker::BeginGenerated(name));
+        }
+        return None;
+    }
+    if let Some(rest) = trimmed.strip_prefix(END_GENERATED_PREFIX) {
+        if let Some(name) = rest.strip_suffix(" -->")
+            && valid_name(name)
+        {
+            return Some(Marker::EndGenerated(name));
+        }
+        return None;
+    }
+    None
+}
+
+fn looks_like_marker(line: &str) -> bool {
+    let trimmed = line.trim();
+    trimmed.starts_with("<!-- kaya:begin generated:")
+        || trimmed.starts_with(END_GENERATED_PREFIX)
+        || trimmed.starts_with("<!-- kaya:authored")
+        || trimmed.starts_with("<!-- kaya:end authored")
+}
+
+fn valid_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name
+            .chars()
+            .any(|c| c.is_whitespace() || c == '<' || c == '>')
+}
+
+fn block_label(name: &str) -> String {
+    if name == "authored" {
+        "authored".to_owned()
+    } else {
+        format!("generated:{name}")
+    }
+}
+
+fn unterminated(name: &str) -> ProjectionError {
+    ProjectionError::new(
+        MANAGED_GRAMMAR,
+        format!("unterminated {} block", block_label(name)),
+    )
+}
+
+fn mismatched_end(name: &str, end_name: &str) -> ProjectionError {
+    ProjectionError::new(
+        MANAGED_GRAMMAR,
+        format!(
+            "mismatched end marker \"{end_name}\" while closing {} block",
+            block_label(name)
+        ),
+    )
+}
