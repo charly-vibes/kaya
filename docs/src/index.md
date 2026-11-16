@@ -1,3 +1,7 @@
+> *"Let me tell you about something*
+> *Bigger than a big bamboo (Big bamboo)"*
+> — Sumo, "Kaya"
+
 # kaya — motivation & design
 
 > Documentation that grows out of the work, rather than work that stops to

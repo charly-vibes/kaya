@@ -1,5 +1,6 @@
-> *"Kaya now, got to have kaya now"*
-> — Bob Marley, "Kaya" (1978)
+> *"Let me tell you about something*
+> *Bigger than a big bamboo (Big bamboo)"*
+> — Sumo, "Kaya"
 
 # kaya
 
