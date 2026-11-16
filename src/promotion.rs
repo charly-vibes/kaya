@@ -45,6 +45,8 @@ const LABEL_APPROVAL: &str = "kaya.promotion.approval_required";
 const LABEL_PROVENANCE: &str = "kaya.promotion.approval_provenance";
 const LABEL_UNKNOWN: &str = "kaya.promotion.unknown_assertion";
 const LABEL_CHALLENGE: &str = "kaya.promotion.challenge_target";
+const LABEL_CHALLENGE_EVIDENCE: &str = "kaya.promotion.challenge_evidence";
+const LABEL_ACTOR: &str = "kaya.promotion.actor_required";
 const LABEL_DUPLICATE: &str = "kaya.promotion.duplicate_assertion";
 
 /// A labeled refusal raised by the promotion capability.
@@ -319,15 +321,18 @@ pub fn propose(actor: &Actor, text: &str, event_ids: &[String]) -> Result<Event,
     if actor.r#type == ActorType::Tool {
         return Err(tool_refusal(actor, "propose an assertion"));
     }
+    if actor.name.trim().is_empty() {
+        return Err(PromotionError::new(
+            LABEL_ACTOR,
+            "cannot record an assertion without its author: the actor name is blank",
+        ));
+    }
     let mut missing: Vec<&str> = Vec::new();
     if text.trim().is_empty() {
         missing.push("text");
     }
     if event_ids.is_empty() || event_ids.iter().any(|id| id.trim().is_empty()) {
         missing.push("event_ids");
-    }
-    if actor.name.trim().is_empty() {
-        missing.push("author");
     }
     if !missing.is_empty() {
         return Err(PromotionError::new(
@@ -369,10 +374,16 @@ pub fn approve(approver: &Actor, assertion_id: &str) -> Result<Event, PromotionE
     if approver.r#type != ActorType::Human {
         return Err(approval_refusal_actor(approver, assertion_id));
     }
-    if assertion_id.trim().is_empty() || approver.name.trim().is_empty() {
+    if approver.name.trim().is_empty() {
+        return Err(PromotionError::new(
+            LABEL_ACTOR,
+            "cannot record a conclusion without its approver: the actor name is blank",
+        ));
+    }
+    if assertion_id.trim().is_empty() {
         return Err(PromotionError::new(
             LABEL_PROVENANCE,
-            "a promotion event must name both the approver and the promoted assertion id",
+            "a promotion event must name the promoted assertion id",
         ));
     }
     let id = new_id();
@@ -407,10 +418,28 @@ pub fn challenge(
     if actor.r#type == ActorType::Tool {
         return Err(tool_refusal(actor, "challenge a conclusion"));
     }
-    if conclusion_id.trim().is_empty() || counter_event_ids.is_empty() {
+    if actor.name.trim().is_empty() {
+        return Err(PromotionError::new(
+            LABEL_ACTOR,
+            "cannot record a challenge without its author: the actor name is blank",
+        ));
+    }
+    if conclusion_id.trim().is_empty() {
         return Err(PromotionError::new(
             LABEL_CHANNEL,
-            "a challenge must name a conclusion and at least one counter-event id",
+            "a challenge must name the conclusion it counters",
+        ));
+    }
+    if counter_event_ids.is_empty() {
+        return Err(PromotionError::new(
+            LABEL_CHALLENGE_EVIDENCE,
+            "a challenge requires counter evidence; at least one counter-event id must be cited",
+        ));
+    }
+    if counter_event_ids.iter().any(|id| id.trim().is_empty()) {
+        return Err(PromotionError::new(
+            LABEL_CHALLENGE_EVIDENCE,
+            "a challenge cites a blank counter-event id; counter evidence must name the events it counters",
         ));
     }
     let id = new_id();

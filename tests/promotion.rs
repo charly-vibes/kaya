@@ -188,6 +188,73 @@ fn approval_provenance_is_required() {
 }
 
 #[test]
+fn proposal_requires_a_named_actor() {
+    let error = propose(&human("   "), "counts fell", &["ev-1".to_string()])
+        .expect_err("a blank author is refused");
+    assert_eq!(error.label, "kaya.promotion.actor_required");
+    assert!(
+        error.message.contains("actor"),
+        "refusal names the missing actor: {}",
+        error.message
+    );
+}
+
+#[test]
+fn approval_requires_a_named_actor() {
+    let recorded = propose(&agent(), "counts fell", &["ev-1".to_string()]).expect("agent proposes");
+    let assertion_id = recorded.subject.id.clone();
+
+    let error =
+        approve(&human(" \t "), &assertion_id).expect_err("a blank approver name is refused");
+    assert_eq!(error.label, "kaya.promotion.actor_required");
+    assert!(
+        error.message.contains("actor"),
+        "refusal names the missing actor: {}",
+        error.message
+    );
+}
+
+#[test]
+fn challenge_requires_counter_evidence() {
+    let error = challenge(&agent(), "assertion-1", &[])
+        .expect_err("a challenge without counter evidence is refused");
+    assert_eq!(error.label, "kaya.promotion.challenge_evidence");
+    assert!(
+        error.message.contains("counter evidence"),
+        "refusal names the missing counter evidence: {}",
+        error.message
+    );
+}
+
+#[test]
+fn challenge_rejects_blank_counter_ids() {
+    let error = challenge(
+        &agent(),
+        "assertion-1",
+        &["ev-2".to_string(), " \t ".to_string()],
+    )
+    .expect_err("a blank counter-event id is refused");
+    assert_eq!(error.label, "kaya.promotion.challenge_evidence");
+    assert!(
+        error.message.contains("counter-event id"),
+        "refusal names the missing counter evidence: {}",
+        error.message
+    );
+}
+
+#[test]
+fn challenge_requires_a_named_actor() {
+    let error = challenge(&human("   "), "assertion-1", &["ev-2".to_string()])
+        .expect_err("a blank challenge author is refused");
+    assert_eq!(error.label, "kaya.promotion.actor_required");
+    assert!(
+        error.message.contains("actor"),
+        "refusal names the missing actor: {}",
+        error.message
+    );
+}
+
+#[test]
 fn challenge_demotes_displayed_status_without_deleting_the_record() {
     let recorded = propose(&human("alice"), "H-001 is falsified", &["ev-1".to_string()])
         .expect("human proposes");
