@@ -19,6 +19,12 @@ use crate::event::Event;
 pub const ENTITY_CREATED_EVENT: &str = "model.entity.created";
 /// Event type that asserts a typed relationship between two nodes.
 pub const RELATIONSHIP_ASSERTED_EVENT: &str = "model.relationship.asserted";
+/// Adapter capture event that records an observed artifact.
+pub const ARTIFACT_OBSERVED_EVENT: &str = "capture.artifact.observed";
+/// Adapter capture event that records an observed commit.
+pub const COMMIT_OBSERVED_EVENT: &str = "capture.commit.observed";
+/// Adapter capture event that records a completed experiment run.
+pub const RUN_COMPLETED_EVENT: &str = "experiment.run.completed";
 
 const ENTITY_TYPE_SET: &str = "{Project, Question, Idea, Hypothesis, Model, Experiment, Run, Artifact, Observation, Claim, Finding, Decision, Source}";
 const RELATIONSHIP_SET: &str = "{investigates, predicts, executes, observes, supports, challenges, influences, realizes, derives}";
@@ -369,19 +375,69 @@ impl GraphBuilder {
 
 /// Build a graph from ledger events.
 ///
-/// `model.entity.created` events create nodes; `model.relationship.asserted`
-/// events add edges. Other event types are ignored — the model interprets
-/// only the two events that describe its own structure.
+/// `model.entity.created` events create nodes and
+/// `model.relationship.asserted` events add edges. Adapter capture events
+/// (`capture.artifact.observed`, `capture.commit.observed`, and
+/// `experiment.run.completed`) create the Artifact and Run nodes they
+/// observed; no relationships are inferred from them. Other event types are
+/// ignored — the model interprets only the events that describe its own
+/// structure.
 pub fn build(events: &[Event]) -> Result<Graph, ModelError> {
     let mut builder = GraphBuilder::new();
     for event in events {
         match event.r#type.as_str() {
             ENTITY_CREATED_EVENT => entity_from_event(event, &mut builder)?,
             RELATIONSHIP_ASSERTED_EVENT => relationship_from_event(event, &mut builder)?,
+            ARTIFACT_OBSERVED_EVENT => {
+                capture_from_event(event, EntityType::Artifact, &["path", "kind"], &mut builder)?
+            }
+            COMMIT_OBSERVED_EVENT => capture_from_event(
+                event,
+                EntityType::Artifact,
+                &["sha", "message"],
+                &mut builder,
+            )?,
+            RUN_COMPLETED_EVENT => capture_from_event(
+                event,
+                EntityType::Run,
+                &["passed", "failed", "ignored", "total"],
+                &mut builder,
+            )?,
             _ => {}
         }
     }
     builder.build()
+}
+
+fn capture_from_event(
+    event: &Event,
+    entity: EntityType,
+    fields: &[&str],
+    builder: &mut GraphBuilder,
+) -> Result<(), ModelError> {
+    let subject_entity = EntityType::from_str(&event.subject.r#type)?;
+    if subject_entity != entity {
+        return Err(ModelError::new(
+            "kaya.model.namespaced_ids",
+            format!(
+                "capture event \"{}\" has subject id \"{}\" typed {} but the event creates a {} node",
+                event.id,
+                event.subject.id,
+                subject_entity.as_str(),
+                entity.as_str()
+            ),
+        ));
+    }
+    let mut attributes = Map::new();
+    if let Some(data) = event.data.as_object() {
+        for field in fields {
+            if let Some(value) = data.get(*field) {
+                attributes.insert((*field).to_owned(), value.clone());
+            }
+        }
+    }
+    builder.entity(event.subject.id.clone(), entity, Value::Object(attributes))?;
+    Ok(())
 }
 
 fn entity_from_event(event: &Event, builder: &mut GraphBuilder) -> Result<(), ModelError> {

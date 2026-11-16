@@ -347,6 +347,109 @@ fn forward_grammar_builds_and_missing_attributes_default_to_an_object() {
 }
 
 #[test]
+fn capture_events_create_artifact_and_run_nodes_with_attributes() {
+    let events = [
+        event(
+            "capture.artifact.observed",
+            "Artifact",
+            "alpha/Artifact/ART-001",
+            json!({ "path": "target/report.json", "kind": "json" }),
+            1,
+        ),
+        event(
+            "capture.commit.observed",
+            "Artifact",
+            "alpha/Artifact/ART-002",
+            json!({ "sha": "abc123", "message": "fix cache" }),
+            2,
+        ),
+        event(
+            "capture.artifact.observed",
+            "Artifact",
+            "alpha/Artifact/ART-003",
+            json!({ "path": "target/only-path.log" }),
+            3,
+        ),
+        event(
+            "experiment.run.completed",
+            "Run",
+            "alpha/Run/RUN-001",
+            json!({ "passed": 10, "failed": 1, "ignored": 0, "total": 11 }),
+            4,
+        ),
+    ];
+
+    let graph = expect_graph(build(&events));
+
+    assert_eq!(graph.nodes().count(), 4);
+    assert_eq!(graph.edges().count(), 0);
+
+    let artifact = graph
+        .node("alpha/Artifact/ART-001")
+        .expect("artifact node present");
+    assert_eq!(artifact.entity, EntityType::Artifact);
+    assert_eq!(
+        artifact.attributes,
+        json!({ "path": "target/report.json", "kind": "json" })
+    );
+
+    let commit = graph
+        .node("alpha/Artifact/ART-002")
+        .expect("commit artifact node present");
+    assert_eq!(commit.entity, EntityType::Artifact);
+    assert_eq!(
+        commit.attributes,
+        json!({ "sha": "abc123", "message": "fix cache" })
+    );
+
+    let partial = graph
+        .node("alpha/Artifact/ART-003")
+        .expect("partial artifact node present");
+    assert_eq!(
+        partial.attributes,
+        json!({ "path": "target/only-path.log" })
+    );
+
+    let run = graph.node("alpha/Run/RUN-001").expect("run node present");
+    assert_eq!(run.entity, EntityType::Run);
+    assert_eq!(
+        run.attributes,
+        json!({ "passed": 10, "failed": 1, "ignored": 0, "total": 11 })
+    );
+}
+
+#[test]
+fn capture_events_still_validate_namespaced_subject_ids() {
+    let unqualified = [event(
+        "capture.artifact.observed",
+        "Artifact",
+        "ART-001",
+        json!({ "path": "target/report.json" }),
+        1,
+    )];
+
+    let error = expect_refusal(build(&unqualified));
+    assert_eq!(error.label, "kaya.model.namespaced_ids");
+    assert!(error.message.contains("ART-001"), "{}", error.message);
+
+    let mismatched_type = [event(
+        "experiment.run.completed",
+        "Artifact",
+        "alpha/Artifact/ART-001",
+        json!({ "passed": 1 }),
+        1,
+    )];
+
+    let error = expect_refusal(build(&mismatched_type));
+    assert_eq!(error.label, "kaya.model.namespaced_ids");
+    assert!(
+        error.message.contains("alpha/Artifact/ART-001"),
+        "{}",
+        error.message
+    );
+}
+
+#[test]
 fn ids_must_be_namespaced_and_match_the_entity_type() {
     let mut builder = GraphBuilder::new();
 
