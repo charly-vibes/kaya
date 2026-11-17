@@ -1,0 +1,11 @@
+run_id: tdd-ro5u-2026-11-17-kaya-scq-status-release-architecture
+pipeline: tdd-ro5u
+topic: kaya-scq status release architecture
+created_at: '2026-11-17T23:13:17.592649539+00:00'
+current_step: 8
+approvals: {}
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []
