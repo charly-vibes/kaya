@@ -144,18 +144,36 @@ fn assertion_event(id: &str, text: &str, cites: &[&str]) -> Value {
     })
 }
 
-fn experiment_event(event_id: &str, node_id: &str, title: &str) -> Value {
+fn node_event(event_id: &str, kind: &str, node_id: &str, title: &str) -> Value {
     json!({
         "id": event_id,
         "schema": "kaya.event/v0",
         "type": "model.entity.created",
         "timestamp": "2026-11-16T10:00:00Z",
         "actor": { "type": "human", "name": "alice" },
-        "subject": { "type": "Experiment", "id": node_id },
+        "subject": { "type": kind, "id": node_id },
         "data": { "attributes": { "title": title } },
         "provenance": { "tool": "kaya", "version": "0.1.0", "reference": event_id },
         "artifacts": [],
     })
+}
+
+fn relationship_event(event_id: &str, relationship: &str, from: &str, to: &str) -> Value {
+    json!({
+        "id": event_id,
+        "schema": "kaya.event/v0",
+        "type": "model.relationship.asserted",
+        "timestamp": "2026-11-16T10:00:00Z",
+        "actor": { "type": "human", "name": "alice" },
+        "subject": { "type": "Relationship", "id": from },
+        "data": { "relationship": relationship, "from": from, "to": to },
+        "provenance": { "tool": "kaya", "version": "0.1.0", "reference": event_id },
+        "artifacts": [],
+    })
+}
+
+fn experiment_event(event_id: &str, node_id: &str, title: &str) -> Value {
+    node_event(event_id, "Experiment", node_id, title)
 }
 
 fn run_event(event_id: &str, run_id: &str, passed: u64) -> Value {
@@ -364,19 +382,54 @@ fn build_writes_one_report_per_experiment() {
         "alpha/Experiment/exp-one",
         "Other Exp One",
     ));
-    write_ledger(&dir, &[experiment, other_project]);
+    // Each experiment declares intent, so a specification block renders.
+    let question = event_line(&node_event(
+        "entity-3",
+        "Question",
+        "kaya/Question/q-one",
+        "Q One",
+    ));
+    let other_question = event_line(&node_event(
+        "entity-4",
+        "Question",
+        "alpha/Question/q-one",
+        "Other Q One",
+    ));
+    let investigates = event_line(&relationship_event(
+        "rel-1",
+        "investigates",
+        "kaya/Question/q-one",
+        "kaya/Experiment/exp-one",
+    ));
+    let other_investigates = event_line(&relationship_event(
+        "rel-2",
+        "investigates",
+        "alpha/Question/q-one",
+        "alpha/Experiment/exp-one",
+    ));
+    write_ledger(
+        &dir,
+        &[
+            experiment,
+            other_project,
+            question,
+            other_question,
+            investigates,
+            other_investigates,
+        ],
+    );
 
     let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
     let recomputed = built["data"]["recomputed"]
         .as_array()
         .expect("recomputed is a list");
     for name in [
-        "experiment-report:kaya/Experiment/exp-one",
-        "experiment-report:alpha/Experiment/exp-one",
+        "exploration.experiment-specification:kaya/Experiment/exp-one",
+        "exploration.experiment-specification:alpha/Experiment/exp-one",
     ] {
         assert!(
             recomputed.iter().any(|candidate| candidate == name),
-            "each report has a distinct summary name ({name}): {recomputed:?}"
+            "each specification block has a distinct summary name ({name}): {recomputed:?}"
         );
     }
 
@@ -387,8 +440,12 @@ fn build_writes_one_report_per_experiment() {
         let report = fs::read_to_string(dir.path().join(path))
             .unwrap_or_else(|err| panic!("the report path sanitizes every id for {path}: {err}"));
         assert!(
-            report.contains("<!-- kaya:begin generated:experiment-report -->"),
-            "report carries the generated block marker: {report}"
+            report.contains("<!-- kaya:begin generated:exploration.experiment-specification -->"),
+            "report carries the specification block marker: {report}"
+        );
+        assert!(
+            !report.contains("exploration.experiment-record"),
+            "an experiment with no runs writes no record block: {report}"
         );
     }
 
@@ -396,8 +453,9 @@ fn build_writes_one_report_per_experiment() {
         .as_object()
         .expect("build exposes the merged source map");
     assert!(
-        sources.contains_key("experiment-report:kaya/Experiment/exp-one")
-            && sources.contains_key("experiment-report:alpha/Experiment/exp-one"),
+        sources.contains_key("exploration.experiment-specification:kaya/Experiment/exp-one")
+            && sources
+                .contains_key("exploration.experiment-specification:alpha/Experiment/exp-one"),
         "each report has its own source-map entry: {sources:?}"
     );
 
@@ -407,8 +465,293 @@ fn build_writes_one_report_per_experiment() {
         "index lists both experiments: {index}"
     );
     assert!(
-        index.contains("_2 nodes from 2 events._"),
+        index.contains("_4 nodes from 6 events._"),
         "the index summary counts rendered nodes and ledger events: {index}"
+    );
+}
+
+#[test]
+fn omitted_kinds_reported_once_in_build_envelope() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    let lines = [
+        event_line(&experiment_event(
+            "entity-1",
+            "kaya/Experiment/exp-one",
+            "Exp One",
+        )),
+        event_line(&experiment_event(
+            "entity-2",
+            "kaya/Experiment/exp-two",
+            "Exp Two",
+        )),
+        event_line(&node_event(
+            "entity-3",
+            "Question",
+            "kaya/Question/q-one",
+            "Q One",
+        )),
+        event_line(&node_event(
+            "entity-4",
+            "Question",
+            "kaya/Question/q-two",
+            "Q Two",
+        )),
+        event_line(&relationship_event(
+            "rel-1",
+            "investigates",
+            "kaya/Question/q-one",
+            "kaya/Experiment/exp-one",
+        )),
+        event_line(&relationship_event(
+            "rel-2",
+            "investigates",
+            "kaya/Question/q-two",
+            "kaya/Experiment/exp-two",
+        )),
+        // Only exp-one has a run; exp-two has no records to report.
+        event_line(&run_event("run-1", "kaya/Run/run-1", 1)),
+        event_line(&relationship_event(
+            "rel-3",
+            "executes",
+            "kaya/Run/run-1",
+            "kaya/Experiment/exp-one",
+        )),
+    ];
+    write_ledger(&dir, &lines);
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    assert_eq!(
+        built["data"]["omitted"],
+        json!([{
+            "family": "exploration",
+            "kind": "experiment-record",
+            "reason": "no-records",
+        }]),
+        "each omitted kind is named exactly once, sorted and deduplicated: {built}"
+    );
+
+    let recomputed = built["data"]["recomputed"]
+        .as_array()
+        .expect("recomputed is a list");
+    assert!(
+        recomputed
+            .iter()
+            .any(|name| name == "exploration.experiment-record:kaya/Experiment/exp-one"),
+        "the experiment with a run writes a record block: {recomputed:?}"
+    );
+    assert!(
+        !recomputed
+            .iter()
+            .any(|name| name == "exploration.experiment-record:kaya/Experiment/exp-two"),
+        "an omitted kind has no summary key: {recomputed:?}"
+    );
+
+    let with_run = fs::read_to_string(
+        dir.path()
+            .join("docs/research/experiments/kaya-Experiment-exp-one.md"),
+    )
+    .expect("the run-bearing report exists");
+    assert!(
+        with_run.contains("<!-- kaya:begin generated:exploration.experiment-record -->"),
+        "a kind with records keeps its block: {with_run}"
+    );
+
+    let without_run = fs::read_to_string(
+        dir.path()
+            .join("docs/research/experiments/kaya-Experiment-exp-two.md"),
+    )
+    .expect("the runless report exists");
+    assert!(
+        without_run.contains("<!-- kaya:begin generated:exploration.experiment-specification -->"),
+        "the runless experiment still renders its specification: {without_run}"
+    );
+    assert!(
+        !without_run.contains("exploration.experiment-record"),
+        "an empty kind leaves no block, markers, or placeholder: {without_run}"
+    );
+}
+
+#[test]
+fn omitted_kinds_are_sorted_and_deduped_across_experiments() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    // exp-a and exp-c declare intent but have no runs; exp-b has no edges at
+    // all, so it omits both kinds and gets no report document.
+    let lines = [
+        event_line(&experiment_event(
+            "entity-1",
+            "kaya/Experiment/exp-a",
+            "Exp A",
+        )),
+        event_line(&experiment_event(
+            "entity-2",
+            "kaya/Experiment/exp-b",
+            "Exp B",
+        )),
+        event_line(&experiment_event(
+            "entity-3",
+            "kaya/Experiment/exp-c",
+            "Exp C",
+        )),
+        event_line(&node_event(
+            "entity-4",
+            "Question",
+            "kaya/Question/q-a",
+            "Q A",
+        )),
+        event_line(&node_event(
+            "entity-5",
+            "Question",
+            "kaya/Question/q-c",
+            "Q C",
+        )),
+        event_line(&relationship_event(
+            "rel-1",
+            "investigates",
+            "kaya/Question/q-a",
+            "kaya/Experiment/exp-a",
+        )),
+        event_line(&relationship_event(
+            "rel-2",
+            "investigates",
+            "kaya/Question/q-c",
+            "kaya/Experiment/exp-c",
+        )),
+    ];
+    write_ledger(&dir, &lines);
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    assert_eq!(
+        built["data"]["omitted"],
+        json!([
+            {
+                "family": "exploration",
+                "kind": "experiment-record",
+                "reason": "no-records",
+            },
+            {
+                "family": "exploration",
+                "kind": "experiment-specification",
+                "reason": "no-records",
+            },
+        ]),
+        "three experiments yield one sorted, deduplicated pair of omissions: {built}"
+    );
+
+    assert!(
+        !dir.path()
+            .join("docs/research/experiments/kaya-Experiment-exp-b.md")
+            .exists(),
+        "an experiment with nothing to render gets no report document"
+    );
+}
+
+#[test]
+fn build_tolerates_a_missing_report_when_corrections_exist() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    // The correction makes `flag_stale_authored` inspect every compiled
+    // document, including the report the edge-less experiment never writes.
+    let lines = [
+        event_line(&experiment_event(
+            "entity-1",
+            "kaya/Experiment/exp-empty",
+            "Empty Exp",
+        )),
+        event_line(&run_event("run-1", "kaya/Run/run-1", 1)),
+        event_line(&run_correction(
+            "correction-1",
+            "kaya/Run/run-1",
+            "run-1",
+            2,
+        )),
+    ];
+    write_ledger(&dir, &lines);
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    assert_eq!(
+        built["data"]["omitted"],
+        json!([
+            {
+                "family": "exploration",
+                "kind": "experiment-record",
+                "reason": "no-records",
+            },
+            {
+                "family": "exploration",
+                "kind": "experiment-specification",
+                "reason": "no-records",
+            },
+        ]),
+        "a runless, edgeless experiment omits both kinds: {built}"
+    );
+    assert!(
+        !dir.path()
+            .join("docs/research/experiments/kaya-Experiment-exp-empty.md")
+            .exists(),
+        "no document is written when both kinds are omitted"
+    );
+}
+
+#[test]
+fn ledger_assertions_do_not_create_a_record_block_for_a_runless_experiment() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    // The assertion cites evidence unrelated to this experiment: only
+    // declared intent renders, and the record kind stays omitted.
+    let lines = [
+        event_line(&experiment_event(
+            "entity-1",
+            "kaya/Experiment/exp-one",
+            "Exp One",
+        )),
+        event_line(&node_event(
+            "entity-2",
+            "Question",
+            "kaya/Question/q-one",
+            "Q One",
+        )),
+        event_line(&relationship_event(
+            "rel-1",
+            "investigates",
+            "kaya/Question/q-one",
+            "kaya/Experiment/exp-one",
+        )),
+        event_line(&assertion_event(
+            "assertion-1",
+            "the model holds",
+            &["evt-unrelated"],
+        )),
+    ];
+    write_ledger(&dir, &lines);
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    let report = fs::read_to_string(
+        dir.path()
+            .join("docs/research/experiments/kaya-Experiment-exp-one.md"),
+    )
+    .expect("the specification-bearing report exists");
+    assert!(
+        report.contains("<!-- kaya:begin generated:exploration.experiment-specification -->"),
+        "declared intent still renders: {report}"
+    );
+    assert!(
+        !report.contains("exploration.experiment-record"),
+        "a ledger-global assertion must not materialize a record block: {report}"
+    );
+    assert!(
+        !report.contains("## Interpretations"),
+        "no interpretation section survives without observed execution: {report}"
+    );
+    assert_eq!(
+        built["data"]["omitted"],
+        json!([{
+            "family": "exploration",
+            "kind": "experiment-record",
+            "reason": "no-records",
+        }]),
+        "the record kind is omitted even though an assertion exists: {built}"
     );
 }
 

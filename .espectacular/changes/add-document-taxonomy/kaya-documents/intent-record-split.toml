@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "intent-record-split"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "intent_and_record_blocks_do_not_mix"}]

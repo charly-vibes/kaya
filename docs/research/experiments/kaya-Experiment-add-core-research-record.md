@@ -5,9 +5,12 @@ Experiment: `kaya/Experiment/add-core-research-record`
 Question: `kaya/Question/mvp-1-acceptance`
 
 This dossier answers the three MVP-1 acceptance questions from the ledger and
-the committed sources it cites. The generated `experiment-report` block below
-is compiled by `kaya build`; the answers here are human-owned and survive
-every rebuild byte for byte.
+the committed sources it cites. The generated
+`exploration.experiment-specification` block below is compiled by `kaya build`;
+observed execution compiles separately into an
+`exploration.experiment-record` block whenever the ledger holds runs,
+observations, or findings for the experiment. The answers here are human-owned
+and survive every rebuild byte for byte.
 
 ### Q1: Why are events not genesis envelopes?
 
@@ -54,7 +57,7 @@ capture, deduplication, and relationship linking to MVP 2 and exploration and
 dossier export to MVP 3.
 <!-- kaya:end authored -->
 
-<!-- kaya:begin generated:experiment-report -->
+<!-- kaya:begin generated:exploration.experiment-specification -->
 ## Question
 
 - kaya/Question/mvp-1-acceptance
@@ -62,46 +65,4 @@ dossier export to MVP 3.
 ## Hypothesis
 
 - kaya/Hypothesis/H-001
-
-## Runs
-
-- _(none)_
-
-## Observations
-
-- _(none)_
-
-## Findings
-
-- _(none)_
-
-## Interpretations
-
-- _(none)_
-<!-- kaya:end generated:experiment-report -->
-
-<!-- kaya:begin generated:experiment-report -->
-## Question
-
-- kaya/Question/mvp-1-acceptance
-
-## Hypothesis
-
-- kaya/Hypothesis/H-001
-
-## Runs
-
-- _(none)_
-
-## Observations
-
-- _(none)_
-
-## Findings
-
-- _(none)_
-
-## Interpretations
-
-- _(none)_
-<!-- kaya:end generated:experiment-report -->
+<!-- kaya:end generated:exploration.experiment-specification -->

@@ -10,7 +10,8 @@
 //!
 //! [`scan`] parses a document into managed blocks and refuses a broken
 //! grammar; [`replace_generated`] rewrites exactly one generated block's
-//! body and leaves the surrounding bytes untouched.
+//! body and [`remove_generated`] deletes one, leaving the surrounding bytes
+//! untouched.
 
 use std::collections::BTreeMap;
 
@@ -23,7 +24,8 @@ pub const BEGIN_PREFIX: &str = "<!-- kaya:begin generated:";
 const END_GENERATED_PREFIX: &str = "<!-- kaya:end generated:";
 const BEGIN_AUTHORED: &str = "<!-- kaya:authored -->";
 const END_AUTHORED: &str = "<!-- kaya:end authored -->";
-const MANAGED_GRAMMAR: &str = "kaya.projection.managed_grammar";
+/// Label for refusals produced by the managed-block grammar.
+pub const LABEL_MANAGED_GRAMMAR: &str = "kaya.projection.managed_grammar";
 
 /// A labeled refusal produced by the projection grammar.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,7 +134,7 @@ pub fn scan(doc: &str) -> Result<Vec<Block>, ProjectionError> {
 pub fn replace_generated(doc: &str, name: &str, body: &str) -> Result<String, ProjectionError> {
     if !valid_name(name) {
         return Err(ProjectionError::new(
-            MANAGED_GRAMMAR,
+            LABEL_MANAGED_GRAMMAR,
             format!("invalid generated block name \"{name}\""),
         ));
     }
@@ -145,7 +147,7 @@ pub fn replace_generated(doc: &str, name: &str, body: &str) -> Result<String, Pr
     if let Some(span) = matching.next() {
         if matching.next().is_some() {
             return Err(ProjectionError::new(
-                MANAGED_GRAMMAR,
+                LABEL_MANAGED_GRAMMAR,
                 format!("duplicate generated block \"{name}\""),
             ));
         }
@@ -178,6 +180,59 @@ pub fn replace_generated(doc: &str, name: &str, body: &str) -> Result<String, Pr
     Ok(out)
 }
 
+/// Remove generated block `name` together with its begin and end markers.
+///
+/// The single blank separator line immediately preceding the begin marker is
+/// removed too, so deleting a block leaves no empty section behind. Every
+/// other byte is preserved exactly. A document without the named block is
+/// returned unchanged; a broken grammar is refused without producing output.
+pub fn remove_generated(doc: &str, name: &str) -> Result<String, ProjectionError> {
+    let spans = scan_spans(doc)?;
+    let mut matching = spans.iter().filter(
+        |span| matches!(&span.kind, BlockKind::Generated(existing) if existing.as_str() == name),
+    );
+
+    let Some(span) = matching.next() else {
+        return Ok(doc.to_owned());
+    };
+    if matching.next().is_some() {
+        return Err(ProjectionError::new(
+            LABEL_MANAGED_GRAMMAR,
+            format!("duplicate generated block \"{name}\""),
+        ));
+    }
+
+    // `body_start` begins the line after the begin marker, so the marker's
+    // line starts after the newline preceding that line.
+    let begin_start = doc[..span.body_start.saturating_sub(1)]
+        .rfind('\n')
+        .map(|index| index + 1)
+        .unwrap_or(0);
+    // `body_end` begins the end-marker line; keep its trailing newline with
+    // the removed span so the surrounding lines close up cleanly.
+    let end_end = doc[span.body_end..]
+        .find('\n')
+        .map(|index| span.body_end + index + 1)
+        .unwrap_or(doc.len());
+
+    // Strip the blank separator line before the begin marker. At byte 1 the
+    // document opens with the separator itself, so there is no earlier byte
+    // to pair with; the first byte still counts as the blank line.
+    let remove_from = if begin_start >= 1
+        && doc.as_bytes()[begin_start - 1] == b'\n'
+        && (begin_start < 2 || doc.as_bytes()[begin_start - 2] == b'\n')
+    {
+        begin_start - 1
+    } else {
+        begin_start
+    };
+
+    let mut out = String::with_capacity(doc.len() - (end_end - remove_from));
+    out.push_str(&doc[..remove_from]);
+    out.push_str(&doc[end_end..]);
+    Ok(out)
+}
+
 fn scan_spans(doc: &str) -> Result<Vec<Span>, ProjectionError> {
     let mut lines: Vec<(usize, usize, &str)> = Vec::new();
     let mut offset = 0;
@@ -195,7 +250,7 @@ fn scan_spans(doc: &str) -> Result<Vec<Span>, ProjectionError> {
             None => {
                 if looks_like_marker(lines[index].2) {
                     return Err(ProjectionError::new(
-                        MANAGED_GRAMMAR,
+                        LABEL_MANAGED_GRAMMAR,
                         format!("malformed kaya marker \"{}\"", lines[index].2.trim()),
                     ));
                 }
@@ -265,13 +320,13 @@ fn scan_spans(doc: &str) -> Result<Vec<Span>, ProjectionError> {
             }
             Marker::EndGenerated(name) => {
                 return Err(ProjectionError::new(
-                    MANAGED_GRAMMAR,
+                    LABEL_MANAGED_GRAMMAR,
                     format!("end marker for generated block \"{name}\" has no begin marker"),
                 ));
             }
             Marker::EndAuthored => {
                 return Err(ProjectionError::new(
-                    MANAGED_GRAMMAR,
+                    LABEL_MANAGED_GRAMMAR,
                     "end marker for authored block has no begin marker",
                 ));
             }
@@ -333,14 +388,14 @@ fn block_label(name: &str) -> String {
 
 fn unterminated(name: &str) -> ProjectionError {
     ProjectionError::new(
-        MANAGED_GRAMMAR,
+        LABEL_MANAGED_GRAMMAR,
         format!("unterminated {} block", block_label(name)),
     )
 }
 
 fn mismatched_end(name: &str, end_name: &str) -> ProjectionError {
     ProjectionError::new(
-        MANAGED_GRAMMAR,
+        LABEL_MANAGED_GRAMMAR,
         format!(
             "mismatched end marker \"{end_name}\" while closing {} block",
             block_label(name)

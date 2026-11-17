@@ -57,11 +57,14 @@ The distinction that matters most: **what we intended to do is not the same as
 what we actually did.** `experiment-specification` and `experiment-record` are
 separate projections; neither is derived from the other.
 
-Status today: `research-map` and `experiment-record` are partial — the index
+Status today: `research-map` and the report projections are partial — the index
 lists nodes without edges, and the report has a Runs section with no run
-events to render. Every other kind is absent, and a single generated
-`experiment-report` block currently conflates the brief, the specification,
-the record, and the findings.
+events to render. Every other kind is absent. The report implements the
+specification/record split as two generated blocks: it compiles
+`exploration.experiment-specification` from declared intent and
+`exploration.experiment-record` from runs, observations, findings, and
+interpretations, omitting any kind with no records. `exploration-brief` and
+`understanding.findings-and-analysis` are not generated yet.
 
 ## Publication layer: twelve products
 

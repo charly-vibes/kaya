@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "empty-kind-silent"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "empty_kind_leaves_no_section_and_reports_omission"}]

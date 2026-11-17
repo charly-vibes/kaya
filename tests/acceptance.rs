@@ -29,7 +29,9 @@ const INDEX: &str = "docs/research/index.md";
 const REPORT: &str = "docs/research/experiments/kaya-Experiment-add-core-research-record.md";
 const CHECKED_IN_REPORT: &str =
     "docs/research/experiments/kaya-Experiment-add-core-research-record.md";
-const REPORT_NAME: &str = "experiment-report:kaya/Experiment/add-core-research-record";
+const SPECIFICATION_NAME: &str =
+    "exploration.experiment-specification:kaya/Experiment/add-core-research-record";
+const RECORD_NAME: &str = "exploration.experiment-record:kaya/Experiment/add-core-research-record";
 const SEED_EVENTS: u64 = 13;
 const SOURCE_COMMIT: &str = "43b606f";
 
@@ -39,8 +41,12 @@ const FOREIGN_BEGIN: &str = "<!-- other-tool:begin -->";
 const FOREIGN_END: &str = "<!-- other-tool:end -->";
 const INDEX_BLOCK_BEGIN: &str = "<!-- kaya:begin generated:research-index -->";
 const INDEX_BLOCK_END: &str = "<!-- kaya:end generated:research-index -->";
-const REPORT_BLOCK_BEGIN: &str = "<!-- kaya:begin generated:experiment-report -->";
-const REPORT_BLOCK_END: &str = "<!-- kaya:end generated:experiment-report -->";
+const SPECIFICATION_BLOCK_BEGIN: &str =
+    "<!-- kaya:begin generated:exploration.experiment-specification -->";
+const SPECIFICATION_BLOCK_END: &str =
+    "<!-- kaya:end generated:exploration.experiment-specification -->";
+const RECORD_BLOCK_BEGIN: &str = "<!-- kaya:begin generated:exploration.experiment-record -->";
+const RECORD_BLOCK_END: &str = "<!-- kaya:end generated:exploration.experiment-record -->";
 
 const QUESTION_HEADINGS: [&str; 3] = [
     "### Q1: Why are events not genesis envelopes?",
@@ -160,6 +166,10 @@ fn copy_seed(workspace: &Path, manifest: &Path) -> PathBuf {
 }
 
 /// Remove kaya generated blocks, keeping authored and foreign bytes intact.
+///
+/// Every generated block is named `<family>.<kind>`, so the dossier's
+/// `exploration.experiment-specification` and `exploration.experiment-record`
+/// blocks both fall under the same `generated:` marker rule.
 fn strip_generated_blocks(document: &str) -> String {
     let mut kept = String::new();
     let mut inside = false;
@@ -285,7 +295,10 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
         "the checked-in index carries no generated block; the first build appends it"
     );
     assert!(
-        !report_source.contains(REPORT_BLOCK_BEGIN),
+        !report_source.contains(SPECIFICATION_BLOCK_BEGIN)
+            && !report_source.contains(SPECIFICATION_BLOCK_END)
+            && !report_source.contains(RECORD_BLOCK_BEGIN)
+            && !report_source.contains(RECORD_BLOCK_END),
         "the checked-in report carries no generated block; the first build appends it"
     );
 
@@ -297,8 +310,21 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
         "first build compiles the index: {build}"
     );
     assert!(
-        lists(&recomputed, REPORT_NAME),
-        "first build compiles the experiment report: {build}"
+        lists(&recomputed, SPECIFICATION_NAME),
+        "first build compiles the experiment specification: {build}"
+    );
+    assert!(
+        !lists(&recomputed, RECORD_NAME),
+        "the dossier has no runs, so no record block is written: {build}"
+    );
+    assert_eq!(
+        build["data"]["omitted"],
+        json!([{
+            "family": "exploration",
+            "kind": "experiment-record",
+            "reason": "no-records",
+        }]),
+        "the empty record kind is reported once with its family and reason: {build}"
     );
 
     // The index: generated block appended after the authored and foreign bytes.
@@ -373,32 +399,48 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
         "build appends to the report without rewriting the authored answers"
     );
     let report_after = String::from_utf8(report_after_bytes.clone()).expect("report is UTF-8");
-    assert!(report_after.contains(REPORT_BLOCK_BEGIN), "{report_after}");
-    assert!(report_after.contains(REPORT_BLOCK_END), "{report_after}");
-    let generated = between(&report_after, REPORT_BLOCK_BEGIN, REPORT_BLOCK_END);
-    for heading in [
-        "## Question",
-        "## Hypothesis",
+    assert!(
+        report_after.contains(SPECIFICATION_BLOCK_BEGIN),
+        "{report_after}"
+    );
+    assert!(
+        report_after.contains(SPECIFICATION_BLOCK_END),
+        "{report_after}"
+    );
+    assert!(
+        !report_after.contains(RECORD_BLOCK_BEGIN) && !report_after.contains(RECORD_BLOCK_END),
+        "the experiment has no runs, so the record block is omitted: {report_after}"
+    );
+    let generated = between(
+        &report_after,
+        SPECIFICATION_BLOCK_BEGIN,
+        SPECIFICATION_BLOCK_END,
+    );
+    for heading in ["## Question", "## Hypothesis"] {
+        assert!(
+            generated.contains(heading),
+            "the generated specification renders {heading}: {generated}"
+        );
+    }
+    for absent in [
         "## Runs",
         "## Observations",
         "## Findings",
+        "## Interpretations",
+        "- _(none)_",
     ] {
         assert!(
-            generated.contains(heading),
-            "the generated report renders {heading}: {generated}"
+            !generated.contains(absent),
+            "an empty kind leaves no section or placeholder row: {absent}"
         );
     }
     assert!(
         generated.contains(QUESTION),
-        "the generated report names the investigated question: {generated}"
+        "the generated specification names the investigated question: {generated}"
     );
     assert!(
         generated.contains(HYPOTHESIS),
-        "the generated report names the predicted hypothesis: {generated}"
-    );
-    assert!(
-        generated.contains("## Interpretations"),
-        "the generated report names the interpretation channel: {generated}"
+        "the generated specification names the predicted hypothesis: {generated}"
     );
     assert!(
         report_after.contains(EXPERIMENT),
@@ -433,8 +475,12 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
         "second build reports the index unchanged: {rebuild}"
     );
     assert!(
-        lists(&unchanged, REPORT_NAME),
-        "second build reports the report unchanged: {rebuild}"
+        lists(&unchanged, SPECIFICATION_NAME),
+        "second build reports the specification unchanged: {rebuild}"
+    );
+    assert!(
+        !lists(&unchanged, RECORD_NAME),
+        "an omitted kind is never reported unchanged: {rebuild}"
     );
     assert_eq!(
         fs::read(&index_path).expect("index still exists"),
@@ -496,12 +542,16 @@ fn committed_ledger_builds_without_the_uncommitted_flag() {
         "committed build compiles the index: {build}"
     );
     assert!(
-        lists(&recomputed, REPORT_NAME),
-        "committed build compiles the experiment report: {build}"
+        lists(&recomputed, SPECIFICATION_NAME),
+        "committed build compiles the experiment specification: {build}"
     );
 
     let report = fs::read_to_string(root.join(REPORT)).expect("build wrote the report");
-    let generated = between(&report, REPORT_BLOCK_BEGIN, REPORT_BLOCK_END);
+    let generated = between(&report, SPECIFICATION_BLOCK_BEGIN, SPECIFICATION_BLOCK_END);
+    assert!(
+        !report.contains(RECORD_BLOCK_BEGIN) && !report.contains(RECORD_BLOCK_END),
+        "the seeded experiment has no runs, so the record block is omitted: {report}"
+    );
     assert!(
         generated.contains(QUESTION) && generated.contains(HYPOTHESIS),
         "the generated report cites its question and hypothesis: {generated}"

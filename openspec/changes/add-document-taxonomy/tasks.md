@@ -25,7 +25,7 @@ code changes here. bd ticket mapping noted per phase.
 
 ## 3. Implementation tickets (red → green, one tdd-ro5u run each)
 
-- [ ] 3.1 Experiment dossier slice: closed vocabulary, `<family>.<kind>`
+- [x] 3.1 Experiment dossier slice: closed vocabulary, `<family>.<kind>`
       block names, intent/record separation, omit-empty with coverage summary
       for `exploration.experiment-specification` and
       `exploration.experiment-record`. (kaya-s5v)

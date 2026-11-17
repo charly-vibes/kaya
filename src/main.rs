@@ -476,6 +476,7 @@ fn cmd_build(
         .filter(|node| node.entity == EntityType::Experiment)
         .map(|node| node.id.clone())
         .collect();
+    let mut omitted: Vec<report::Omitted> = Vec::new();
     if !experiments.is_empty() {
         let experiments_dir = out.join("experiments");
         fs::create_dir_all(&experiments_dir).map_err(|err| {
@@ -487,9 +488,10 @@ fn cmd_build(
         for experiment_id in experiments {
             let file_name = format!("{}.md", experiment_id.replace('/', "-"));
             let report_path = experiments_dir.join(file_name);
-            let report_summary = report::build(&graph, &experiment_id, &report_path, &state)
+            let built = report::build(&graph, &experiment_id, &report_path, &state)
                 .map_err(projection_failure)?;
-            merge_summary(&mut summary, report_summary);
+            omitted.extend(built.omitted);
+            merge_summary(&mut summary, built.summary);
             flag_stale_authored(&mut summary, &report_path, &changed_ids)?;
         }
     }
@@ -516,6 +518,18 @@ fn cmd_build(
         ids.sort();
         ids.dedup();
     }
+    omitted.sort_by(|left, right| (left.family, left.kind).cmp(&(right.family, right.kind)));
+    omitted.dedup();
+    let omitted: Vec<serde_json::Value> = omitted
+        .into_iter()
+        .map(|item| {
+            json!({
+                "family": item.family,
+                "kind": item.kind,
+                "reason": item.reason,
+            })
+        })
+        .collect();
 
     Ok(Envelope::ok(
         "build",
@@ -523,6 +537,7 @@ fn cmd_build(
             "out": out.display().to_string(),
             "recomputed": recomputed,
             "unchanged": unchanged,
+            "omitted": omitted,
             "stale": stale,
             "sources": sources,
             "pending_proposals": state.pending_count(),
@@ -543,12 +558,19 @@ fn flag_stale_authored(
     if changed_ids.is_empty() {
         return Ok(());
     }
-    let document = fs::read_to_string(path).map_err(|err| {
-        failure(
-            "build-io",
-            format!("failed to read {}: {err}", path.display()),
-        )
-    })?;
+    let document = match fs::read_to_string(path) {
+        Ok(document) => document,
+        // A report can legitimately be absent: when both kinds have no
+        // source records, the build writes no file. Absence means there is
+        // no authored prose to check, not an I/O failure.
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(failure(
+                "build-io",
+                format!("failed to read {}: {error}", path.display()),
+            ));
+        }
+    };
     summary.stale.extend(report::stale_authored(
         &document,
         changed_ids,

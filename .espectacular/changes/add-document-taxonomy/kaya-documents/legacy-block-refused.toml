@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "legacy-block-refused"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "legacy_block_name_is_refused_before_writing"}]
