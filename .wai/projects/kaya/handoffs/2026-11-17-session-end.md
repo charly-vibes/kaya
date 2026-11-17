@@ -35,9 +35,9 @@ phase: research
 ### git_status
 
 ```
- M .wai/pipeline-runs/tdd-ro5u-2026-11-17-kaya-qp8-publications-tracer.yml
+ M .wai/pipeline-runs/tdd-ro5u-2026-11-17-kaya-249-understanding-kinds.yml
 ?? .espectacular/state/
-?? .wai/projects/kaya/research/2026-11-17-ship-kaya-qp8-feature-e8dcfcb-publication-module.md
+?? .wai/projects/kaya/research/2026-11-17-ship-kaya-249-feature-89e8f1b-understanding-bloc.md
 ?? .whisper/
 ```
 
@@ -47,7 +47,6 @@ phase: research
 ○ kaya-152 P1 Research: Hegel property-based testing plan (antithesis-research)
 ○ kaya-nx4 P1 Implement Hegel property tests
 ○ kaya-1b9 P2 Orientation kind: project-overview
-○ kaya-249 P2 Understanding kinds: findings-and-analysis and decision-record
 ○ kaya-duv P2 Developer-guide products: getting-started, how-to, concept, example, troubleshooting, faq
 ○ kaya-n50 P2 Cutover: replace hand-written overview and concept prose with generated products
 ○ kaya-rdr P2 Authorize crates.io publish for kaya
@@ -57,7 +56,7 @@ phase: research
 ○ kaya-lh1 P3 Reuse families: technical-reference and knowledge-brief (specodelic/turu inputs)
 
 --------------------------------------------------------------------------------
-Total: 11 issues (11 open, 0 in progress)
+Total: 10 issues (10 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
