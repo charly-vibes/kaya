@@ -84,8 +84,10 @@ generated yet.
 | `release-migration` | What changed and what must I do? | `orientation.project-overview`, `understanding.decision-record` |
 | `architecture-design` | How is it structured and why? | `understanding.decision-record`, `orientation.research-map` |
 
-No product exists today as a projection. The authored README, this page, and
-`status.md` cover parts of `overview` and `concept` by hand.
+Status today: `kaya publish` emits `reference` from
+`orientation.research-map` (the `reuse-handoff.technical-reference` include has
+no producer yet) and `project-site` over `overview` and `reference`, with
+`overview` omitted as `no-backing-document`, never stubbed.
 
 ## Collections and packages
 

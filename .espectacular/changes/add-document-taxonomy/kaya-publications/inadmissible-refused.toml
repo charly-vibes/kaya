@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "inadmissible-refused"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "inadmissible_inclusion_is_refused"}]

@@ -12,3 +12,4 @@ pub mod ledger;
 pub mod model;
 pub mod projection;
 pub mod promotion;
+pub mod publication;

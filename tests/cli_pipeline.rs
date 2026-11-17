@@ -1,5 +1,5 @@
-//! Integration tests for the CLI pipeline: `import`, `build`, `promote`,
-//! `challenge`, and the `status` proposal counter.
+//! Integration tests for the CLI pipeline: `import`, `build`, `publish`,
+//! `promote`, `challenge`, and the `status` proposal counter.
 //!
 //! Every case drives the real binary in a tempfile project, writes its own
 //! fixture tree, and reads the one JSON envelope each invocation prints.
@@ -1209,6 +1209,339 @@ fn challenge_of_an_unestablished_conclusion_is_a_promotion_refusal() {
         ledger_lines(&dir).len(),
         1,
         "a refused challenge appends nothing"
+    );
+}
+
+/// `data.pages` names each published page, either as a bare name or as a page
+/// object; both shapes carry the same vocabularies.
+fn published_page_names(pages: &Value) -> Vec<String> {
+    pages
+        .as_array()
+        .expect("publish reports its pages as a list")
+        .iter()
+        .map(|page| {
+            page.as_str()
+                .or_else(|| page.get("name").and_then(Value::as_str))
+                .unwrap_or_else(|| panic!("each published page names itself: {page}"))
+                .to_owned()
+        })
+        .collect()
+}
+
+/// The `kaya/...` node ids a rendered publication block cites, sorted and
+/// deduplicated so they compare as a set.
+fn block_source_ids(page: &str, block: &str) -> Vec<String> {
+    let begin = format!("kaya:begin generated:{block}");
+    let end = format!("kaya:end generated:{block}");
+    let start = page
+        .find(&begin)
+        .unwrap_or_else(|| panic!("the page carries the {block} block: {page}"));
+    let stop = start
+        + page[start..]
+            .find(&end)
+            .unwrap_or_else(|| panic!("the {block} block is closed: {page}"));
+    let body = &page[start..stop];
+    let mut ids: Vec<String> = body
+        .split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_' | '.')))
+        .filter(|token| token.starts_with("kaya/"))
+        .map(str::to_owned)
+        .collect();
+    ids.sort();
+    ids.dedup();
+    ids
+}
+
+#[test]
+fn publish_writes_project_site_and_reports_the_missing_overview() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    // One Question investigated by one Experiment: the seeded edge makes
+    // `build` render the research map, while no project-overview document has
+    // any backing in this workspace.
+    write_ledger(
+        &dir,
+        &[
+            event_line(&node_event(
+                "event-question",
+                "Question",
+                "kaya/Question/q-one",
+                "Q One",
+            )),
+            event_line(&experiment_event(
+                "event-experiment",
+                "kaya/Experiment/exp-one",
+                "Exp One",
+            )),
+            event_line(&relationship_event(
+                "event-relationship",
+                "investigates",
+                "kaya/Question/q-one",
+                "kaya/Experiment/exp-one",
+            )),
+        ],
+    );
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    let recomputed = built["data"]["recomputed"]
+        .as_array()
+        .expect("recomputed is a list");
+    assert!(
+        recomputed
+            .iter()
+            .any(|name| name == "orientation.research-map"),
+        "the seeded edge yields a fresh research map: {recomputed:?}"
+    );
+
+    let index = fs::read_to_string(dir.path().join(INDEX)).expect("the research map is written");
+    let map_row = index
+        .lines()
+        .find(|line| line.contains("-[investigates]->"))
+        .expect("the research map renders the seeded edge")
+        .to_owned();
+
+    let ledger = dir.path().join(LEDGER);
+    let bytes_before = fs::read(&ledger).expect("the ledger is readable");
+    let lines_before = ledger_lines(&dir).len();
+
+    let published = assert_success(&run(&dir, &["publish"]));
+    assert_eq!(published["envelope_kind"], json!("publish"));
+    assert_eq!(
+        published["data"]["out"],
+        json!("docs/public"),
+        "publish defaults to docs/public: {published}"
+    );
+    assert_eq!(
+        published["data"]["omitted"],
+        json!([{
+            "tier": "product",
+            "name": "overview",
+            "reason": "no-backing-document",
+        }]),
+        "the unbacked overview is the only omission: {published}"
+    );
+    let pages = published_page_names(&published["data"]["pages"]);
+    for name in ["reference", "project-site"] {
+        assert!(
+            pages.iter().any(|page| page == name),
+            "publish names the {name} page: {pages:?}"
+        );
+    }
+    assert!(
+        !pages.iter().any(|page| page == "overview"),
+        "an omitted product gets no page entry: {pages:?}"
+    );
+
+    let reference = fs::read_to_string(dir.path().join("docs/public/reference.md"))
+        .expect("the reference page is written");
+    assert!(
+        reference.contains("generated:publication.product.reference"),
+        "the reference page carries its generated block: {reference}"
+    );
+    assert!(
+        reference.contains(&map_row),
+        "the reference page carries the research map body row {map_row:?}: {reference}"
+    );
+
+    let package = fs::read_to_string(dir.path().join("docs/public/project-site.md"))
+        .expect("the project-site package page is written");
+    assert!(
+        package.contains("generated:publication.package.project-site"),
+        "the package page carries its generated block: {package}"
+    );
+    assert!(
+        package.contains("[reference](reference.md)"),
+        "an emitted product is linked from the package: {package}"
+    );
+    assert!(
+        package.contains("overview — unavailable"),
+        "an omitted product is named unavailable rather than linked: {package}"
+    );
+    assert!(
+        !dir.path().join("docs/public/overview.md").exists(),
+        "an omitted product leaves no stub page"
+    );
+
+    let export: Value = serde_json::from_str(
+        &fs::read_to_string(dir.path().join("docs/public/publication.json"))
+            .expect("the structured export is written"),
+    )
+    .expect("the export is JSON");
+    let products = export["products"]
+        .as_array()
+        .expect("the export lists products");
+    let reference_entry = products
+        .iter()
+        .find(|product| product["name"] == json!("reference"))
+        .expect("the export names the emitted reference product");
+    let documents = reference_entry["documents"]
+        .as_array()
+        .expect("the reference product lists its documents");
+    let map = documents
+        .iter()
+        .find(|document| document["kind"] == json!("orientation.research-map"))
+        .expect("the export names the research map document");
+    let mut exported_ids: Vec<String> = map["event_ids"]
+        .as_array()
+        .expect("the document lists its event ids")
+        .iter()
+        .map(|id| {
+            id.as_str()
+                .expect("every exported event id is a string")
+                .to_owned()
+        })
+        .collect();
+    exported_ids.sort();
+    exported_ids.dedup();
+
+    let page_ids = block_source_ids(&reference, "publication.product.reference");
+    assert_eq!(
+        exported_ids, page_ids,
+        "both formats trace to the same source ids: {export}"
+    );
+    for id in ["kaya/Question/q-one", "kaya/Experiment/exp-one"] {
+        assert!(
+            exported_ids.iter().any(|candidate| candidate == id),
+            "the research map attribution keeps {id}: {exported_ids:?}"
+        );
+    }
+
+    for (page, block, text) in [
+        (
+            "reference",
+            "publication.product.reference",
+            reference.as_str(),
+        ),
+        (
+            "project-site",
+            "publication.package.project-site",
+            package.as_str(),
+        ),
+    ] {
+        assert_eq!(
+            text.matches(&format!("kaya:begin generated:{block}"))
+                .count(),
+            1,
+            "the {page} page carries exactly one begin marker for {block}: {text}"
+        );
+        assert_eq!(
+            text.matches(&format!("kaya:end generated:{block}")).count(),
+            1,
+            "the {page} page closes its {block} block exactly once: {text}"
+        );
+    }
+
+    let recomputed = published["data"]["recomputed"]
+        .as_array()
+        .expect("publish reports the recomputed blocks");
+    for name in [
+        "publication.product.reference",
+        "publication.package.project-site",
+        "publication.json",
+    ] {
+        assert!(
+            recomputed.iter().any(|entry| entry == name),
+            "a fresh publish recomputes {name}: {recomputed:?}"
+        );
+    }
+    assert_eq!(
+        published["data"]["unchanged"],
+        json!([]),
+        "a fresh publish has nothing already current: {published}"
+    );
+
+    // The envelope's compiled documents match the export, kind by kind.
+    let mut exported_documents: Vec<&Value> = Vec::new();
+    for product in products {
+        if let Some(documents) = product["documents"].as_array() {
+            exported_documents.extend(documents.iter());
+        }
+    }
+    let envelope_documents = published["data"]["documents"]
+        .as_array()
+        .expect("publish reports the compiled documents");
+    assert!(
+        !envelope_documents.is_empty(),
+        "the compiled research map is reported: {published}"
+    );
+    for document in envelope_documents {
+        let kind = document["kind"]
+            .as_str()
+            .expect("each compiled document names its kind");
+        let ids = document["event_ids"]
+            .as_array()
+            .expect("each compiled document lists its event ids");
+        let exported = exported_documents
+            .iter()
+            .find(|candidate| candidate["kind"] == json!(kind))
+            .unwrap_or_else(|| panic!("the export names compiled document kind {kind}: {export}"));
+        assert_eq!(
+            ids,
+            exported["event_ids"]
+                .as_array()
+                .expect("the exported document lists its event ids"),
+            "the envelope and export agree on the event ids for {kind}"
+        );
+    }
+
+    // Publishing twice changes no byte and reports the same payload; only the
+    // recomputed/unchanged split moves, from all-recomputed to all-unchanged.
+    let public = dir.path().join("docs/public");
+    let reference_bytes =
+        fs::read(public.join("reference.md")).expect("the reference page is readable");
+    let package_bytes =
+        fs::read(public.join("project-site.md")).expect("the package page is readable");
+    let export_bytes = fs::read(public.join("publication.json")).expect("the export is readable");
+
+    let second = assert_success(&run(&dir, &["publish"]));
+    for key in ["out", "pages", "omitted", "documents"] {
+        assert_eq!(
+            second["data"][key], published["data"][key],
+            "a second publish reports the same {key}: {second}"
+        );
+    }
+    assert_eq!(
+        second["data"]["recomputed"],
+        json!([]),
+        "a second publish recomputes nothing: {second}"
+    );
+    let unchanged = second["data"]["unchanged"]
+        .as_array()
+        .expect("a second publish reports the unchanged blocks");
+    for name in [
+        "publication.product.reference",
+        "publication.package.project-site",
+        "publication.json",
+    ] {
+        assert!(
+            unchanged.iter().any(|entry| entry == name),
+            "a second publish reports {name} unchanged: {unchanged:?}"
+        );
+    }
+    assert_eq!(
+        fs::read(public.join("reference.md")).expect("the reference page is readable"),
+        reference_bytes,
+        "publishing twice leaves the reference page byte-identical"
+    );
+    assert_eq!(
+        fs::read(public.join("project-site.md")).expect("the package page is readable"),
+        package_bytes,
+        "publishing twice leaves the package page byte-identical"
+    );
+    assert_eq!(
+        fs::read(public.join("publication.json")).expect("the export is readable"),
+        export_bytes,
+        "publishing twice leaves the export byte-identical"
+    );
+
+    assert_eq!(
+        fs::read(&ledger).expect("the ledger is readable"),
+        bytes_before,
+        "publishing copies no payload into the ledger"
+    );
+    assert_eq!(
+        ledger_lines(&dir).len(),
+        lines_before,
+        "publishing creates no ledger entity"
     );
 }
 

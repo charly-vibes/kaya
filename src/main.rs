@@ -9,7 +9,7 @@
 //! `missing-ledger`, `ledger-io`, `build-io`, `not-a-file`) or the label raised
 //! by the library that refused the run.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{ErrorKind, Read};
 use std::path::{Path, PathBuf};
@@ -27,6 +27,7 @@ use kaya::ledger::{AppendOutcome, Ledger, LedgerError, changed_event_ids, sha256
 use kaya::model::{self, EntityType, ModelError};
 use kaya::projection::{ProjectionError, StaleBlock, Summary, index, report, reuse};
 use kaya::promotion::{self, PromotionError, PromotionState};
+use kaya::publication::{self, Decl, Tier};
 
 /// Project-local directory holding kaya state.
 const KAYA_DIR: &str = ".kaya";
@@ -73,6 +74,12 @@ enum Command {
         /// Accept an untracked ledger whose history git cannot verify
         #[arg(long)]
         allow_uncommitted: bool,
+    },
+    /// Compose the client-facing publication tree from the compiled research
+    Publish {
+        /// Directory receiving the published pages and export
+        #[arg(long, default_value = "docs/public", value_name = "DIR")]
+        out: PathBuf,
     },
     /// Approve a proposed assertion as a conclusion
     Promote {
@@ -152,6 +159,7 @@ fn main() -> ExitCode {
             expect_digest,
             allow_uncommitted,
         } => cmd_build(&out, expect_digest.as_deref(), allow_uncommitted),
+        Command::Publish { out } => cmd_publish(&out),
         Command::Promote {
             assertion_id,
             actor,
@@ -259,6 +267,10 @@ fn projection_failure(err: ProjectionError) -> Failure {
 }
 
 fn promotion_failure(err: PromotionError) -> Failure {
+    (err.label, err.message)
+}
+
+fn publication_failure(err: publication::PublicationError) -> Failure {
     (err.label, err.message)
 }
 
@@ -554,6 +566,108 @@ fn cmd_build(
             "sources": sources,
             "pending_proposals": state.pending_count(),
             "ledger_digest": ledger_digest,
+        }),
+    ))
+}
+
+/// Compose the project-site package over the compiled research documents.
+///
+/// The document source is read once from `docs/research`; the publication
+/// layer refuses invalid declarations before writing, omits products without
+/// a backing document, and exports the same attribution it renders. It also
+/// owns the write: each page is a `publication.<tier>.<name>` managed block
+/// inside its file, so published bytes stay compiler-owned without a second
+/// pass here.
+fn cmd_publish(out: &Path) -> Result<Envelope, Failure> {
+    let documents =
+        publication::read_documents(Path::new("docs/research")).map_err(publication_failure)?;
+
+    let declarations = [
+        Decl {
+            tier: Tier::Product,
+            name: "overview".to_owned(),
+            includes: vec!["orientation.project-overview".to_owned()],
+            members: Vec::new(),
+        },
+        Decl {
+            tier: Tier::Product,
+            name: "reference".to_owned(),
+            includes: vec![
+                "reuse-handoff.technical-reference".to_owned(),
+                "orientation.research-map".to_owned(),
+            ],
+            members: Vec::new(),
+        },
+        Decl {
+            tier: Tier::Package,
+            name: "project-site".to_owned(),
+            includes: Vec::new(),
+            members: vec!["overview".to_owned(), "reference".to_owned()],
+        },
+    ];
+
+    let built = publication::build(&declarations, &documents, out).map_err(publication_failure)?;
+
+    let pages: Vec<serde_json::Value> = built
+        .pages
+        .iter()
+        .map(|page| {
+            json!({
+                "name": page.name,
+                "path": page.path.display().to_string(),
+                "question": page.question,
+                "documents": page.documents,
+            })
+        })
+        .collect();
+    let omitted: Vec<serde_json::Value> = built
+        .omitted
+        .iter()
+        .map(|entry| {
+            json!({
+                "tier": entry.tier,
+                "name": entry.name,
+                "reason": entry.reason,
+            })
+        })
+        .collect();
+    // The envelope reports the documents the tree actually attributes, in kind
+    // order: one entry per kind the export carries, never a compiled document
+    // no emitted product composes.
+    let mut attributed: BTreeSet<&str> = BTreeSet::new();
+    for page in &built.pages {
+        for kind in &page.documents {
+            attributed.insert(kind.as_str());
+        }
+    }
+    let documents: Vec<serde_json::Value> = attributed
+        .into_iter()
+        .filter_map(|kind| documents.0.get(kind))
+        .map(|document| {
+            json!({
+                "kind": document.kind,
+                "event_ids": document.event_ids,
+            })
+        })
+        .collect();
+    // The build's own summary is the publish report: it names every page block
+    // and the export exactly as the writer saw them.
+    let mut recomputed = built.summary.recomputed.clone();
+    recomputed.sort();
+    recomputed.dedup();
+    let mut unchanged = built.summary.unchanged.clone();
+    unchanged.sort();
+    unchanged.dedup();
+
+    Ok(Envelope::ok(
+        "publish",
+        json!({
+            "out": out.display().to_string(),
+            "recomputed": recomputed,
+            "unchanged": unchanged,
+            "pages": pages,
+            "omitted": omitted,
+            "documents": documents,
         }),
     ))
 }

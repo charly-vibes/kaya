@@ -36,7 +36,7 @@ code changes here. bd ticket mapping noted per phase.
       entities. (kaya-i03)
 - [x] 3.5 Reuse slice with existing adapters: `reproduction-package` and
       `handoff` from git and wai references. (kaya-3f6)
-- [ ] 3.6 Publication slice: tier vocabulary, justified emission, composition,
+- [x] 3.6 Publication slice: tier vocabulary, justified emission, composition,
       reader-question binding, exercised by `project-site` over `overview` and
       `reference`. (kaya-qp8)
 - [ ] 3.7 Developer-guide products: `getting-started`, `how-to`, `concept`,
