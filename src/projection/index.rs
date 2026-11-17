@@ -18,7 +18,8 @@ use serde_json::Value;
 use crate::model::{EntityType, Graph, Node};
 
 use super::{
-    BlockKind, ProjectionError, Summary, replace_generated, scan, validate_generated_blocks,
+    BlockKind, ProjectionError, Summary, attribute, key, replace_generated, scan, source_reference,
+    title_or_key, validate_generated_blocks,
 };
 
 /// Name of the generated block this projection owns.
@@ -104,13 +105,17 @@ fn render(graph: &Graph, event_count: usize) -> (String, Vec<String>) {
         body.push_str(&cited);
     }
 
-    for node in graph.nodes().filter(|node| {
-        matches!(
-            node.entity,
-            EntityType::Artifact | EntityType::Run | EntityType::Source
-        )
-    }) {
-        sources.insert(node.id.clone());
+    // The source map traces rendered rows: an Artifact or Run always renders
+    // one, a Source only when it carries a full `path@commit`.
+    for node in graph.nodes() {
+        let rendered = match node.entity {
+            EntityType::Artifact | EntityType::Run => true,
+            EntityType::Source => source_reference(node).is_some(),
+            _ => false,
+        };
+        if rendered {
+            sources.insert(node.id.clone());
+        }
     }
 
     body.push('\n');
@@ -218,25 +223,25 @@ fn run_section(graph: &Graph) -> String {
 }
 
 /// Render repo files as `path@commit`, pinned to the recorded commit.
+///
+/// A Source node missing or blank in `path` or `commit` has no resolvable
+/// reference, so it renders no row rather than a bare `@`.
 fn source_section(graph: &Graph) -> String {
     let mut section = String::new();
     for node in graph
         .nodes()
         .filter(|node| node.entity == EntityType::Source)
     {
+        let Some(reference) = source_reference(node) else {
+            continue;
+        };
         section.push_str("- ");
         section.push_str(&node.id);
         section.push_str(" — ");
-        section.push_str(&attribute(node, "path").unwrap_or_default());
-        section.push('@');
-        section.push_str(&attribute(node, "commit").unwrap_or_default());
+        section.push_str(&reference);
         section.push('\n');
     }
     section
-}
-
-fn title_or_key(node: &Node) -> String {
-    attribute(node, "title").unwrap_or_else(|| key(node))
 }
 
 fn artifact_label(node: &Node) -> String {
@@ -245,34 +250,12 @@ fn artifact_label(node: &Node) -> String {
         .unwrap_or_else(|| key(node))
 }
 
-fn attribute(node: &Node, name: &str) -> Option<String> {
-    let value = node.attributes.get(name).and_then(Value::as_str)?;
-    let single_line: String = value
-        .chars()
-        .map(|c| if c == '\n' || c == '\r' { ' ' } else { c })
-        .collect();
-    let trimmed = single_line.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_owned())
-    }
-}
-
 fn count(node: &Node, name: &str) -> String {
     node.attributes
         .get(name)
         .and_then(Value::as_u64)
         .unwrap_or(0)
         .to_string()
-}
-
-fn key(node: &Node) -> String {
-    node.id
-        .rsplit('/')
-        .next()
-        .unwrap_or(node.id.as_str())
-        .to_owned()
 }
 
 fn generated_body(document: &str) -> Result<Option<String>, ProjectionError> {

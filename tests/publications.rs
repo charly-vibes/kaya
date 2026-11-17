@@ -23,12 +23,14 @@ const MAP_KIND: &str = "orientation.research-map";
 const TECH_KIND: &str = "reuse-handoff.technical-reference";
 const SPEC_KIND: &str = "exploration.experiment-specification";
 const FINDINGS_KIND: &str = "understanding.findings-and-analysis";
+const DECISION_KIND: &str = "understanding.decision-record";
 
 const OVERVIEW_BODY: &str = "Kaya publishes client-facing documents from one source.";
 const MAP_BODY: &str = "The research map links each fact to its event.";
 const TECH_BODY: &str = "Reuse begins from the recorded handoff.";
 const SPEC_BODY: &str = "The experiment specification states the intended change.";
 const FINDINGS_BODY: &str = "The findings record what the runs taught the project.";
+const DECISION_BODY: &str = "The decision record pins the shipped cache revision.";
 
 /// The closed document vocabulary an admission row may name.
 const DOCUMENT_KINDS: [&str; 11] = [
@@ -1803,5 +1805,113 @@ fn export_and_page_attribution_agree_after_one_document_changes() {
         map["event_ids"],
         json!(["kaya/Evidence/m-two"]),
         "the rebuilt attribution carries the changed document's new ids"
+    );
+}
+
+// 25. kaya.publications.fact_once — the understanding document backs its
+// products, and each document body renders once across their pages
+#[test]
+fn understanding_document_backs_concept_faq_and_troubleshooting_once() {
+    let tmp = TempDir::new().expect("temp dir");
+    let research = tmp.path().join("research");
+    fs::create_dir_all(&research).expect("research tree is creatable");
+    let findings = format!(
+        "<!-- kaya:begin generated:{FINDINGS_KIND} -->\n\
+         ### Findings\n\n\
+         - kaya/Finding/f-hit-rate — {FINDINGS_BODY}\n\
+         <!-- kaya:end generated:{FINDINGS_KIND} -->\n"
+    );
+    let decision = format!(
+        "<!-- kaya:begin generated:{DECISION_KIND} -->\n\
+         ### Decisions\n\n\
+         - kaya/Decision/d-ship-cache — {DECISION_BODY}\n\
+         <!-- kaya:end generated:{DECISION_KIND} -->\n"
+    );
+    fs::write(
+        research.join("understanding.md"),
+        format!("# Understanding\n\n{findings}\n{decision}"),
+    )
+    .expect("understanding is writable");
+
+    let docs = read_documents(&research).expect("the compiled documents are readable");
+    let kinds: Vec<&str> = docs.0.keys().map(String::as_str).collect();
+    assert_eq!(
+        kinds,
+        vec![DECISION_KIND, FINDINGS_KIND],
+        "both understanding blocks are compiled documents"
+    );
+    assert_eq!(
+        docs.0[FINDINGS_KIND].event_ids,
+        ["kaya/Finding/f-hit-rate"],
+        "the findings document attributes its rendered id"
+    );
+    assert!(
+        docs.0[FINDINGS_KIND].body.contains(FINDINGS_BODY),
+        "the findings document keeps its body: {}",
+        docs.0[FINDINGS_KIND].body
+    );
+    assert_eq!(
+        docs.0[DECISION_KIND].event_ids,
+        ["kaya/Decision/d-ship-cache"],
+        "the decision document attributes its rendered id"
+    );
+    assert!(
+        docs.0[DECISION_KIND].body.contains(DECISION_BODY),
+        "the decision document keeps its body: {}",
+        docs.0[DECISION_KIND].body
+    );
+
+    let out = tmp.path().join("out");
+    let decls = [
+        product("concept", &[DECISION_KIND, FINDINGS_KIND]),
+        product("faq", &[FINDINGS_KIND, DECISION_KIND]),
+        product("troubleshooting", &[FINDINGS_KIND]),
+    ];
+    let built = build(&decls, &docs, &out).expect("the understanding products must build");
+    assert!(
+        built.omitted.is_empty(),
+        "every declared product has an admissible backing document: {:?}",
+        built.omitted
+    );
+
+    let pages = markdown(&read_tree(&out));
+    for name in ["concept.md", "faq.md", "troubleshooting.md"] {
+        assert!(
+            pages.contains_key(name),
+            "a backed product writes its page, missing {name}: {:?}",
+            pages.keys().collect::<Vec<_>>()
+        );
+    }
+
+    // Each document body is rendered once, in the first product page that
+    // admits it; every later page cross-references it.
+    for (kind, body) in [
+        (FINDINGS_KIND, FINDINGS_BODY),
+        (DECISION_KIND, DECISION_BODY),
+    ] {
+        let occurrences: usize = pages.values().map(|page| page.matches(body).count()).sum();
+        assert_eq!(
+            occurrences, 1,
+            "{body} is rendered exactly once across the product pages: {pages:?}"
+        );
+        assert!(
+            pages["concept.md"].contains(&format!("### {kind}")),
+            "the concept page carries the {kind} section: {}",
+            pages["concept.md"]
+        );
+        assert!(
+            pages["faq.md"].contains(&format!("See [concept](concept.md#{kind}).")),
+            "the faq page cross-references the {kind} body: {}",
+            pages["faq.md"]
+        );
+    }
+    let troubleshooting = &pages["troubleshooting.md"];
+    assert!(
+        troubleshooting.contains(&format!("See [concept](concept.md#{FINDINGS_KIND}).")),
+        "the troubleshooting page cross-references the findings body: {troubleshooting}"
+    );
+    assert!(
+        !troubleshooting.contains(DECISION_BODY),
+        "troubleshooting admits no decision record: {troubleshooting}"
     );
 }

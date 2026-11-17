@@ -46,7 +46,7 @@ A product is never a document kind, and a collection is never a product.
 | exploration | `exploration-brief` | What triggered this question and what would change our mind? | Question, Idea, Hypothesis |
 | exploration | `experiment-specification` | How will we investigate it? | Experiment, Hypothesis, intent relationships |
 | exploration | `experiment-record` | What actually happened? | Run, Artifact, observation events |
-| understanding | `findings-and-analysis` | What does the evidence tell us? | Finding, Claim, Observation, Run |
+| understanding | `findings-and-analysis` | What does the evidence tell us? | Finding, Claim, Observation |
 | understanding | `decision-record` | Why did we choose this direction? | Decision, Source, Finding |
 | reuse-handoff | `technical-reference` | What exactly is this interface or constraint? | Source references (specodelic specs, model) |
 | reuse-handoff | `reproduction-package` | How do I reproduce this run? | Run revision, commands, expected outputs |
@@ -63,9 +63,17 @@ edge, inside the `orientation.research-map` block of `docs/research/index.md`.
 The report implements the specification/record split as two generated blocks:
 it compiles `exploration.experiment-specification` from declared intent and
 `exploration.experiment-record` from runs, observations, findings, and
-interpretations, omitting any kind with no records. Every other kind is absent:
-`exploration-brief` and `understanding.findings-and-analysis` are not
-generated yet.
+interpretations, omitting any kind with no records. The project-level
+`docs/research/understanding.md` implements both understanding kinds:
+`understanding.findings-and-analysis` renders Finding, Observation, and Claim
+records (runs and artifacts never enter it), and
+`understanding.decision-record` renders decisions plus their evidence — source
+revisions and influenced findings — with a Source row only when both `path` and
+`commit` are present and non-blank. Findings canonically precede the decision
+record, and a document left holding neither block is deleted rather than
+written empty. `exploration-brief`, `technical-reference`, and
+`knowledge-brief` are not generated yet; `reproduction-package` and `handoff`
+render reference rows from the ledger.
 
 ## Publication layer: twelve products
 
@@ -84,10 +92,17 @@ generated yet.
 | `release-migration` | What changed and what must I do? | `orientation.project-overview`, `understanding.decision-record` |
 | `architecture-design` | How is it structured and why? | `understanding.decision-record`, `orientation.research-map` |
 
-Status today: `kaya publish` emits `reference` from
-`orientation.research-map` (the `reuse-handoff.technical-reference` include has
-no producer yet) and `project-site` over `overview` and `reference`, with
-`overview` omitted as `no-backing-document`, never stubbed.
+Status today: `kaya publish` reads `index.md`, `understanding.md`,
+`reproduction-package.md`, `handoff.md`, and the experiment dossiers in that
+fixed order, keeping only generated blocks in the document vocabulary — so the
+understanding kinds can back any product that admits them. Today's declarations
+are `overview`, `reference`, and the `project-site` package: `kaya publish`
+emits `reference` from `orientation.research-map` (the
+`reuse-handoff.technical-reference` include has no producer yet) and
+`project-site` over `overview` and `reference`, with `overview` omitted as
+`no-backing-document`, never stubbed. No product declares an understanding kind
+yet, and the committed ledger holds no Finding, Claim, Observation, or Decision
+record, so no `understanding.md` is compiled.
 
 ## Collections and packages
 

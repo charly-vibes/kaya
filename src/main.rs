@@ -508,6 +508,16 @@ fn cmd_build(
         }
     }
 
+    // The understanding projection is project-level: one document, both
+    // kinds, whether or not the ledger declares an experiment. An empty
+    // ledger leaves the document absent rather than writing a blank file.
+    let understanding_path = out.join("understanding.md");
+    let built =
+        report::build_understanding(&graph, &understanding_path).map_err(projection_failure)?;
+    omitted.extend(built.omitted);
+    merge_summary(&mut summary, built.summary);
+    flag_stale_authored(&mut summary, &understanding_path, &changed_ids)?;
+
     // The reuse projection always runs, even when the ledger holds no reuse
     // references: an existing document's stale blocks and legacy names are
     // only visible by validating the documents, and an empty kind is reported

@@ -55,6 +55,7 @@ const REPRODUCTION_BLOCK_END: &str =
     "<!-- kaya:end generated:reuse-handoff.reproduction-package -->";
 const REPRODUCTION_FILE: &str = "docs/research/reproduction-package.md";
 const HANDOFF_FILE: &str = "docs/research/handoff.md";
+const UNDERSTANDING_FILE: &str = "docs/research/understanding.md";
 
 /// The reproduction package lists exactly these committed Source rows, sorted
 /// by node id, one `path@commit` reference each.
@@ -369,8 +370,18 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
                 "kind": "handoff",
                 "reason": "no-records",
             },
+            {
+                "family": "understanding",
+                "kind": "decision-record",
+                "reason": "no-records",
+            },
+            {
+                "family": "understanding",
+                "kind": "findings-and-analysis",
+                "reason": "no-records",
+            },
         ]),
-        "the empty record and handoff kinds are reported once with family and reason: {build}"
+        "every empty kind is reported once with family and reason, sorted by family then kind: {build}"
     );
 
     // The index: generated block appended after the authored and foreign bytes.
@@ -490,6 +501,10 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     assert!(
         !root.join(HANDOFF_FILE).exists(),
         "no handoff artifact exists, so no handoff document is written"
+    );
+    assert!(
+        !root.join(UNDERSTANDING_FILE).exists(),
+        "the ledger holds no Finding or Decision records, so both understanding kinds are empty and no understanding document is written"
     );
 
     // The report: generated block plus the preserved authored dossier.
@@ -659,6 +674,10 @@ fn committed_ledger_builds_without_the_uncommitted_flag() {
     assert!(
         generated.contains(QUESTION) && generated.contains(HYPOTHESIS),
         "the generated report cites its question and hypothesis: {generated}"
+    );
+    assert!(
+        !root.join(UNDERSTANDING_FILE).exists(),
+        "the committed ledger holds no Finding or Decision records, so both understanding kinds are empty and no understanding document is written"
     );
 
     let index = fs::read_to_string(root.join(INDEX)).expect("build wrote the index");

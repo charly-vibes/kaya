@@ -18,6 +18,8 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+use crate::model::Node;
+
 pub mod index;
 pub mod report;
 pub mod reuse;
@@ -294,6 +296,52 @@ pub(crate) fn io_error(action: &str, path: &Path, error: io::Error) -> Projectio
         LABEL_IO,
         format!("failed to {action} \"{}\": {error}", path.display()),
     )
+}
+
+/// A single-line, trimmed string attribute; blank values count as absent.
+///
+/// A missing attribute, a blank value, and a non-string value all yield
+/// `None`, so a projection never renders an empty placeholder for one.
+pub(crate) fn attribute(node: &Node, name: &str) -> Option<String> {
+    let value = node
+        .attributes
+        .get(name)
+        .and_then(serde_json::Value::as_str)?;
+    let single_line: String = value
+        .chars()
+        .map(|c| if c == '\n' || c == '\r' { ' ' } else { c })
+        .collect();
+    let trimmed = single_line.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_owned())
+    }
+}
+
+/// The key segment of a node id, used when the node carries no title.
+pub(crate) fn key(node: &Node) -> String {
+    node.id
+        .rsplit('/')
+        .next()
+        .unwrap_or(node.id.as_str())
+        .to_owned()
+}
+
+/// A node's single-line title, or the key segment of its id when untitled.
+pub(crate) fn title_or_key(node: &Node) -> String {
+    attribute(node, "title").unwrap_or_else(|| key(node))
+}
+
+/// A repo file reference as `path@commit`, pinned to the recorded revision.
+///
+/// A reference needs both halves: a node missing or blank in `path` or
+/// `commit` has no resolvable reference, so it yields `None` and the caller
+/// renders no row rather than `path@` or `@commit`.
+pub(crate) fn source_reference(node: &Node) -> Option<String> {
+    let path = attribute(node, "path")?;
+    let commit = attribute(node, "commit")?;
+    Some(format!("{path}@{commit}"))
 }
 
 fn scan_spans(doc: &str) -> Result<Vec<Span>, ProjectionError> {

@@ -410,19 +410,24 @@ pub struct Built {
 
 /// Read the compiled documents under `research_dir`.
 ///
-/// Files are read in a fixed order — `index.md`, `reproduction-package.md`,
-/// `handoff.md`, then the experiment dossiers sorted by name — and only
-/// generated blocks whose names are in the document vocabulary are kept. A
-/// repeated block name inside one file is refused, because the file's grammar
-/// then admits two answers; across files the first populated block wins.
-/// Whitespace-only blocks are skipped, so an empty compilation never shadows a
-/// populated one. The block body's `kaya/...` node ids become its event
-/// attribution. No ledger access is needed.
+/// Files are read in a fixed order — `index.md`, `understanding.md`,
+/// `reproduction-package.md`, `handoff.md`, then the experiment dossiers
+/// sorted by name — and only generated blocks whose names are in the document
+/// vocabulary are kept. A repeated block name inside one file is refused,
+/// because the file's grammar then admits two answers; across files the first
+/// populated block wins. Whitespace-only blocks are skipped, so an empty
+/// compilation never shadows a populated one. The block body's `kaya/...` node
+/// ids become its event attribution. No ledger access is needed.
 pub fn read_documents(research_dir: &Path) -> Result<Documents, PublicationError> {
     let mut documents = BTreeMap::new();
 
     let mut files: Vec<PathBuf> = Vec::new();
-    for name in ["index.md", "reproduction-package.md", "handoff.md"] {
+    for name in [
+        "index.md",
+        "understanding.md",
+        "reproduction-package.md",
+        "handoff.md",
+    ] {
         files.push(research_dir.join(name));
     }
     let experiments = research_dir.join("experiments");

@@ -125,6 +125,21 @@ fn ledger_lines(dir: &TempDir) -> Vec<String> {
         .collect()
 }
 
+/// Bytes between a generated block's begin and end markers.
+fn generated_block_body(doc: &str, name: &str) -> String {
+    let begin = format!("<!-- kaya:begin generated:{name} -->");
+    let end = format!("<!-- kaya:end generated:{name} -->");
+    let start = doc
+        .find(&begin)
+        .unwrap_or_else(|| panic!("the document carries the {name} block: {doc}"))
+        + begin.len();
+    let stop = doc[start..]
+        .find(&end)
+        .unwrap_or_else(|| panic!("the {name} block is closed: {doc}"))
+        + start;
+    doc[start..stop].to_string()
+}
+
 fn assertion_event(id: &str, text: &str, cites: &[&str]) -> Value {
     json!({
         "id": id,
@@ -507,6 +522,267 @@ fn build_writes_one_report_per_experiment() {
 }
 
 #[test]
+fn build_writes_understanding_from_recorded_records() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    // Run and Artifact records exist, so the findings-and-analysis block
+    // proves it renders only its own kind: neither id nor path may leak.
+    let lines = [
+        event_line(&node_event(
+            "entity-1",
+            "Finding",
+            "kaya/Finding/f-hit-rate",
+            "Cache hit rate rose",
+        )),
+        event_line(&node_event(
+            "entity-2",
+            "Decision",
+            "kaya/Decision/d-ship-cache",
+            "Ship the cache",
+        )),
+        event_line(&source_event(
+            "entity-3",
+            "kaya/Source/src-cache-rs@abc123",
+            "src/cache.rs",
+            "abc123",
+        )),
+        event_line(&run_event("run-1", "kaya/Run/run-1", 3)),
+        event_line(&artifact_event(
+            "artifact-1",
+            "kaya/Artifact/run-jsonl",
+            "reports",
+            "target/run.jsonl",
+        )),
+        event_line(&relationship_event(
+            "rel-1",
+            "influences",
+            "kaya/Decision/d-ship-cache",
+            "kaya/Finding/f-hit-rate",
+        )),
+    ];
+    write_ledger(&dir, &lines);
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    let recomputed = built["data"]["recomputed"]
+        .as_array()
+        .expect("recomputed is a list");
+    for name in [
+        "understanding.findings-and-analysis",
+        "understanding.decision-record",
+    ] {
+        assert!(
+            recomputed.iter().any(|candidate| candidate == name),
+            "the build compiles the {name} block: {recomputed:?}"
+        );
+    }
+    let omitted = built["data"]["omitted"]
+        .as_array()
+        .expect("omitted is a list");
+    assert!(
+        !omitted
+            .iter()
+            .any(|entry| entry["family"] == json!("understanding")),
+        "a kind with records is never reported omitted: {omitted:?}"
+    );
+
+    let sources = built["data"]["sources"]
+        .as_object()
+        .expect("build exposes the merged source map");
+    assert_eq!(
+        sources["understanding.findings-and-analysis"],
+        json!(["kaya/Finding/f-hit-rate"]),
+        "the findings block's source map names the rendered finding: {sources:?}"
+    );
+    assert!(
+        sources.contains_key("understanding.decision-record"),
+        "the decision record has its own source-map entry: {sources:?}"
+    );
+    assert_eq!(
+        sources["understanding.decision-record"],
+        json!([
+            "kaya/Decision/d-ship-cache",
+            "kaya/Finding/f-hit-rate",
+            "kaya/Source/src-cache-rs@abc123",
+        ]),
+        "the decision source map is exactly its decisions and evidence: {sources:?}"
+    );
+    for name in [
+        "understanding.findings-and-analysis",
+        "understanding.decision-record",
+    ] {
+        let ids = sources[name]
+            .as_array()
+            .unwrap_or_else(|| panic!("{name} maps to a list of ids: {sources:?}"));
+        assert!(
+            !ids.iter().any(|id| {
+                let id = id.as_str().expect("every source id is a string");
+                id.starts_with("kaya/Run/") || id.starts_with("kaya/Artifact/")
+            }),
+            "run and artifact ids stay out of the understanding source maps: {ids:?}"
+        );
+    }
+
+    let understanding = fs::read_to_string(dir.path().join("docs/research/understanding.md"))
+        .expect("the understanding document is written");
+    let findings = generated_block_body(&understanding, "understanding.findings-and-analysis");
+    assert!(
+        findings.contains("- kaya/Finding/f-hit-rate — Cache hit rate rose"),
+        "the findings block renders the recorded finding: {findings}"
+    );
+    for forbidden in [
+        "kaya/Run/run-1",
+        "### Runs",
+        "kaya/Artifact/run-jsonl",
+        "target/run.jsonl",
+    ] {
+        assert!(
+            !findings.contains(forbidden),
+            "run and artifact rows stay out of the findings block ({forbidden}): {findings}"
+        );
+    }
+
+    let decisions = generated_block_body(&understanding, "understanding.decision-record");
+    assert!(
+        decisions.contains("- kaya/Decision/d-ship-cache — Ship the cache"),
+        "the decision record renders the recorded decision: {decisions}"
+    );
+    assert!(
+        decisions.contains("- kaya/Source/src-cache-rs@abc123 — src/cache.rs@abc123"),
+        "evidence names the source revision as path@commit: {decisions}"
+    );
+    assert!(
+        decisions.contains("- kaya/Finding/f-hit-rate — see kaya/Decision/d-ship-cache"),
+        "the influences edge renders as a finding reference: {decisions}"
+    );
+    for forbidden in ["kaya/Run/run-1", "target/run.jsonl"] {
+        assert!(
+            !decisions.contains(forbidden),
+            "run and artifact rows stay out of the decision record ({forbidden}): {decisions}"
+        );
+    }
+}
+
+#[test]
+fn build_flags_authored_understanding_prose_and_pins_the_decision_source_map() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    let authored = "# Understanding notes\n\n\
+        <!-- kaya:authored -->\n\
+        The corrected run settled the cache question.\n\
+        <!-- kaya:cites run-1 -->\n\
+        <!-- kaya:end authored -->\n";
+    fs::create_dir_all(dir.path().join("docs/research")).unwrap();
+    fs::write(dir.path().join("docs/research/understanding.md"), authored)
+        .expect("the authored understanding document is writable");
+
+    // A run exists, is superseded, and produces an artifact: none of those
+    // facts may leak into the understanding blocks or their source maps.
+    let lines = [
+        event_line(&node_event(
+            "entity-1",
+            "Finding",
+            "kaya/Finding/f-hit-rate",
+            "Cache hit rate rose",
+        )),
+        event_line(&node_event(
+            "entity-2",
+            "Decision",
+            "kaya/Decision/d-ship-cache",
+            "Ship the cache",
+        )),
+        event_line(&source_event(
+            "entity-3",
+            "kaya/Source/src-cache-rs@abc123",
+            "src/cache.rs",
+            "abc123",
+        )),
+        event_line(&run_event("run-1", "kaya/Run/run-1", 3)),
+        event_line(&run_correction(
+            "correction-1",
+            "kaya/Run/run-1",
+            "run-1",
+            4,
+        )),
+        event_line(&artifact_event(
+            "artifact-1",
+            "kaya/Artifact/run-jsonl",
+            "reports",
+            "target/run.jsonl",
+        )),
+        event_line(&relationship_event(
+            "rel-1",
+            "influences",
+            "kaya/Decision/d-ship-cache",
+            "kaya/Finding/f-hit-rate",
+        )),
+    ];
+    write_ledger(&dir, &lines);
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+
+    assert_eq!(
+        built["data"]["stale"],
+        json!([{ "block": "authored-1", "evidence": ["run-1"] }]),
+        "a correction under authored understanding prose produces a stale entry: {built}"
+    );
+
+    let sources = built["data"]["sources"]
+        .as_object()
+        .expect("build exposes the merged source map");
+    assert_eq!(
+        sources["understanding.decision-record"],
+        json!([
+            "kaya/Decision/d-ship-cache",
+            "kaya/Finding/f-hit-rate",
+            "kaya/Source/src-cache-rs@abc123",
+        ]),
+        "the decision source map names the decision, its evidence, and the source: {sources:?}"
+    );
+    assert_eq!(
+        sources["understanding.findings-and-analysis"],
+        json!(["kaya/Finding/f-hit-rate"]),
+        "the findings source map names the rendered records only: {sources:?}"
+    );
+    for name in [
+        "understanding.findings-and-analysis",
+        "understanding.decision-record",
+    ] {
+        let ids = sources[name]
+            .as_array()
+            .unwrap_or_else(|| panic!("{name} maps to a list of ids: {sources:?}"));
+        assert!(
+            !ids.iter().any(|id| {
+                let id = id.as_str().expect("every source id is a string");
+                id.starts_with("kaya/Run/") || id.starts_with("kaya/Artifact/")
+            }),
+            "run and artifact ids stay out of the understanding source maps: {ids:?}"
+        );
+    }
+
+    let understanding = fs::read_to_string(dir.path().join("docs/research/understanding.md"))
+        .expect("the understanding document is written");
+    assert!(
+        understanding.starts_with(authored),
+        "authored understanding prose is never rewritten: {understanding}"
+    );
+    let decisions = generated_block_body(&understanding, "understanding.decision-record");
+    for forbidden in [
+        "kaya/Run/run-1",
+        "kaya/Artifact/run-jsonl",
+        "target/run.jsonl",
+    ] {
+        assert!(
+            !decisions.contains(forbidden),
+            "run and artifact rows stay out of the decision record ({forbidden}): {decisions}"
+        );
+    }
+    assert!(
+        decisions.contains("- kaya/Source/src-cache-rs@abc123 — src/cache.rs@abc123"),
+        "the pinned source renders once as path@commit: {decisions}"
+    );
+}
+
+#[test]
 fn omitted_kinds_reported_once_in_build_envelope() {
     let dir = tempfile::tempdir().unwrap();
     init(&dir);
@@ -573,6 +849,16 @@ fn omitted_kinds_reported_once_in_build_envelope() {
             {
                 "family": "reuse-handoff",
                 "kind": "reproduction-package",
+                "reason": "no-records",
+            },
+            {
+                "family": "understanding",
+                "kind": "decision-record",
+                "reason": "no-records",
+            },
+            {
+                "family": "understanding",
+                "kind": "findings-and-analysis",
                 "reason": "no-records",
             },
         ]),
@@ -693,6 +979,16 @@ fn omitted_kinds_are_sorted_and_deduped_across_experiments() {
                 "kind": "reproduction-package",
                 "reason": "no-records",
             },
+            {
+                "family": "understanding",
+                "kind": "decision-record",
+                "reason": "no-records",
+            },
+            {
+                "family": "understanding",
+                "kind": "findings-and-analysis",
+                "reason": "no-records",
+            },
         ]),
         "three experiments yield one sorted, deduplicated pair of omissions: {built}"
     );
@@ -749,6 +1045,16 @@ fn build_tolerates_a_missing_report_when_corrections_exist() {
             {
                 "family": "reuse-handoff",
                 "kind": "reproduction-package",
+                "reason": "no-records",
+            },
+            {
+                "family": "understanding",
+                "kind": "decision-record",
+                "reason": "no-records",
+            },
+            {
+                "family": "understanding",
+                "kind": "findings-and-analysis",
                 "reason": "no-records",
             },
         ]),
@@ -828,6 +1134,16 @@ fn ledger_assertions_do_not_create_a_record_block_for_a_runless_experiment() {
             {
                 "family": "reuse-handoff",
                 "kind": "reproduction-package",
+                "reason": "no-records",
+            },
+            {
+                "family": "understanding",
+                "kind": "decision-record",
+                "reason": "no-records",
+            },
+            {
+                "family": "understanding",
+                "kind": "findings-and-analysis",
                 "reason": "no-records",
             },
         ]),
@@ -1014,11 +1330,23 @@ fn build_writes_reference_documents_and_leaves_the_ledger_unchanged() {
     );
     assert_eq!(
         built["data"]["omitted"],
-        json!([{
-            "family": "reuse-handoff",
-            "kind": "reproduction-package",
-            "reason": "no-records",
-        }]),
+        json!([
+            {
+                "family": "reuse-handoff",
+                "kind": "reproduction-package",
+                "reason": "no-records",
+            },
+            {
+                "family": "understanding",
+                "kind": "decision-record",
+                "reason": "no-records",
+            },
+            {
+                "family": "understanding",
+                "kind": "findings-and-analysis",
+                "reason": "no-records",
+            },
+        ]),
         "no Source nodes means the reproduction package is omitted: {built}"
     );
 

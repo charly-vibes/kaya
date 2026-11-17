@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "block-content-limited-to-its-kind"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "findings_and_analysis_renders_admissible_records_only"}]
