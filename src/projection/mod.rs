@@ -14,9 +14,13 @@
 //! untouched.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::io;
+use std::path::Path;
 
 pub mod index;
 pub mod report;
+pub mod reuse;
 
 /// Prefix of a generated-block begin marker.
 pub const BEGIN_PREFIX: &str = "<!-- kaya:begin generated:";
@@ -253,6 +257,43 @@ pub fn remove_generated(doc: &str, name: &str) -> Result<String, ProjectionError
     out.push_str(&doc[..remove_from]);
     out.push_str(&doc[end_end..]);
     Ok(out)
+}
+
+/// Label for projection document read and write failures.
+pub(crate) const LABEL_IO: &str = "kaya.projection.io";
+
+/// The body of generated block `name`, when the document carries it.
+pub(crate) fn generated_body(
+    document: &str,
+    name: &str,
+) -> Result<Option<String>, ProjectionError> {
+    let blocks = scan(document)?;
+    Ok(blocks.into_iter().find_map(|block| match block.kind {
+        BlockKind::Generated(existing) if existing.as_str() == name => Some(block.body),
+        _ => None,
+    }))
+}
+
+/// Read a projection document, treating absence as an empty document.
+pub(crate) fn read_existing(path: &Path) -> Result<Option<String>, ProjectionError> {
+    match fs::read_to_string(path) {
+        Ok(document) => Ok(Some(document)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(io_error("read", path, error)),
+    }
+}
+
+/// Write a projection document verbatim.
+pub(crate) fn write(path: &Path, document: &str) -> Result<(), ProjectionError> {
+    fs::write(path, document).map_err(|error| io_error("write", path, error))
+}
+
+/// Render an I/O failure as a labeled projection refusal naming the path.
+pub(crate) fn io_error(action: &str, path: &Path, error: io::Error) -> ProjectionError {
+    ProjectionError::new(
+        LABEL_IO,
+        format!("failed to {action} \"{}\": {error}", path.display()),
+    )
 }
 
 fn scan_spans(doc: &str) -> Result<Vec<Span>, ProjectionError> {

@@ -48,6 +48,24 @@ const SPECIFICATION_BLOCK_END: &str =
     "<!-- kaya:end generated:exploration.experiment-specification -->";
 const RECORD_BLOCK_BEGIN: &str = "<!-- kaya:begin generated:exploration.experiment-record -->";
 const RECORD_BLOCK_END: &str = "<!-- kaya:end generated:exploration.experiment-record -->";
+const REPRODUCTION_BLOCK_NAME: &str = "reuse-handoff.reproduction-package";
+const REPRODUCTION_BLOCK_BEGIN: &str =
+    "<!-- kaya:begin generated:reuse-handoff.reproduction-package -->";
+const REPRODUCTION_BLOCK_END: &str =
+    "<!-- kaya:end generated:reuse-handoff.reproduction-package -->";
+const REPRODUCTION_FILE: &str = "docs/research/reproduction-package.md";
+const HANDOFF_FILE: &str = "docs/research/handoff.md";
+
+/// The reproduction package lists exactly these committed Source rows, sorted
+/// by node id, one `path@commit` reference each.
+const REPRODUCTION_ROWS: [&str; 6] = [
+    "- kaya/Source/docs-src-index.md@43b606f — docs/src/index.md@43b606f",
+    "- kaya/Source/openspec-changes-add-core-research-record-proposal.md@43b606f — openspec/changes/add-core-research-record/proposal.md@43b606f",
+    "- kaya/Source/openspec-changes-add-core-research-record-specs-kaya-adapters-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-adapters/spec.md@43b606f",
+    "- kaya/Source/openspec-changes-add-core-research-record-specs-kaya-event-layer.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-event/layer.md@43b606f",
+    "- kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f",
+    "- kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f",
+];
 
 const QUESTION_HEADINGS: [&str; 3] = [
     "### Q1: Why are events not genesis envelopes?",
@@ -340,12 +358,19 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     );
     assert_eq!(
         build["data"]["omitted"],
-        json!([{
-            "family": "exploration",
-            "kind": "experiment-record",
-            "reason": "no-records",
-        }]),
-        "the empty record kind is reported once with its family and reason: {build}"
+        json!([
+            {
+                "family": "exploration",
+                "kind": "experiment-record",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "handoff",
+                "reason": "no-records",
+            },
+        ]),
+        "the empty record and handoff kinds are reported once with family and reason: {build}"
     );
 
     // The index: generated block appended after the authored and foreign bytes.
@@ -433,6 +458,40 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
         );
     }
 
+    // The reproduction package: one reference row per committed Source and no
+    // Commands section. No handoff artifact exists, so no handoff document.
+    let reproduction_after = fs::read_to_string(root.join(REPRODUCTION_FILE))
+        .expect("build wrote the reproduction package");
+    assert!(
+        reproduction_after.contains(REPRODUCTION_BLOCK_BEGIN)
+            && reproduction_after.contains(REPRODUCTION_BLOCK_END),
+        "the reproduction package carries its generated block: {reproduction_after}"
+    );
+    let reproduction_block = between(
+        &reproduction_after,
+        REPRODUCTION_BLOCK_BEGIN,
+        REPRODUCTION_BLOCK_END,
+    );
+    let reproduction_body = reproduction_block
+        .strip_prefix(REPRODUCTION_BLOCK_BEGIN)
+        .and_then(|rest| rest.strip_suffix(REPRODUCTION_BLOCK_END))
+        .expect("the reproduction block is delimited by its markers");
+    let mut expected_rows = vec!["### Sources"];
+    expected_rows.extend(REPRODUCTION_ROWS);
+    assert_eq!(
+        reproduction_body.trim(),
+        expected_rows.join("\n"),
+        "the package lists exactly the six committed Source references"
+    );
+    assert!(
+        !reproduction_after.contains("### Commands"),
+        "the dossier records no run command: {reproduction_after}"
+    );
+    assert!(
+        !root.join(HANDOFF_FILE).exists(),
+        "no handoff artifact exists, so no handoff document is written"
+    );
+
     // The report: generated block plus the preserved authored dossier.
     let report_after_bytes = fs::read(&report_path).expect("build wrote the report");
     assert!(
@@ -504,7 +563,7 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
         );
     }
 
-    // A second build must be a no-op on both projections.
+    // A second build must be a no-op on every projection.
     let rebuild = run_kaya(root, &["build", "--allow-uncommitted"]);
     assert!(
         names(&rebuild, "recomputed").is_empty(),
@@ -518,6 +577,10 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     assert!(
         lists(&unchanged, SPECIFICATION_NAME),
         "second build reports the specification unchanged: {rebuild}"
+    );
+    assert!(
+        lists(&unchanged, REPRODUCTION_BLOCK_NAME),
+        "second build reports the reproduction package unchanged: {rebuild}"
     );
     assert!(
         !lists(&unchanged, RECORD_NAME),

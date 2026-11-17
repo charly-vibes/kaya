@@ -176,6 +176,38 @@ fn experiment_event(event_id: &str, node_id: &str, title: &str) -> Value {
     node_event(event_id, "Experiment", node_id, title)
 }
 
+fn artifact_event(event_id: &str, node_id: &str, kind: &str, path: &str) -> Value {
+    json!({
+        "id": event_id,
+        "schema": "kaya.event/v0",
+        "type": "capture.artifact.observed",
+        "timestamp": "2026-11-16T10:00:00Z",
+        "actor": { "type": "tool", "name": "wai" },
+        "subject": { "type": "Artifact", "id": node_id },
+        "data": { "kind": kind, "path": path },
+        "provenance": {
+            "tool": "wai",
+            "version": "2026.10.10",
+            "reference": path
+        },
+        "artifacts": [path],
+    })
+}
+
+fn source_event(event_id: &str, node_id: &str, path: &str, commit: &str) -> Value {
+    json!({
+        "id": event_id,
+        "schema": "kaya.event/v0",
+        "type": "model.entity.created",
+        "timestamp": "2026-11-16T10:00:00Z",
+        "actor": { "type": "human", "name": "alice" },
+        "subject": { "type": "Source", "id": node_id },
+        "data": { "attributes": { "path": path, "commit": commit } },
+        "provenance": { "tool": "kaya", "version": "0.1.0", "reference": event_id },
+        "artifacts": [],
+    })
+}
+
 fn run_event(event_id: &str, run_id: &str, passed: u64) -> Value {
     json!({
         "id": event_id,
@@ -527,11 +559,23 @@ fn omitted_kinds_reported_once_in_build_envelope() {
     let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
     assert_eq!(
         built["data"]["omitted"],
-        json!([{
-            "family": "exploration",
-            "kind": "experiment-record",
-            "reason": "no-records",
-        }]),
+        json!([
+            {
+                "family": "exploration",
+                "kind": "experiment-record",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "handoff",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "reproduction-package",
+                "reason": "no-records",
+            },
+        ]),
         "each omitted kind is named exactly once, sorted and deduplicated: {built}"
     );
 
@@ -639,6 +683,16 @@ fn omitted_kinds_are_sorted_and_deduped_across_experiments() {
                 "kind": "experiment-specification",
                 "reason": "no-records",
             },
+            {
+                "family": "reuse-handoff",
+                "kind": "handoff",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "reproduction-package",
+                "reason": "no-records",
+            },
         ]),
         "three experiments yield one sorted, deduplicated pair of omissions: {built}"
     );
@@ -685,6 +739,16 @@ fn build_tolerates_a_missing_report_when_corrections_exist() {
             {
                 "family": "exploration",
                 "kind": "experiment-specification",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "handoff",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "reproduction-package",
                 "reason": "no-records",
             },
         ]),
@@ -750,11 +814,23 @@ fn ledger_assertions_do_not_create_a_record_block_for_a_runless_experiment() {
     );
     assert_eq!(
         built["data"]["omitted"],
-        json!([{
-            "family": "exploration",
-            "kind": "experiment-record",
-            "reason": "no-records",
-        }]),
+        json!([
+            {
+                "family": "exploration",
+                "kind": "experiment-record",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "handoff",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "reproduction-package",
+                "reason": "no-records",
+            },
+        ]),
         "the record kind is omitted even though an assertion exists: {built}"
     );
 }
@@ -904,6 +980,147 @@ fn build_accepts_an_untracked_ledger_only_when_allowed_or_pinned() {
 
     let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
     assert_eq!(built["data"]["pending_proposals"], json!(0));
+}
+
+#[test]
+fn build_writes_reference_documents_and_leaves_the_ledger_unchanged() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    let handoff_path = ".wai/projects/kaya/handoffs/h.md";
+    write_ledger(
+        &dir,
+        &[event_line(&artifact_event(
+            "artifact-1",
+            "kaya/Artifact/handoffs-h",
+            "handoffs",
+            handoff_path,
+        ))],
+    );
+
+    let ledger = dir.path().join(LEDGER);
+    let bytes_before = fs::read(&ledger).expect("the ledger is readable");
+    let events_before = ledger_lines(&dir).len();
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+
+    let recomputed = built["data"]["recomputed"]
+        .as_array()
+        .expect("recomputed is a list");
+    assert!(
+        recomputed
+            .iter()
+            .any(|name| name == "reuse-handoff.handoff"),
+        "the handoff document reports its reuse block: {recomputed:?}"
+    );
+    assert_eq!(
+        built["data"]["omitted"],
+        json!([{
+            "family": "reuse-handoff",
+            "kind": "reproduction-package",
+            "reason": "no-records",
+        }]),
+        "no Source nodes means the reproduction package is omitted: {built}"
+    );
+
+    let handoff = fs::read_to_string(dir.path().join("docs/research/handoff.md"))
+        .expect("the handoff document is written");
+    assert!(
+        handoff.contains("<!-- kaya:begin generated:reuse-handoff.handoff -->"),
+        "the handoff document carries its generated block marker: {handoff}"
+    );
+    assert!(
+        handoff.contains(handoff_path),
+        "every handoff row names its wai artifact reference: {handoff}"
+    );
+    assert!(
+        handoff.contains("kaya/Artifact/handoffs-h"),
+        "the reference row keeps the source node id: {handoff}"
+    );
+    assert!(
+        !handoff.contains("reuse-handoff.reproduction-package"),
+        "an omitted kind leaves no block in the handoff document: {handoff}"
+    );
+    assert!(
+        !dir.path()
+            .join("docs/research/reproduction-package.md")
+            .exists(),
+        "an omitted kind gets no document of its own"
+    );
+
+    let bytes_after = fs::read(&ledger).expect("the ledger is readable");
+    assert_eq!(
+        bytes_after, bytes_before,
+        "a reuse document copies no payload into the ledger"
+    );
+    assert_eq!(
+        ledger_lines(&dir).len(),
+        events_before,
+        "a reuse document creates no ledger entity"
+    );
+}
+
+#[test]
+fn build_refuses_a_legacy_block_in_a_reuse_document() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    let handoff_path = ".wai/projects/kaya/handoffs/h.md";
+    // A Source row means the reproduction package has something to write:
+    // the refusal must happen before that document is created.
+    write_ledger(
+        &dir,
+        &[
+            event_line(&source_event(
+                "source-1",
+                "kaya/Source/src-main-rs@9f2c1a",
+                "src/main.rs",
+                "9f2c1a",
+            )),
+            event_line(&artifact_event(
+                "artifact-1",
+                "kaya/Artifact/handoffs-h",
+                "handoffs",
+                handoff_path,
+            )),
+        ],
+    );
+
+    let seeded = "\
+# Handoffs
+
+<!-- kaya:begin generated:experiment-report -->
+## Runs
+
+- kaya/Run/run-1
+<!-- kaya:end generated:experiment-report -->
+";
+    let document = dir.path().join("docs/research/handoff.md");
+    fs::create_dir_all(document.parent().expect("document dir")).unwrap();
+    fs::write(&document, seeded).unwrap();
+
+    let envelope = assert_failure(&run(&dir, &["build", "--allow-uncommitted"]));
+    assert_eq!(
+        envelope["error"]["label"],
+        json!("kaya.documents.legacy_block_refused"),
+        "a legacy block in a reuse document is refused by the vocabulary gate"
+    );
+    let message = envelope["error"]["message"]
+        .as_str()
+        .expect("error envelopes carry a message");
+    assert!(
+        message.contains("experiment-report"),
+        "the refusal names the offending block: {message}"
+    );
+    assert_eq!(
+        fs::read_to_string(&document).expect("the document is readable"),
+        seeded,
+        "a refused document keeps its bytes untouched"
+    );
+    assert!(
+        !dir.path()
+            .join("docs/research/reproduction-package.md")
+            .exists(),
+        "the reproduction package is not written before the refusal"
+    );
 }
 
 #[test]

@@ -25,7 +25,7 @@ use kaya::envelope::Envelope;
 use kaya::event::{Actor, ActorType, Event, parse_line};
 use kaya::ledger::{AppendOutcome, Ledger, LedgerError, changed_event_ids, sha256_hex};
 use kaya::model::{self, EntityType, ModelError};
-use kaya::projection::{ProjectionError, StaleBlock, Summary, index, report};
+use kaya::projection::{ProjectionError, StaleBlock, Summary, index, report, reuse};
 use kaya::promotion::{self, PromotionError, PromotionState};
 
 /// Project-local directory holding kaya state.
@@ -494,6 +494,18 @@ fn cmd_build(
             merge_summary(&mut summary, built.summary);
             flag_stale_authored(&mut summary, &report_path, &changed_ids)?;
         }
+    }
+
+    // The reuse projection always runs, even when the ledger holds no reuse
+    // references: an existing document's stale blocks and legacy names are
+    // only visible by validating the documents, and an empty kind is reported
+    // once so callers see the whole closed family.
+    let reuse_inputs = reuse::inputs(&graph).map_err(projection_failure)?;
+    let built = reuse::build(&reuse_inputs, out).map_err(projection_failure)?;
+    omitted.extend(built.omitted);
+    merge_summary(&mut summary, built.summary);
+    for (_, path) in reuse::documents(out) {
+        flag_stale_authored(&mut summary, &path, &changed_ids)?;
     }
 
     let mut recomputed = summary.recomputed;

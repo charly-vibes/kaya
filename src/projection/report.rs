@@ -12,14 +12,12 @@
 //! shown with its promotion status so a proposal never reads as a verdict.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
-use std::io;
 use std::path::Path;
 
 use crate::model::{EntityType, Graph, Relationship};
 use crate::projection::{
-    BlockKind, ProjectionError, StaleBlock, Summary, remove_generated, replace_generated, scan,
-    validate_generated_blocks,
+    ProjectionError, StaleBlock, Summary, generated_body, read_existing, remove_generated,
+    replace_generated, validate_generated_blocks, write,
 };
 use crate::promotion::PromotionState;
 
@@ -40,7 +38,6 @@ const CITES_PREFIX: &str = "<!-- kaya:cites";
 const MARKER_END: &str = "-->";
 
 const LABEL_EXPERIMENT: &str = "kaya.projection.report_experiment";
-const LABEL_IO: &str = "kaya.projection.io";
 
 /// One document family in the closed taxonomy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -343,33 +340,6 @@ pub fn build(
     }
 
     Ok(Built { summary, omitted })
-}
-
-fn generated_body(document: &str, name: &str) -> Result<Option<String>, ProjectionError> {
-    let blocks = scan(document)?;
-    Ok(blocks.into_iter().find_map(|block| match block.kind {
-        BlockKind::Generated(existing) if existing.as_str() == name => Some(block.body),
-        _ => None,
-    }))
-}
-
-fn read_existing(path: &Path) -> Result<Option<String>, ProjectionError> {
-    match fs::read_to_string(path) {
-        Ok(document) => Ok(Some(document)),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(io_error("read", path, error)),
-    }
-}
-
-fn write(path: &Path, document: &str) -> Result<(), ProjectionError> {
-    fs::write(path, document).map_err(|error| io_error("write", path, error))
-}
-
-fn io_error(action: &str, path: &Path, error: io::Error) -> ProjectionError {
-    ProjectionError::new(
-        LABEL_IO,
-        format!("failed to {action} \"{}\": {error}", path.display()),
-    )
 }
 
 /// Flag authored blocks whose cited evidence changed after acknowledgment.
