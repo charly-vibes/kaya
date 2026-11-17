@@ -39,7 +39,7 @@ code changes here. bd ticket mapping noted per phase.
 - [x] 3.6 Publication slice: tier vocabulary, justified emission, composition,
       reader-question binding, exercised by `project-site` over `overview` and
       `reference`. (kaya-qp8)
-- [ ] 3.7 Developer-guide products: `getting-started`, `how-to`, `concept`,
+- [x] 3.7 Developer-guide products: `getting-started`, `how-to`, `concept`,
       `example`, `troubleshooting`, `faq`. (kaya-duv)
 - [ ] 3.8 Remaining products plus structured export: `status-compatibility`,
       `release-migration`, `architecture-design`, one source for every format.

@@ -25,6 +25,12 @@ const SPEC_KIND: &str = "exploration.experiment-specification";
 const FINDINGS_KIND: &str = "understanding.findings-and-analysis";
 const DECISION_KIND: &str = "understanding.decision-record";
 
+/// The heading anchors cross-references point at: the document kind with every
+/// character other than an alphanumeric, hyphen, or underscore removed.
+const OVERVIEW_ANCHOR: &str = "orientationproject-overview";
+const FINDINGS_ANCHOR: &str = "understandingfindings-and-analysis";
+const DECISION_ANCHOR: &str = "understandingdecision-record";
+
 const OVERVIEW_BODY: &str = "Kaya publishes client-facing documents from one source.";
 const MAP_BODY: &str = "The research map links each fact to its event.";
 const TECH_BODY: &str = "Reuse begins from the recorded handoff.";
@@ -569,7 +575,7 @@ fn shared_fact_is_rendered_once_with_a_cross_reference() {
         .get(&format!("{other}.md"))
         .unwrap_or_else(|| panic!("{other} is emitted"));
     assert!(
-        other_page.contains(&format!("See [{holder}]({holder}.md#{OVERVIEW_KIND}).")),
+        other_page.contains(&format!("See [{holder}]({holder}.md#{OVERVIEW_ANCHOR}).")),
         "the second product cross-references the first instead of repeating the body: {other_page}"
     );
     assert!(
@@ -1924,9 +1930,9 @@ fn understanding_document_backs_concept_faq_and_troubleshooting_once() {
 
     // Each document body is rendered once, in the first product page that
     // admits it; every later page cross-references it.
-    for (kind, body) in [
-        (FINDINGS_KIND, FINDINGS_BODY),
-        (DECISION_KIND, DECISION_BODY),
+    for (kind, anchor, body) in [
+        (FINDINGS_KIND, FINDINGS_ANCHOR, FINDINGS_BODY),
+        (DECISION_KIND, DECISION_ANCHOR, DECISION_BODY),
     ] {
         let occurrences: usize = pages.values().map(|page| page.matches(body).count()).sum();
         assert_eq!(
@@ -1939,14 +1945,14 @@ fn understanding_document_backs_concept_faq_and_troubleshooting_once() {
             pages["concept.md"]
         );
         assert!(
-            pages["faq.md"].contains(&format!("See [concept](concept.md#{kind}).")),
+            pages["faq.md"].contains(&format!("See [concept](concept.md#{anchor}).")),
             "the faq page cross-references the {kind} body: {}",
             pages["faq.md"]
         );
     }
     let troubleshooting = &pages["troubleshooting.md"];
     assert!(
-        troubleshooting.contains(&format!("See [concept](concept.md#{FINDINGS_KIND}).")),
+        troubleshooting.contains(&format!("See [concept](concept.md#{FINDINGS_ANCHOR}).")),
         "the troubleshooting page cross-references the findings body: {troubleshooting}"
     );
     assert!(

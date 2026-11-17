@@ -588,7 +588,41 @@ fn cmd_build(
     ))
 }
 
-/// Compose the project-site package over the compiled research documents.
+/// Products `kaya publish` declares: the project-site pair and the six
+/// developer-guide products. Every include is the product's admission row, so
+/// a declaration can never widen a product beyond its contract. The remaining
+/// products stay undeclared: `status-compatibility`, `release-migration`, and
+/// `architecture-design` belong to kaya-scq, and `tutorial` has no declared
+/// slice yet.
+const PUBLISHED_PRODUCTS: [&str; 8] = [
+    "overview",
+    "reference",
+    "getting-started",
+    "how-to",
+    "concept",
+    "example",
+    "troubleshooting",
+    "faq",
+];
+
+/// Packages `kaya publish` declares, with their members in declaration order.
+const PUBLISHED_PACKAGES: [(&str, &[&str]); 2] = [
+    ("project-site", &["overview", "reference"]),
+    (
+        "developer-guide",
+        &[
+            "getting-started",
+            "how-to",
+            "concept",
+            "example",
+            "troubleshooting",
+            "faq",
+        ],
+    ),
+];
+
+/// Compose the project-site and developer-guide packages over the compiled
+/// research documents.
 ///
 /// The document source is read once from `docs/research`; the publication
 /// layer refuses invalid declarations before writing, omits products without
@@ -600,29 +634,24 @@ fn cmd_publish(out: &Path) -> Result<Envelope, Failure> {
     let documents =
         publication::read_documents(Path::new("docs/research")).map_err(publication_failure)?;
 
-    let declarations = [
-        Decl {
+    let declarations: Vec<Decl> = PUBLISHED_PRODUCTS
+        .iter()
+        .map(|name| Decl {
             tier: Tier::Product,
-            name: "overview".to_owned(),
-            includes: vec!["orientation.project-overview".to_owned()],
+            name: (*name).to_owned(),
+            includes: publication::admission(name)
+                .iter()
+                .map(|kind| (*kind).to_owned())
+                .collect(),
             members: Vec::new(),
-        },
-        Decl {
-            tier: Tier::Product,
-            name: "reference".to_owned(),
-            includes: vec![
-                "reuse-handoff.technical-reference".to_owned(),
-                "orientation.research-map".to_owned(),
-            ],
-            members: Vec::new(),
-        },
-        Decl {
+        })
+        .chain(PUBLISHED_PACKAGES.iter().map(|(name, members)| Decl {
             tier: Tier::Package,
-            name: "project-site".to_owned(),
+            name: (*name).to_owned(),
             includes: Vec::new(),
-            members: vec!["overview".to_owned(), "reference".to_owned()],
-        },
-    ];
+            members: members.iter().map(|member| (*member).to_owned()).collect(),
+        }))
+        .collect();
 
     let built = publication::build(&declarations, &documents, out).map_err(publication_failure)?;
 

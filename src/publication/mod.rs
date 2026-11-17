@@ -641,7 +641,8 @@ pub fn build(decls: &[Decl], docs: &Documents, out: &Path) -> Result<Built, Publ
                 page.push_str(body);
                 page.push('\n');
             } else {
-                page.push_str(&format!("See [{holder}]({holder}.md#{kind}).\n"));
+                let anchor = heading_anchor(kind);
+                page.push_str(&format!("See [{holder}]({holder}.md#{anchor}).\n"));
             }
             page.push('\n');
         }
@@ -757,6 +758,24 @@ fn block_name(tier: Tier, name: &str) -> String {
     format!("publication.{}.{name}", tier.as_str())
 }
 
+/// The heading anchor a document kind is listed under on its holder's page.
+///
+/// The page lists each kind as an `### <kind>` heading, whose anchor keeps only
+/// alphanumerics, hyphens and underscores — turning each space into a hyphen
+/// and dropping every other character — so `orientation.project-overview`
+/// anchors as `orientationproject-overview`.
+fn heading_anchor(kind: &str) -> String {
+    let mut anchor = String::with_capacity(kind.len());
+    for character in kind.chars() {
+        if character == ' ' {
+            anchor.push('-');
+        } else if character.is_alphanumeric() || character == '-' || character == '_' {
+            anchor.push(character);
+        }
+    }
+    anchor
+}
+
 /// Read a page, treating an absent file as an absent document.
 fn read_text(path: &Path) -> Result<Option<String>, PublicationError> {
     match fs::read_to_string(path) {
@@ -799,18 +818,27 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), PublicationError> {
 
 /// Remove the page of an omitted publication without destroying authored bytes.
 ///
-/// A page whose only content is the managed block (or that carries no managed
-/// block at all) is removed whole. A page with authored bytes outside the
-/// block keeps them: only the block disappears.
+/// A document that does not carry this page's managed block is not ours: a
+/// file the build never wrote at that path is authored, even when its name
+/// matches a now-omitted product, so it is left byte-identical. A document
+/// carrying the block is unlinked when the block is all it holds and otherwise
+/// keeps every byte outside the block.
 fn remove_page(out: &Path, tier: Tier, name: &str) -> Result<(), PublicationError> {
     let path = out.join(format!("{name}.md"));
     let Some(document) = read_text(&path)? else {
         return Ok(());
     };
     let block = block_name(tier, name);
+    let carries_block = scan(&document)
+        .map_err(|error| compose_error(&path, error))?
+        .iter()
+        .any(|found| matches!(&found.kind, BlockKind::Generated(existing) if existing == &block));
+    if !carries_block {
+        return Ok(());
+    }
     let stripped =
         remove_generated(&document, &block).map_err(|error| compose_error(&path, error))?;
-    if stripped == document || stripped.trim().is_empty() {
+    if stripped.trim().is_empty() {
         fs::remove_file(&path).map_err(|error| PublicationError::io("remove", &path, error))?;
     } else {
         write_atomic(&path, stripped.as_bytes())?;

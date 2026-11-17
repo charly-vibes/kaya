@@ -1698,18 +1698,32 @@ fn build_writes_overview_and_publish_uses_it() {
         json!("docs/public"),
         "publish defaults to docs/public: {published}"
     );
+    // The question backs the project overview and the research map, so the
+    // products admitting either emit; the understanding, reuse, and experiment
+    // products have no compiled document and are reported omitted.
     assert_eq!(
         published["data"]["omitted"],
-        json!([]),
-        "the question backs the overview, so every declared product emits: {published}"
+        json!([
+            { "tier": "product", "name": "concept", "reason": "no-backing-document" },
+            { "tier": "product", "name": "example", "reason": "no-backing-document" },
+            { "tier": "product", "name": "faq", "reason": "no-backing-document" },
+            { "tier": "product", "name": "how-to", "reason": "no-backing-document" },
+            { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
+        ]),
+        "every declared product without an admissible compiled document is omitted, sorted by name: {published}"
     );
     let pages = published_page_names(&published["data"]["pages"]);
-    for name in ["overview", "reference", "project-site"] {
-        assert!(
-            pages.iter().any(|page| page == name),
-            "publish names the {name} page: {pages:?}"
-        );
-    }
+    assert_eq!(
+        pages,
+        [
+            "developer-guide",
+            "getting-started",
+            "overview",
+            "project-site",
+            "reference",
+        ],
+        "the declared packages and every backed product get a page, sorted by name: {pages:?}"
+    );
 
     let overview_page = fs::read_to_string(dir.path().join("docs/public/overview.md"))
         .expect("the overview page is written");
@@ -1717,9 +1731,26 @@ fn build_writes_overview_and_publish_uses_it() {
         overview_page.contains("generated:publication.product.overview"),
         "the overview page carries its generated block: {overview_page}"
     );
+    // The project overview body is rendered once, on the first page that admits
+    // it in page order; the overview product cross-references that page.
     assert!(
-        overview_page.contains("- kaya/Question/q-one — Q One"),
-        "the overview page renders the compiled disclosure: {overview_page}"
+        overview_page
+            .contains("See [getting-started](getting-started.md#orientationproject-overview)."),
+        "the overview page cross-references the page that renders the shared body: {overview_page}"
+    );
+    assert!(
+        !overview_page.contains("- kaya/Question/q-one — Q One"),
+        "the shared overview body is not rendered twice: {overview_page}"
+    );
+    let getting_started = fs::read_to_string(dir.path().join("docs/public/getting-started.md"))
+        .expect("the getting-started page is written");
+    assert!(
+        getting_started.contains("generated:publication.product.getting-started"),
+        "the getting-started page carries its generated block: {getting_started}"
+    );
+    assert!(
+        getting_started.contains("- kaya/Question/q-one — Q One"),
+        "the project overview body is rendered on the first page that admits it: {getting_started}"
     );
 
     let reference = fs::read_to_string(dir.path().join("docs/public/reference.md"))
@@ -1750,6 +1781,26 @@ fn build_writes_overview_and_publish_uses_it() {
     assert!(
         !package.contains("overview — unavailable"),
         "the backed overview is linked, never named unavailable: {package}"
+    );
+
+    // The developer-guide package names all six members in declaration order;
+    // only getting-started is backed here, so the other five stay unavailable
+    // markers instead of links to pages publish never wrote.
+    let developer_guide = fs::read_to_string(dir.path().join("docs/public/developer-guide.md"))
+        .expect("the developer-guide package page is written");
+    assert_eq!(
+        generated_block_body(&developer_guide, "publication.package.developer-guide")
+            .trim_start_matches('\n'),
+        concat!(
+            "## Developer-guide\n\n",
+            "- [getting-started](getting-started.md)\n",
+            "- how-to — unavailable\n",
+            "- concept — unavailable\n",
+            "- example — unavailable\n",
+            "- troubleshooting — unavailable\n",
+            "- faq — unavailable\n",
+        ),
+        "the package block lists six members in declaration order, linking the emitted one: {developer_guide}"
     );
 
     let export: Value = serde_json::from_str(
@@ -1841,8 +1892,10 @@ fn build_writes_overview_and_publish_uses_it() {
         .as_array()
         .expect("publish reports the recomputed blocks");
     for name in [
+        "publication.product.getting-started",
         "publication.product.overview",
         "publication.product.reference",
+        "publication.package.developer-guide",
         "publication.package.project-site",
         "publication.json",
     ] {
@@ -1918,8 +1971,10 @@ fn build_writes_overview_and_publish_uses_it() {
         .as_array()
         .expect("a second publish reports the unchanged blocks");
     for name in [
+        "publication.product.getting-started",
         "publication.product.overview",
         "publication.product.reference",
+        "publication.package.developer-guide",
         "publication.package.project-site",
         "publication.json",
     ] {
@@ -1958,6 +2013,245 @@ fn build_writes_overview_and_publish_uses_it() {
         ledger_lines(&dir).len(),
         lines_before,
         "publishing creates no ledger entity"
+    );
+}
+
+/// `publish` declares every product this release ships and reports each one
+/// without an admissible compiled document as omitted — with its reason, sorted
+/// by name — instead of stubbing a page for it.
+#[test]
+fn publish_declares_every_product_and_reports_justified_omissions() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    // A Question backs the project overview, and one committed Source backs the
+    // reproduction package; `build` also renders the research map (one isolated
+    // Question row). No understanding or experiment document exists, so those
+    // products have no backing.
+    write_ledger(
+        &dir,
+        &[
+            event_line(&node_event(
+                "event-question",
+                "Question",
+                "kaya/Question/q-one",
+                "Q One",
+            )),
+            event_line(&source_event(
+                "event-source",
+                "kaya/Source/src-main-rs@9f2c1a",
+                "src/main.rs",
+                "9f2c1a",
+            )),
+        ],
+    );
+    assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+
+    let published = assert_success(&run(&dir, &["publish"]));
+    assert_eq!(
+        published["data"]["out"],
+        json!("docs/public"),
+        "publish defaults to docs/public: {published}"
+    );
+
+    let pages = published_page_names(&published["data"]["pages"]);
+    assert_eq!(
+        pages,
+        [
+            "developer-guide",
+            "getting-started",
+            "how-to",
+            "overview",
+            "project-site",
+            "reference",
+        ],
+        "the declared packages and every backed product get a page, sorted by name: {pages:?}"
+    );
+
+    assert_eq!(
+        published["data"]["omitted"],
+        json!([
+            { "tier": "product", "name": "concept", "reason": "no-backing-document" },
+            { "tier": "product", "name": "example", "reason": "no-backing-document" },
+            { "tier": "product", "name": "faq", "reason": "no-backing-document" },
+            { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
+        ]),
+        "the omitted products are exactly the declared ones without an admissible document, sorted by name: {published}"
+    );
+
+    let public = dir.path().join("docs/public");
+    for name in ["concept", "example", "faq", "troubleshooting"] {
+        assert!(
+            !public.join(format!("{name}.md")).exists(),
+            "an omitted product is never stubbed into a page: {name}"
+        );
+    }
+    for name in [
+        "developer-guide",
+        "getting-started",
+        "how-to",
+        "overview",
+        "project-site",
+        "reference",
+    ] {
+        assert!(
+            public.join(format!("{name}.md")).exists(),
+            "the emitted {name} page is written"
+        );
+    }
+
+    // getting-started is the first page admitting both of its documents, so it
+    // composes the project overview and the reproduction package in full.
+    let getting_started = fs::read_to_string(public.join("getting-started.md"))
+        .expect("the getting-started page is written");
+    let getting_started_block =
+        generated_block_body(&getting_started, "publication.product.getting-started");
+    for section in [
+        "### orientation.project-overview",
+        "### reuse-handoff.reproduction-package",
+    ] {
+        assert!(
+            getting_started_block.contains(section),
+            "getting-started composes both admitted kinds ({section}): {getting_started}"
+        );
+    }
+    assert!(
+        getting_started_block.contains("- kaya/Question/q-one — Q One"),
+        "the project overview body is rendered on the first page that admits it: {getting_started}"
+    );
+    assert!(
+        getting_started_block.contains("- kaya/Source/src-main-rs@9f2c1a — src/main.rs@9f2c1a"),
+        "the reproduction package body names the committed source: {getting_started}"
+    );
+
+    // how-to admits the technical reference and the reproduction package; only
+    // the latter exists, and getting-started already owns it, so how-to
+    // cross-references it by its generated heading anchor.
+    let how_to = fs::read_to_string(public.join("how-to.md")).expect("the how-to page is written");
+    assert!(
+        how_to.contains(
+            "See [getting-started](getting-started.md#reuse-handoffreproduction-package)."
+        ),
+        "how-to cross-references the page rendering the shared reproduction package: {how_to}"
+    );
+    assert!(
+        !how_to.contains("- kaya/Source/src-main-rs@9f2c1a — src/main.rs@9f2c1a"),
+        "the reproduction body is not duplicated on how-to: {how_to}"
+    );
+    assert!(
+        !how_to.contains("### reuse-handoff.technical-reference"),
+        "how-to composes no section for a document the ledger never produced: {how_to}"
+    );
+
+    let overview =
+        fs::read_to_string(public.join("overview.md")).expect("the overview page is written");
+    assert!(
+        overview.contains("See [getting-started](getting-started.md#orientationproject-overview)."),
+        "the overview product cross-references the shared body: {overview}"
+    );
+    assert!(
+        !overview.contains("- kaya/Question/q-one — Q One"),
+        "the shared body is not duplicated across pages: {overview}"
+    );
+
+    // The developer-guide package names all six members in declaration order,
+    // linking exactly the two products the compiled documents back.
+    let developer_guide = fs::read_to_string(public.join("developer-guide.md"))
+        .expect("the developer-guide package page is written");
+    assert_eq!(
+        generated_block_body(&developer_guide, "publication.package.developer-guide")
+            .trim_start_matches('\n'),
+        concat!(
+            "## Developer-guide\n\n",
+            "- [getting-started](getting-started.md)\n",
+            "- [how-to](how-to.md)\n",
+            "- concept — unavailable\n",
+            "- example — unavailable\n",
+            "- troubleshooting — unavailable\n",
+            "- faq — unavailable\n",
+        ),
+        "the package block lists six members in declaration order, linking the emitted two: {developer_guide}"
+    );
+}
+
+/// An omitted product owns only its managed block: a document at that path
+/// without the block keeps every byte, while a page whose only content is the
+/// block is removed once the product loses its backing document.
+#[test]
+fn publish_preserves_authored_pages_at_omitted_product_paths() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_ledger(
+        &dir,
+        &[event_line(&node_event(
+            "event-question",
+            "Question",
+            "kaya/Question/q-one",
+            "Q One",
+        ))],
+    );
+    assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+
+    // `how-to` has no compiled document, so publish treats its page as omitted
+    // from the first run; the file is authored, not generated, and no publish
+    // may touch it.
+    let public = dir.path().join("docs/public");
+    fs::create_dir_all(&public).expect("public directory");
+    let authored =
+        "# Working notes\n\nA human wrote this page; publish owns only its own blocks.\n";
+    fs::write(public.join("how-to.md"), authored).expect("the authored page is writable");
+    let authored_bytes = fs::read(public.join("how-to.md")).expect("the authored page is readable");
+
+    let first = assert_success(&run(&dir, &["publish"]));
+    assert!(
+        public.join("getting-started.md").exists(),
+        "the backed getting-started page is written: {first}"
+    );
+    assert!(
+        public.join("overview.md").exists(),
+        "the backed overview page is written: {first}"
+    );
+    assert_eq!(
+        fs::read(public.join("how-to.md")).expect("the authored page is still readable"),
+        authored_bytes,
+        "an omitted product leaves a document carrying no managed block byte-identical"
+    );
+
+    // The project overview stops compiling, so every product that admitted it
+    // is newly omitted; their pages hold nothing but the managed block.
+    fs::remove_file(dir.path().join("docs/research/overview.md"))
+        .expect("the compiled overview document is removable");
+    let second = assert_success(&run(&dir, &["publish"]));
+    for name in ["getting-started", "overview"] {
+        assert!(
+            !public.join(format!("{name}.md")).exists(),
+            "a newly omitted product removes the page that held only its block: {name}"
+        );
+    }
+    assert_eq!(
+        fs::read(public.join("how-to.md")).expect("the authored page is still readable"),
+        authored_bytes,
+        "a later publish still leaves the authored page byte-identical"
+    );
+    assert_eq!(
+        second["data"]["pages"]
+            .as_array()
+            .expect("pages is a list")
+            .len(),
+        3,
+        "only the packages and the research-map-backed reference remain: {second}"
+    );
+    assert_eq!(
+        second["data"]["omitted"],
+        json!([
+            { "tier": "product", "name": "concept", "reason": "no-backing-document" },
+            { "tier": "product", "name": "example", "reason": "no-backing-document" },
+            { "tier": "product", "name": "faq", "reason": "no-backing-document" },
+            { "tier": "product", "name": "getting-started", "reason": "no-backing-document" },
+            { "tier": "product", "name": "how-to", "reason": "no-backing-document" },
+            { "tier": "product", "name": "overview", "reason": "no-backing-document" },
+            { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
+        ]),
+        "the products whose backing document disappeared are reported omitted: {second}"
     );
 }
 

@@ -5,8 +5,6 @@ Reader question: what is this and why does it matter
 
 ### orientation.project-overview
 
-### Questions
-
-- kaya/Question/mvp-1-acceptance — mvp-1-acceptance
+See [getting-started](getting-started.md#orientationproject-overview).
 
 <!-- kaya:end generated:publication.product.overview -->

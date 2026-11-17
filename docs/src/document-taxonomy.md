@@ -100,15 +100,24 @@ Status today: `kaya publish` reads `index.md`, `overview.md`,
 `understanding.md`, `reproduction-package.md`, `handoff.md`, and the experiment
 dossiers in that fixed order, keeping only generated blocks in the document
 vocabulary — so the overview and understanding kinds can back any product that
-admits them. Today's declarations are `overview`, `reference`, and the
-`project-site` package: `kaya publish` emits `overview` from
-`orientation.project-overview` (the orientation slice of the ledger),
-`reference` from `orientation.research-map` (the
-`reuse-handoff.technical-reference` include has no producer yet) and
-`project-site` over both, linking each emitted product and never stubbing an
-unbacked one. No product declares an understanding kind yet, and the committed
-ledger holds no Finding, Claim, Observation, or Decision record, so no
-`understanding.md` is compiled.
+admits them. Today's declarations are the eight products `overview`,
+`reference`, `getting-started`, `how-to`, `concept`, `example`,
+`troubleshooting`, and `faq` — each including exactly its admission row —
+plus two packages: `project-site` over `overview` and `reference`, and
+`developer-guide` over the six developer products. The committed ledger emits
+`overview`, `reference`, `getting-started`, and `how-to`: `getting-started`
+renders `orientation.project-overview` (the orientation slice of the ledger)
+and `reuse-handoff.reproduction-package`, `reference` renders
+`orientation.research-map` (its `reuse-handoff.technical-reference` include has
+no producer yet), and `overview` and `how-to` cross-reference the page that
+owns their shared body — `getting-started` in both cases — instead of
+repeating it. `concept`, `example`, `troubleshooting`, and `faq` are omitted
+with reason `no-backing-document`, because the committed ledger holds no
+Finding, Claim, Observation, Decision, or experiment record, so no
+`understanding.md` is compiled; `developer-guide` lists those members as
+unavailable and never stubs them. `tutorial`, plus the three products kaya-scq
+owns — `status-compatibility`, `release-migration`, and
+`architecture-design` — stay undeclared until that ticket declares them.
 
 ## Collections and packages
 
