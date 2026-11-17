@@ -3,7 +3,7 @@
     {
       "members": [
         {
-          "emitted": false,
+          "emitted": true,
           "name": "overview"
         },
         {
@@ -16,8 +16,15 @@
   ],
   "products": [
     {
-      "documents": [],
-      "emitted": false,
+      "documents": [
+        {
+          "event_ids": [
+            "kaya/Question/mvp-1-acceptance"
+          ],
+          "kind": "orientation.project-overview"
+        }
+      ],
+      "emitted": true,
       "name": "overview",
       "question": "what is this and why does it matter"
     },

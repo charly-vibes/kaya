@@ -71,9 +71,13 @@ records (runs and artifacts never enter it), and
 revisions and influenced findings — with a Source row only when both `path` and
 `commit` are present and non-blank. Findings canonically precede the decision
 record, and a document left holding neither block is deleted rather than
-written empty. `exploration-brief`, `technical-reference`, and
-`knowledge-brief` are not generated yet; `reproduction-package` and `handoff`
-render reference rows from the ledger.
+written empty. The project-level `docs/research/overview.md` implements
+`orientation.project-overview`: Project, Question, and Finding records in three
+sections in a fixed order — Project, Questions, Findings — with the rows of
+each section id-sorted, empty sections omitted, and no document at all when
+none of the three groups has a record. `exploration-brief`,
+`technical-reference`, and `knowledge-brief` are not generated yet;
+`reproduction-package` and `handoff` render reference rows from the ledger.
 
 ## Publication layer: twelve products
 
@@ -92,17 +96,19 @@ render reference rows from the ledger.
 | `release-migration` | What changed and what must I do? | `orientation.project-overview`, `understanding.decision-record` |
 | `architecture-design` | How is it structured and why? | `understanding.decision-record`, `orientation.research-map` |
 
-Status today: `kaya publish` reads `index.md`, `understanding.md`,
-`reproduction-package.md`, `handoff.md`, and the experiment dossiers in that
-fixed order, keeping only generated blocks in the document vocabulary — so the
-understanding kinds can back any product that admits them. Today's declarations
-are `overview`, `reference`, and the `project-site` package: `kaya publish`
-emits `reference` from `orientation.research-map` (the
+Status today: `kaya publish` reads `index.md`, `overview.md`,
+`understanding.md`, `reproduction-package.md`, `handoff.md`, and the experiment
+dossiers in that fixed order, keeping only generated blocks in the document
+vocabulary — so the overview and understanding kinds can back any product that
+admits them. Today's declarations are `overview`, `reference`, and the
+`project-site` package: `kaya publish` emits `overview` from
+`orientation.project-overview` (the orientation slice of the ledger),
+`reference` from `orientation.research-map` (the
 `reuse-handoff.technical-reference` include has no producer yet) and
-`project-site` over `overview` and `reference`, with `overview` omitted as
-`no-backing-document`, never stubbed. No product declares an understanding kind
-yet, and the committed ledger holds no Finding, Claim, Observation, or Decision
-record, so no `understanding.md` is compiled.
+`project-site` over both, linking each emitted product and never stubbing an
+unbacked one. No product declares an understanding kind yet, and the committed
+ledger holds no Finding, Claim, Observation, or Decision record, so no
+`understanding.md` is compiled.
 
 ## Collections and packages
 

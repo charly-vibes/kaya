@@ -953,14 +953,18 @@ fn read_documents_keeps_vocabulary_kinds_first_wins_across_files() {
     let research = tmp.path().join("research");
     fs::create_dir_all(research.join("experiments")).expect("research tree is creatable");
 
+    let overview = format!(
+        "<!-- kaya:begin generated:{OVERVIEW_KIND} -->\n\
+         {OVERVIEW_BODY} cites kaya/Overview/o-one\n\
+         <!-- kaya:end generated:{OVERVIEW_KIND} -->\n"
+    );
+    fs::write(research.join("overview.md"), overview).expect("overview is writable");
+
     let index = format!(
         "# Research index\n\n\
          <!-- kaya:begin generated:{MAP_KIND} -->\n\
          index map cites kaya/Orientation/m-two, kaya/Orientation/m-one and kaya/Orientation/m-one\n\
          <!-- kaya:end generated:{MAP_KIND} -->\n\n\
-         <!-- kaya:begin generated:{OVERVIEW_KIND} -->\n\
-         {OVERVIEW_BODY} cites kaya/Overview/o-one\n\
-         <!-- kaya:end generated:{OVERVIEW_KIND} -->\n\n\
          <!-- kaya:begin generated:orientation.other-block -->\n\
          outside the vocabulary, cites kaya/Orientation/ignored\n\
          <!-- kaya:end generated:orientation.other-block -->\n"
@@ -998,9 +1002,17 @@ fn read_documents_keeps_vocabulary_kinds_first_wins_across_files() {
         ["kaya/Orientation/m-one", "kaya/Orientation/m-two"],
         "event ids are sorted and deduplicated from the winning body"
     );
+    let overview = &docs.0[OVERVIEW_KIND];
+    assert_eq!(overview.kind, OVERVIEW_KIND);
     assert!(
-        docs.0.contains_key(OVERVIEW_KIND),
-        "every vocabulary kind in the file is a document"
+        overview.body.contains(OVERVIEW_BODY),
+        "the overview document is read from overview.md: {}",
+        overview.body
+    );
+    assert_eq!(
+        overview.event_ids,
+        ["kaya/Overview/o-one"],
+        "event ids are sorted and deduplicated from the overview body"
     );
     assert!(
         !docs.0.contains_key("orientation.other-block"),
@@ -1009,6 +1021,33 @@ fn read_documents_keeps_vocabulary_kinds_first_wins_across_files() {
     assert!(
         !research.join("reproduction-package.md").exists(),
         "missing compiled files are tolerated, not fabricated"
+    );
+
+    // The document read from overview.md is the overview product's backing.
+    let out = tmp.path().join("out");
+    let decls = [
+        product("overview", &[OVERVIEW_KIND]),
+        package("project-site", &["overview"]),
+    ];
+    let built = build(&decls, &docs, &out).expect("the overview document backs its product");
+    assert!(
+        built.pages.iter().any(|page| page.name == "overview"),
+        "the overview product is emitted: {:?}",
+        built.pages
+    );
+    assert!(
+        out.join("overview.md").exists(),
+        "the backed overview page is written"
+    );
+    let page = fs::read_to_string(out.join("overview.md")).expect("the overview page is readable");
+    assert!(
+        page.contains(OVERVIEW_BODY),
+        "the page renders the compiled overview body: {page}"
+    );
+    assert!(
+        !built.omitted.iter().any(|entry| entry.name == "overview"),
+        "the overview document leaves the product unomitted: {:?}",
+        built.omitted
     );
 }
 
@@ -1913,5 +1952,80 @@ fn understanding_document_backs_concept_faq_and_troubleshooting_once() {
     assert!(
         !troubleshooting.contains(DECISION_BODY),
         "troubleshooting admits no decision record: {troubleshooting}"
+    );
+}
+
+// 26. kaya.publications.io — the block name, not the file name, names the kind
+#[test]
+fn read_documents_reads_a_vocabulary_kind_from_a_non_canonical_file() {
+    let tmp = TempDir::new().expect("temp dir");
+    let research = tmp.path().join("research");
+    fs::create_dir_all(&research).expect("research tree is creatable");
+    // A reuse-handoff kind compiled into index.md — the file a reader keyed on
+    // canonical per-kind paths would never consult.
+    let index = format!(
+        "# Research index\n\n\
+         <!-- kaya:begin generated:{TECH_KIND} -->\n\
+         {TECH_BODY} cites kaya/Document/technical-reference\n\
+         <!-- kaya:end generated:{TECH_KIND} -->\n\n\
+         <!-- kaya:begin generated:reuse-handoff.other-block -->\n\
+         outside the vocabulary, cites kaya/Document/ignored\n\
+         <!-- kaya:end generated:reuse-handoff.other-block -->\n"
+    );
+    fs::write(research.join("index.md"), index).expect("index is writable");
+
+    let docs = read_documents(&research).expect("the compiled documents are readable");
+
+    assert_eq!(
+        docs.0.len(),
+        1,
+        "only document-vocabulary kinds are kept: {:?}",
+        docs.0.keys().collect::<Vec<_>>()
+    );
+    let technical = &docs.0[TECH_KIND];
+    assert_eq!(
+        technical.kind, TECH_KIND,
+        "the DocumentRef names the kind its block declares"
+    );
+    assert!(
+        technical.body.contains(TECH_BODY),
+        "the block is read from index.md even though no technical-reference.md exists: {}",
+        technical.body
+    );
+    assert_eq!(
+        technical.event_ids,
+        ["kaya/Document/technical-reference"],
+        "event ids come from the block body"
+    );
+    assert!(
+        !docs.0.contains_key("reuse-handoff.other-block"),
+        "a generated block outside the document vocabulary is not a document"
+    );
+    assert!(
+        !research.join("technical-reference.md").exists(),
+        "the kind is not restricted to a canonical filename"
+    );
+
+    // The reference product takes its backing from the block in index.md.
+    let out = tmp.path().join("out");
+    let decls = [
+        product("reference", &[TECH_KIND]),
+        package("project-site", &["reference"]),
+    ];
+    let built = build(&decls, &docs, &out).expect("the non-canonical file backs its product");
+    assert!(
+        built.pages.iter().any(|page| page.name == "reference"),
+        "the reference product is emitted: {:?}",
+        built.pages
+    );
+    assert!(
+        !built.omitted.iter().any(|entry| entry.name == "reference"),
+        "the technical-reference block leaves the product unomitted: {:?}",
+        built.omitted
+    );
+    let page = fs::read_to_string(out.join("reference.md")).expect("the reference page is written");
+    assert!(
+        page.contains(TECH_BODY),
+        "the page renders the compiled technical-reference body: {page}"
     );
 }

@@ -80,9 +80,12 @@ kaya challenge <conclusion> --events <id>... --actor <name>
 
 - The ledger lives at `.kaya/ledger.jsonl`: one `kaya.event/v0` record per
   line, append-only, plain JSONL that survives in git.
-- `kaya build` compiles `docs/research/index.md` and one
-  `docs/research/experiments/<key>.md` per experiment, rewriting only its own
-  generated blocks and preserving authored bytes verbatim.
+- `kaya build` compiles `docs/research/index.md`, one
+  `docs/research/experiments/<key>.md` per experiment, the project-level
+  `docs/research/overview.md` and `docs/research/understanding.md`, and the
+  reuse-handoff reference documents; it rewrites only its own generated
+  blocks, preserves authored bytes verbatim, and leaves a document absent
+  when its kinds have no records.
 - Promotion is human-approved and pull-based: `promote` and `challenge`
   require `--actor`, and pending counts surface in `status`/`build` output
   instead of as prompts. Events are not conclusions.

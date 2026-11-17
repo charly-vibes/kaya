@@ -4,7 +4,8 @@
 //! into deterministic Markdown blocks that stay in sync with the ledger.
 //! Responsibilities: classify document blocks against the closed family/kind
 //! vocabulary, split declared intent (`experiment-specification`) from
-//! observed execution (`experiment-record`), render findings and decision
+//! observed execution (`experiment-record`), render the project overview from
+//! Project, Question, and Finding records, render findings and decision
 //! records with their evidence, replace only those generated blocks, report
 //! empty kinds as omitted, and flag authored blocks whose cited evidence
 //! moved.
@@ -29,6 +30,12 @@ use crate::promotion::PromotionState;
 pub const SPECIFICATION_BLOCK: &str = "exploration.experiment-specification";
 /// Generated block carrying an experiment's observed execution.
 pub const RECORD_BLOCK: &str = "exploration.experiment-record";
+/// The project overview block name, as a test-facing alias.
+///
+/// `build_overview` derives the name from `Kind::ProjectOverview.block_name()`;
+/// this constant exists so tests and callers can name the block without
+/// constructing a `Kind`.
+pub const OVERVIEW_BLOCK: &str = "orientation.project-overview";
 /// Generated block carrying findings, observations, and claims.
 pub const FINDINGS_BLOCK: &str = "understanding.findings-and-analysis";
 /// Generated block carrying decisions and their evidence references.
@@ -364,37 +371,94 @@ pub fn build(
 /// The summary is keyed by block name — one document covers the project, not
 /// one per experiment — and the source map traces every rendered id.
 pub fn build_understanding(graph: &Graph, path: &Path) -> Result<Built, ProjectionError> {
-    let mut document = read_existing(path)?.unwrap_or_default();
+    let mut summary = Summary::default();
+    let mut omitted = Vec::new();
+    commit_project_document(
+        read_project_document(path)?,
+        path,
+        vec![
+            (Kind::FindingsAndAnalysis, render_findings(graph)),
+            (Kind::DecisionRecord, render_decision(graph)),
+        ],
+        &mut summary,
+        &mut omitted,
+    )?;
+    Ok(Built { summary, omitted })
+}
+
+/// Build the project overview at `path`.
+///
+/// Validates every generated block already in the document against the closed
+/// vocabulary before rendering anything: a legacy or unknown block name is
+/// refused without a write. It then renders one block from the Project,
+/// Question, and Finding records — each in its own section, sections with no
+/// record omitted — replacing or appending the block. Runs, artifacts, and
+/// every other family stay out of the overview by construction.
+///
+/// When none of the three groups has a record the kind is omitted once, an
+/// existing block is removed, and a document left with only whitespace is
+/// deleted rather than written empty — absence is the whole-project
+/// representation of "nothing to orient the reader". The summary is keyed by
+/// the block name and the source map traces every rendered id.
+pub fn build_overview(graph: &Graph, path: &Path) -> Result<Built, ProjectionError> {
+    let mut summary = Summary::default();
+    let mut omitted = Vec::new();
+    commit_project_document(
+        read_project_document(path)?,
+        path,
+        vec![(Kind::ProjectOverview, render_overview(graph))],
+        &mut summary,
+        &mut omitted,
+    )?;
+    Ok(Built { summary, omitted })
+}
+
+/// Read a project-level document, refusing a block outside the closed
+/// vocabulary before a single byte can be rewritten.
+fn read_project_document(path: &Path) -> Result<String, ProjectionError> {
+    let document = read_existing(path)?.unwrap_or_default();
     if !document.is_empty() {
         validate_generated_blocks(&document)?;
     }
+    Ok(document)
+}
 
-    let findings = render_findings(graph);
-    let decision = render_decision(graph);
-
-    let mut summary = Summary::default();
-    let mut omitted = Vec::new();
+/// Apply the project-level commit policy: one document, one write, one delete.
+///
+/// `blocks` names the document's kinds in canonical order. A rendered block
+/// replaces or appends its body and records its ids under the block name; an
+/// unrendered kind is reported omitted and its obsolete block removed. Kind
+/// order is part of the document contract, so a block that is newly declared
+/// while a later block already exists drops that later block first: canonical
+/// order then never depends on build history. `summary` and `omitted`
+/// accumulate across kinds, so the whole document is committed once.
+///
+/// A document left holding only whitespace is deleted rather than written
+/// empty — absence already maps to success, so a concurrent removal is not a
+/// failure. A document whose blocks all match is not rewritten at all.
+fn commit_project_document(
+    mut document: String,
+    path: &Path,
+    blocks: Vec<(Kind, Option<RenderedBlock>)>,
+    summary: &mut Summary,
+    omitted: &mut Vec<Omitted>,
+) -> Result<(), ProjectionError> {
     let mut changed = false;
 
-    // Kind order is part of the document contract: findings always precede the
-    // decision record. When the findings block is newly declared but the
-    // document already holds a decision block, drop the decision here so the
-    // kind loop re-appends it after findings instead of leaving the order to
-    // build history.
-    let findings_name = Kind::FindingsAndAnalysis.block_name();
-    let decision_name = Kind::DecisionRecord.block_name();
-    if findings.is_some()
-        && generated_body(&document, &findings_name)?.is_none()
-        && generated_body(&document, &decision_name)?.is_some()
-    {
-        document = remove_generated(&document, &decision_name)?;
-        changed = true;
+    for (index, (kind, rendered)) in blocks.iter().enumerate() {
+        if rendered.is_none() || generated_body(&document, &kind.block_name())?.is_some() {
+            continue;
+        }
+        for (later, _) in &blocks[index + 1..] {
+            let later_name = later.block_name();
+            if generated_body(&document, &later_name)?.is_some() {
+                document = remove_generated(&document, &later_name)?;
+                changed = true;
+            }
+        }
     }
 
-    for (kind, rendered) in [
-        (Kind::FindingsAndAnalysis, findings),
-        (Kind::DecisionRecord, decision),
-    ] {
+    for (kind, rendered) in blocks {
         let name = kind.block_name();
         match rendered {
             Some(rendered) => {
@@ -422,23 +486,17 @@ pub fn build_understanding(graph: &Graph, path: &Path) -> Result<Built, Projecti
         }
     }
 
-    if changed {
-        // Removing both kinds from a document that holds nothing else leaves
-        // no bytes worth keeping: delete the file instead of writing an empty
-        // one. Absence already maps to success, so a concurrent removal is not
-        // a failure.
-        if document.trim().is_empty() {
-            match fs::remove_file(path) {
-                Ok(()) => {}
-                Err(error) if error.kind() == ErrorKind::NotFound => {}
-                Err(error) => return Err(io_error("remove", path, error)),
-            }
-        } else {
-            write(path, &document)?;
+    if document.trim().is_empty() {
+        match fs::remove_file(path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == ErrorKind::NotFound => {}
+            Err(error) => return Err(io_error("remove", path, error)),
         }
+    } else if changed {
+        write(path, &document)?;
     }
 
-    Ok(Built { summary, omitted })
+    Ok(())
 }
 
 /// Flag authored blocks whose cited evidence changed after acknowledgment.
@@ -603,25 +661,57 @@ fn render_record(
     })
 }
 
+/// `- <id> — <title-or-key>` rows for every node of `entities`, plus their ids.
+///
+/// `graph.nodes()` is id-ordered, so the rows are id-sorted; sections keep a
+/// fixed order of their own, chosen by the caller. The ids come back as one
+/// set so the source map is traced without walking the graph twice.
+fn entity_rows(graph: &Graph, entities: &[EntityType]) -> (Vec<String>, BTreeSet<String>) {
+    let mut rows = Vec::new();
+    let mut ids = BTreeSet::new();
+    for node in graph.nodes() {
+        if !entities.contains(&node.entity) {
+            continue;
+        }
+        rows.push(format!("- {} — {}", node.id, title_or_key(node)));
+        ids.insert(node.id.clone());
+    }
+    (rows, ids)
+}
+
+/// The orientation slice only: Project, Question, and Finding records, each in
+/// its own section, id-sorted. Runs, artifacts, observations, decisions, and
+/// every other entity never enter this block.
+fn render_overview(graph: &Graph) -> Option<RenderedBlock> {
+    let (projects, project_ids) = entity_rows(graph, &[EntityType::Project]);
+    let (questions, question_ids) = entity_rows(graph, &[EntityType::Question]);
+    let (findings, finding_ids) = entity_rows(graph, &[EntityType::Finding]);
+
+    if projects.is_empty() && questions.is_empty() && findings.is_empty() {
+        return None;
+    }
+
+    let mut body = String::new();
+    push_heading(&mut body, 3, "Project", &projects);
+    push_heading(&mut body, 3, "Questions", &questions);
+    push_heading(&mut body, 3, "Findings", &findings);
+
+    let mut sources = project_ids;
+    sources.extend(question_ids);
+    sources.extend(finding_ids);
+
+    Some(RenderedBlock {
+        body,
+        sources: sources.into_iter().collect(),
+    })
+}
+
 /// Findings and their analysis only: Finding, Observation, and Claim records,
 /// each in its own section. Runs and artifacts never enter this block.
 fn render_findings(graph: &Graph) -> Option<RenderedBlock> {
-    let mut findings = Vec::new();
-    let mut observations = Vec::new();
-    let mut claims = Vec::new();
-    let mut sources = BTreeSet::new();
-
-    // `graph.nodes()` is id-ordered, so every section sorts by id.
-    for node in graph.nodes() {
-        let lines = match node.entity {
-            EntityType::Finding => &mut findings,
-            EntityType::Observation => &mut observations,
-            EntityType::Claim => &mut claims,
-            _ => continue,
-        };
-        lines.push(format!("- {} — {}", node.id, title_or_key(node)));
-        sources.insert(node.id.clone());
-    }
+    let (findings, finding_ids) = entity_rows(graph, &[EntityType::Finding]);
+    let (observations, observation_ids) = entity_rows(graph, &[EntityType::Observation]);
+    let (claims, claim_ids) = entity_rows(graph, &[EntityType::Claim]);
 
     if findings.is_empty() && observations.is_empty() && claims.is_empty() {
         return None;
@@ -631,6 +721,10 @@ fn render_findings(graph: &Graph) -> Option<RenderedBlock> {
     push_heading(&mut body, 3, "Findings", &findings);
     push_heading(&mut body, 3, "Observations", &observations);
     push_heading(&mut body, 3, "Claims", &claims);
+
+    let mut sources = finding_ids;
+    sources.extend(observation_ids);
+    sources.extend(claim_ids);
 
     Some(RenderedBlock {
         body,
@@ -648,15 +742,7 @@ fn render_findings(graph: &Graph) -> Option<RenderedBlock> {
 /// reference: a missing or blank half skips the node entirely, with no row and
 /// no source-map entry.
 fn render_decision(graph: &Graph) -> Option<RenderedBlock> {
-    let mut decisions = Vec::new();
-    let mut sources = BTreeSet::new();
-    for node in graph
-        .nodes()
-        .filter(|node| node.entity == EntityType::Decision)
-    {
-        decisions.push(format!("- {} — {}", node.id, title_or_key(node)));
-        sources.insert(node.id.clone());
-    }
+    let (decisions, mut sources) = entity_rows(graph, &[EntityType::Decision]);
     if decisions.is_empty() {
         return None;
     }

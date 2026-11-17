@@ -15,7 +15,7 @@ MVP-1 implements those capabilities end to end as a static research compiler.
 | Research vocabulary | [implemented](../../openspec/changes/add-core-research-record/specs/kaya-model/spec.md) | 13 entities, 9 typed direction-fixed relationships; relationships over entity count |
 | CLI | implemented | `kaya init`, `kaya status`, `kaya import` (wai, git, test), `kaya build [--out] [--expect-digest]`, `kaya promote`, `kaya challenge` |
 | Integrations | wai, git, test runner implemented; dont, whisper (turu), specodelic [specified](../../openspec/changes/add-core-research-record/specs/kaya-adapters/spec.md), not implemented | Adapters translate tool outputs into `kaya.event/v0`; the remaining sources have encoded specs but no adapter |
-| Document taxonomy | implemented (seven record kinds, publication tracer) | [Record layer: four families, eleven kinds; publication layer: twelve products, collections, packages](../../openspec/changes/add-document-taxonomy/proposal.md). Implemented: `research-map`, `experiment-specification`, `experiment-record`, `findings-and-analysis`, `decision-record`, `reproduction-package`, `handoff`; `kaya publish` emits the `reference` product and `project-site` package and omits unbacked products rather than stubbing them. `project-overview`, `exploration-brief`, `technical-reference`, `knowledge-brief` remain specified. See [Documentation taxonomy](document-taxonomy.md) |
+| Document taxonomy | implemented (eight record kinds, publication tracer) | [Record layer: four families, eleven kinds; publication layer: twelve products, collections, packages](../../openspec/changes/add-document-taxonomy/proposal.md). Implemented: `research-map`, `project-overview`, `experiment-specification`, `experiment-record`, `findings-and-analysis`, `decision-record`, `reproduction-package`, `handoff`; `kaya publish` emits the `overview` and `reference` products and the `project-site` package and omits unbacked products rather than stubbing them. `exploration-brief`, `technical-reference`, `knowledge-brief` remain specified. See [Documentation taxonomy](document-taxonomy.md) |
 | Docs | buildable, deploy workflow present | `book.toml` + `theme/charly.css` at root; `.github/workflows/docs.yml` builds the book and deploys it to GitHub Pages on push to `main` |
 | CI | implemented | `just ci` (cargo test, fmt + clippy, mdbook build, `ah check`, `spk lint`, `openspec validate --strict`) run by `.github/workflows/ci.yml`; lefthook gates `ah check`, `spk lint`, and `pretender` on commit |
 | Release | workflow implemented, no release tagged | `.github/workflows/release.yml` builds the five standard targets on a `v*` tag, publishes the canonical archives plus `checksums.txt` and `provenance.json`, and updates the homebrew-charly tap and scoop-charly bucket. Deviation (§1): the crates.io channel is token-gated and currently disabled — publishing requires explicit authorization (`kaya-dgz`), and no GitHub Release exists yet, so prebuilt binaries are not the install path until the first tag. Until then the only install path is building from source |
@@ -32,10 +32,11 @@ MVP-1 implements those capabilities end to end as a static research compiler.
 - `kaya build [--out DIR] [--expect-digest HEX] [--allow-uncommitted]` —
   compiles `docs/research/index.md`, one
   `docs/research/experiments/<key>.md` per experiment, the project-level
-  `docs/research/understanding.md`, and the reuse-handoff reference documents;
-  only `kaya:`-owned blocks are rewritten, the ledger is verified against its
-  committed history, and `--expect-digest` refuses to build from bytes other
-  than the recorded ones.
+  `docs/research/overview.md` and `docs/research/understanding.md`, and the
+  reuse-handoff reference documents; only `kaya:`-owned blocks are rewritten,
+  a document whose kinds have no records stays absent, the ledger is verified
+  against its committed history, and `--expect-digest` refuses to build from
+  bytes other than the recorded ones.
 - `kaya promote <assertion> --actor <name>` and
   `kaya challenge <conclusion> --events <ids...> --actor <name>` — the
   human-only door into the record: proposals become conclusions, conclusions
@@ -58,8 +59,8 @@ written.
 
 - kaya's own dossier is compiled by kaya: the ledger at
   `.kaya/ledger.jsonl` and the projections under `docs/research/`
-  (`index.md`, `experiments/add-core-research-record.md`) are checked in and
-  rebuilt by `kaya build`.
+  (`index.md`, `overview.md`, `experiments/add-core-research-record.md`) are
+  checked in and rebuilt by `kaya build`.
 - Reverse dogfooding: kaya's own specs are written in specodelic format and
   gate-checked by `spk lint` on every commit, and the change validates under
   `openspec validate --strict` — kaya is specified with the tools it reads.

@@ -1,6 +1,6 @@
 <!-- kaya:begin generated:publication.package.project-site -->
 ## Project-site
 
-- overview — unavailable
+- [overview](overview.md)
 - [reference](reference.md)
 <!-- kaya:end generated:publication.package.project-site -->

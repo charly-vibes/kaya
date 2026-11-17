@@ -518,6 +518,14 @@ fn cmd_build(
     merge_summary(&mut summary, built.summary);
     flag_stale_authored(&mut summary, &understanding_path, &changed_ids)?;
 
+    // The overview is the orientation slice of the same graph: Project,
+    // Question, and current Findings, or no document at all.
+    let overview_path = out.join("overview.md");
+    let built = report::build_overview(&graph, &overview_path).map_err(projection_failure)?;
+    omitted.extend(built.omitted);
+    merge_summary(&mut summary, built.summary);
+    flag_stale_authored(&mut summary, &overview_path, &changed_ids)?;
+
     // The reuse projection always runs, even when the ledger holds no reuse
     // references: an existing document's stale blocks and legacy names are
     // only visible by validating the documents, and an empty kind is reported

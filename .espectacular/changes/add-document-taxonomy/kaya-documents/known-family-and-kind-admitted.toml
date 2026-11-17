@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "known-family-and-kind-admitted"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "overview_block_name_is_the_vocabulary_name"}]

@@ -1038,6 +1038,11 @@ fn build_tolerates_a_missing_report_when_corrections_exist() {
                 "reason": "no-records",
             },
             {
+                "family": "orientation",
+                "kind": "project-overview",
+                "reason": "no-records",
+            },
+            {
                 "family": "reuse-handoff",
                 "kind": "handoff",
                 "reason": "no-records",
@@ -1332,6 +1337,11 @@ fn build_writes_reference_documents_and_leaves_the_ledger_unchanged() {
         built["data"]["omitted"],
         json!([
             {
+                "family": "orientation",
+                "kind": "project-overview",
+                "reason": "no-records",
+            },
+            {
                 "family": "reuse-handoff",
                 "kind": "reproduction-package",
                 "reason": "no-records",
@@ -1580,12 +1590,13 @@ fn block_source_ids(page: &str, block: &str) -> Vec<String> {
 }
 
 #[test]
-fn publish_writes_project_site_and_reports_the_missing_overview() {
+fn build_writes_overview_and_publish_uses_it() {
     let dir = tempfile::tempdir().unwrap();
     init(&dir);
     // One Question investigated by one Experiment: the seeded edge makes
-    // `build` render the research map, while no project-overview document has
-    // any backing in this workspace.
+    // `build` render the research map, and the Question backs the project
+    // overview. A run and its captured artifact exist but must never enter
+    // the overview.
     write_ledger(
         &dir,
         &[
@@ -1606,6 +1617,13 @@ fn publish_writes_project_site_and_reports_the_missing_overview() {
                 "kaya/Question/q-one",
                 "kaya/Experiment/exp-one",
             )),
+            event_line(&run_event("run-1", "kaya/Run/run-1", 3)),
+            event_line(&artifact_event(
+                "artifact-1",
+                "kaya/Artifact/run-jsonl",
+                "reports",
+                "target/run.jsonl",
+            )),
         ],
     );
 
@@ -1613,11 +1631,53 @@ fn publish_writes_project_site_and_reports_the_missing_overview() {
     let recomputed = built["data"]["recomputed"]
         .as_array()
         .expect("recomputed is a list");
+    for name in ["orientation.research-map", "orientation.project-overview"] {
+        assert!(
+            recomputed.iter().any(|candidate| candidate == name),
+            "build compiles the {name} block: {recomputed:?}"
+        );
+    }
+
+    let overview = fs::read_to_string(dir.path().join("docs/research/overview.md"))
+        .expect("the project overview is written");
+    let overview_body = generated_block_body(&overview, "orientation.project-overview");
     assert!(
-        recomputed
-            .iter()
-            .any(|name| name == "orientation.research-map"),
-        "the seeded edge yields a fresh research map: {recomputed:?}"
+        overview_body.contains("### Questions"),
+        "the overview renders its Questions section: {overview_body}"
+    );
+    assert!(
+        overview_body.contains("- kaya/Question/q-one — Q One"),
+        "the overview renders the recorded question: {overview_body}"
+    );
+    for forbidden in [
+        "kaya/Run/run-1",
+        "### Runs",
+        "kaya/Artifact/run-jsonl",
+        "target/run.jsonl",
+        "### Artifacts",
+    ] {
+        assert!(
+            !overview_body.contains(forbidden),
+            "run and artifact rows stay out of the overview ({forbidden}): {overview_body}"
+        );
+    }
+
+    let sources = built["data"]["sources"]
+        .as_object()
+        .expect("build exposes the merged source map");
+    assert_eq!(
+        sources["orientation.project-overview"],
+        json!(["kaya/Question/q-one"]),
+        "the overview source map names exactly the rendered question: {sources:?}"
+    );
+    let omitted = built["data"]["omitted"]
+        .as_array()
+        .expect("omitted is a list");
+    assert!(
+        !omitted.iter().any(|entry| {
+            entry["family"] == json!("orientation") && entry["kind"] == json!("project-overview")
+        }),
+        "a question backs the overview, so the kind is not omitted: {omitted:?}"
     );
 
     let index = fs::read_to_string(dir.path().join(INDEX)).expect("the research map is written");
@@ -1640,23 +1700,26 @@ fn publish_writes_project_site_and_reports_the_missing_overview() {
     );
     assert_eq!(
         published["data"]["omitted"],
-        json!([{
-            "tier": "product",
-            "name": "overview",
-            "reason": "no-backing-document",
-        }]),
-        "the unbacked overview is the only omission: {published}"
+        json!([]),
+        "the question backs the overview, so every declared product emits: {published}"
     );
     let pages = published_page_names(&published["data"]["pages"]);
-    for name in ["reference", "project-site"] {
+    for name in ["overview", "reference", "project-site"] {
         assert!(
             pages.iter().any(|page| page == name),
             "publish names the {name} page: {pages:?}"
         );
     }
+
+    let overview_page = fs::read_to_string(dir.path().join("docs/public/overview.md"))
+        .expect("the overview page is written");
     assert!(
-        !pages.iter().any(|page| page == "overview"),
-        "an omitted product gets no page entry: {pages:?}"
+        overview_page.contains("generated:publication.product.overview"),
+        "the overview page carries its generated block: {overview_page}"
+    );
+    assert!(
+        overview_page.contains("- kaya/Question/q-one — Q One"),
+        "the overview page renders the compiled disclosure: {overview_page}"
     );
 
     let reference = fs::read_to_string(dir.path().join("docs/public/reference.md"))
@@ -1677,16 +1740,16 @@ fn publish_writes_project_site_and_reports_the_missing_overview() {
         "the package page carries its generated block: {package}"
     );
     assert!(
+        package.contains("[overview](overview.md)"),
+        "the package links the emitted overview: {package}"
+    );
+    assert!(
         package.contains("[reference](reference.md)"),
         "an emitted product is linked from the package: {package}"
     );
     assert!(
-        package.contains("overview — unavailable"),
-        "an omitted product is named unavailable rather than linked: {package}"
-    );
-    assert!(
-        !dir.path().join("docs/public/overview.md").exists(),
-        "an omitted product leaves no stub page"
+        !package.contains("overview — unavailable"),
+        "the backed overview is linked, never named unavailable: {package}"
     );
 
     let export: Value = serde_json::from_str(
@@ -1697,6 +1760,22 @@ fn publish_writes_project_site_and_reports_the_missing_overview() {
     let products = export["products"]
         .as_array()
         .expect("the export lists products");
+    let overview_entry = products
+        .iter()
+        .find(|product| product["name"] == json!("overview"))
+        .expect("the export names the emitted overview product");
+    let overview_documents = overview_entry["documents"]
+        .as_array()
+        .expect("the overview product lists its documents");
+    let overview_document = overview_documents
+        .iter()
+        .find(|document| document["kind"] == json!("orientation.project-overview"))
+        .expect("the export names the project overview document under the overview product");
+    assert_eq!(
+        overview_document["event_ids"],
+        json!(["kaya/Question/q-one"]),
+        "the exported overview attributes the rendered question: {export}"
+    );
     let reference_entry = products
         .iter()
         .find(|product| product["name"] == json!("reference"))
@@ -1762,6 +1841,7 @@ fn publish_writes_project_site_and_reports_the_missing_overview() {
         .as_array()
         .expect("publish reports the recomputed blocks");
     for name in [
+        "publication.product.overview",
         "publication.product.reference",
         "publication.package.project-site",
         "publication.json",
@@ -1789,7 +1869,7 @@ fn publish_writes_project_site_and_reports_the_missing_overview() {
         .expect("publish reports the compiled documents");
     assert!(
         !envelope_documents.is_empty(),
-        "the compiled research map is reported: {published}"
+        "the compiled documents are reported: {published}"
     );
     for document in envelope_documents {
         let kind = document["kind"]
@@ -1814,6 +1894,8 @@ fn publish_writes_project_site_and_reports_the_missing_overview() {
     // Publishing twice changes no byte and reports the same payload; only the
     // recomputed/unchanged split moves, from all-recomputed to all-unchanged.
     let public = dir.path().join("docs/public");
+    let overview_bytes =
+        fs::read(public.join("overview.md")).expect("the overview page is readable");
     let reference_bytes =
         fs::read(public.join("reference.md")).expect("the reference page is readable");
     let package_bytes =
@@ -1836,6 +1918,7 @@ fn publish_writes_project_site_and_reports_the_missing_overview() {
         .as_array()
         .expect("a second publish reports the unchanged blocks");
     for name in [
+        "publication.product.overview",
         "publication.product.reference",
         "publication.package.project-site",
         "publication.json",
@@ -1845,6 +1928,11 @@ fn publish_writes_project_site_and_reports_the_missing_overview() {
             "a second publish reports {name} unchanged: {unchanged:?}"
         );
     }
+    assert_eq!(
+        fs::read(public.join("overview.md")).expect("the overview page is readable"),
+        overview_bytes,
+        "publishing twice leaves the overview page byte-identical"
+    );
     assert_eq!(
         fs::read(public.join("reference.md")).expect("the reference page is readable"),
         reference_bytes,
