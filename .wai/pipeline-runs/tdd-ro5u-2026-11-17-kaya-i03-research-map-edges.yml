@@ -1,0 +1,11 @@
+run_id: tdd-ro5u-2026-11-17-kaya-i03-research-map-edges
+pipeline: tdd-ro5u
+topic: kaya-i03 research map edges
+created_at: '2026-11-17T20:00:02.803363195+00:00'
+current_step: 8
+approvals: {}
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []
