@@ -35,9 +35,9 @@ phase: research
 ### git_status
 
 ```
- M .wai/pipeline-runs/tdd-ro5u-2026-11-17-kaya-i03-research-map-edges.yml
+ M .wai/pipeline-runs/tdd-ro5u-2026-11-17-kaya-3f6-reuse-references.yml
 ?? .espectacular/state/
-?? .wai/projects/kaya/research/2026-11-17-ship-kaya-i03-feature-fe33a0b-orientation-resear.md
+?? .wai/projects/kaya/research/2026-11-17-ship-kaya-3f6-feature-32a3d2d-reuse-reference-do.md
 ?? .whisper/
 ```
 
@@ -48,7 +48,6 @@ phase: research
 ○ kaya-nx4 P1 Implement Hegel property tests
 ○ kaya-1b9 P2 Orientation kind: project-overview
 ○ kaya-249 P2 Understanding kinds: findings-and-analysis and decision-record
-○ kaya-3f6 P2 Reuse slice: reproduction-package and handoff (git/wai references)
 ○ kaya-duv P2 Developer-guide products: getting-started, how-to, concept, example, troubleshooting, faq
 ○ kaya-n50 P2 Cutover: replace hand-written overview and concept prose with generated products
 ○ kaya-qp8 P2 Publication slice: tiers and project-site (overview, reference)
@@ -59,7 +58,7 @@ phase: research
 ○ kaya-lh1 P3 Reuse families: technical-reference and knowledge-brief (specodelic/turu inputs)
 
 --------------------------------------------------------------------------------
-Total: 13 issues (13 open, 0 in progress)
+Total: 12 issues (12 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
