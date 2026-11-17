@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-17-kaya-249-understanding-kinds, pipeline-step:fix-review]
+---
+
+RO5U-FIXES kaya-249: main.rs flags stale authored citations in understanding.md; build_understanding canonicalizes findings-before-decision order regardless of build history; incomplete Sources (missing/blank/non-string path or commit) are skipped entirely so evidence rows always resolve; block names derive from Kind; a whitespace-only document is deleted instead of truncated; the shared attribute/key/title_or_key/source_reference helpers moved to projection::mod and index.rs/report.rs reuse them (index bytes unchanged); publication::read_documents now opens understanding.md; docs reconciled (findings row no longer lists Run as a source, both kinds marked generated, status page updated). Tests: 13 understanding cases incl. incomplete sources, canonical order, both-kinds deletion, constant/kind equality; CLI stale-authored + exact decision source map; publication backs concept/faq/troubleshooting once each. Verified: cargo test all suites green, fmt/clippy clean, build/publish idempotent, ah check --run-tests 11 passed.

@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-17-kaya-249-understanding-kinds, pipeline-step:green]
+---
+
+GREEN kaya-249: report.rs gains FINDINGS_BLOCK/DECISION_BLOCK and build_understanding(graph, path): one project-level document; findings block renders Finding/Observation/Claim rows only (no run/artifact rows); decision block renders Decision rows plus Evidence rows (Source path@commit, influences-linked Finding 'see decision' refs) and empties on Decision records only; both kinds omit/remove their block and report no-records when empty; validation precedes writes; write only on change; heading depth ### with experiment blocks kept at ##. main.rs merges the result. docs/research/understanding.md intentionally absent for the committed ledger (no Finding/Decision records). Verified: 231 tests, fmt/clippy clean, second build identical with four omitted kinds, ah check --run-tests 11 passed. Test-side fix: tests/understanding.rs document_path helper creates docs/research (orchestrator-made).
