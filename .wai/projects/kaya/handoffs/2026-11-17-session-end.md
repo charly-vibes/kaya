@@ -35,9 +35,9 @@ phase: research
 ### git_status
 
 ```
- M .wai/pipeline-runs/tdd-ro5u-2026-11-17-kaya-s5v-experiment-dossier-slice.yml
+ M .wai/pipeline-runs/tdd-ro5u-2026-11-17-kaya-i03-research-map-edges.yml
 ?? .espectacular/state/
-?? .wai/projects/kaya/research/2026-11-17-ship-kaya-s5v-feature-5dd91b6-vocabulary-split.md
+?? .wai/projects/kaya/research/2026-11-17-ship-kaya-i03-feature-fe33a0b-orientation-resear.md
 ?? .whisper/
 ```
 
@@ -45,7 +45,6 @@ phase: research
 
 ```
 ○ kaya-152 P1 Research: Hegel property-based testing plan (antithesis-research)
-○ kaya-i03 P1 Research map: render typed relationship edges
 ○ kaya-nx4 P1 Implement Hegel property tests
 ○ kaya-1b9 P2 Orientation kind: project-overview
 ○ kaya-249 P2 Understanding kinds: findings-and-analysis and decision-record
@@ -60,7 +59,7 @@ phase: research
 ○ kaya-lh1 P3 Reuse families: technical-reference and knowledge-brief (specodelic/turu inputs)
 
 --------------------------------------------------------------------------------
-Total: 14 issues (14 open, 0 in progress)
+Total: 13 issues (13 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
