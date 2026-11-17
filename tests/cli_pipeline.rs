@@ -6,9 +6,12 @@
 
 use assert_cmd::Command;
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use std::fs;
 use std::process::Command as StdCommand;
 use tempfile::TempDir;
+
+use kaya::publication::admission;
 
 const LEDGER: &str = ".kaya/ledger.jsonl";
 const INDEX: &str = "docs/research/index.md";
@@ -1579,14 +1582,44 @@ fn block_source_ids(page: &str, block: &str) -> Vec<String> {
             .find(&end)
             .unwrap_or_else(|| panic!("the {block} block is closed: {page}"));
     let body = &page[start..stop];
-    let mut ids: Vec<String> = body
-        .split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_' | '.')))
+    source_ids(body)
+}
+
+/// The `kaya/...` node ids named in `text`, sorted and deduplicated.
+///
+/// `@` stays inside the token so a Source reference keeps its `@commit`
+/// suffix: `kaya/Source/src-main-rs@9f2c1a` is one id, never the bare path.
+fn source_ids(text: &str) -> Vec<String> {
+    let mut ids: Vec<String> = text
+        .split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_' | '.' | '@')))
         .filter(|token| token.starts_with("kaya/"))
         .map(str::to_owned)
         .collect();
     ids.sort();
     ids.dedup();
     ids
+}
+
+/// The `### <kind>` sections of a rendered product block body, in page order.
+///
+/// A rendered document may carry its own `###` subheadings, so only a heading
+/// naming one of `kinds` starts a new section; every other line stays content.
+fn product_sections(body: &str, kinds: &[&str]) -> Vec<(String, String)> {
+    let mut sections: Vec<(String, String)> = Vec::new();
+    for line in body.lines() {
+        if let Some(heading) = line.strip_prefix("### ") {
+            let heading = heading.trim();
+            if kinds.contains(&heading) {
+                sections.push((heading.to_owned(), String::new()));
+                continue;
+            }
+        }
+        if let Some((_, buffer)) = sections.last_mut() {
+            buffer.push_str(line);
+            buffer.push('\n');
+        }
+    }
+    sections
 }
 
 #[test]
@@ -1716,11 +1749,14 @@ fn build_writes_overview_and_publish_uses_it() {
     assert_eq!(
         pages,
         [
+            "architecture-design",
             "developer-guide",
             "getting-started",
             "overview",
             "project-site",
             "reference",
+            "release-migration",
+            "status-compatibility",
         ],
         "the declared packages and every backed product get a page, sorted by name: {pages:?}"
     );
@@ -1759,9 +1795,19 @@ fn build_writes_overview_and_publish_uses_it() {
         reference.contains("generated:publication.product.reference"),
         "the reference page carries its generated block: {reference}"
     );
+    // architecture-design sorts first among the pages admitting the research
+    // map, so it renders the body; reference cross-references it.
+    let architecture = fs::read_to_string(dir.path().join("docs/public/architecture-design.md"))
+        .expect("the architecture-design page is written");
     assert!(
-        reference.contains(&map_row),
-        "the reference page carries the research map body row {map_row:?}: {reference}"
+        architecture.contains(&map_row),
+        "the architecture-design page carries the research map body row {map_row:?}: {architecture}"
+    );
+    let cross_reference =
+        "See [architecture-design](architecture-design.md#orientationresearch-map).";
+    assert!(
+        reference.contains(cross_reference),
+        "the reference page cross-references the page that renders the shared research map: {reference}"
     );
 
     let package = fs::read_to_string(dir.path().join("docs/public/project-site.md"))
@@ -1851,7 +1897,7 @@ fn build_writes_overview_and_publish_uses_it() {
     exported_ids.sort();
     exported_ids.dedup();
 
-    let page_ids = block_source_ids(&reference, "publication.product.reference");
+    let page_ids = block_source_ids(&architecture, "publication.product.architecture-design");
     assert_eq!(
         exported_ids, page_ids,
         "both formats trace to the same source ids: {export}"
@@ -2057,12 +2103,15 @@ fn publish_declares_every_product_and_reports_justified_omissions() {
     assert_eq!(
         pages,
         [
+            "architecture-design",
             "developer-guide",
             "getting-started",
             "how-to",
             "overview",
             "project-site",
             "reference",
+            "release-migration",
+            "status-compatibility",
         ],
         "the declared packages and every backed product get a page, sorted by name: {pages:?}"
     );
@@ -2173,6 +2222,219 @@ fn publish_declares_every_product_and_reports_justified_omissions() {
     );
 }
 
+/// `publish` declares the three remaining reader-question products, and the
+/// structured export attributes every rendered document to the same event ids
+/// its Markdown section cites; a second publish changes no byte.
+#[test]
+fn publish_declares_the_remaining_products_and_export_agrees() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    // A Question backs the project overview and the research map, and one
+    // committed Source backs the reproduction package, so each remaining
+    // product has at least one admissible compiled document.
+    write_ledger(
+        &dir,
+        &[
+            event_line(&node_event(
+                "event-question",
+                "Question",
+                "kaya/Question/q-one",
+                "Q One",
+            )),
+            event_line(&source_event(
+                "event-source",
+                "kaya/Source/src-main-rs@9f2c1a",
+                "src/main.rs",
+                "9f2c1a",
+            )),
+        ],
+    );
+    assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+
+    let published = assert_success(&run(&dir, &["publish"]));
+    let pages = published_page_names(&published["data"]["pages"]);
+    assert_eq!(
+        pages,
+        [
+            "architecture-design",
+            "developer-guide",
+            "getting-started",
+            "how-to",
+            "overview",
+            "project-site",
+            "reference",
+            "release-migration",
+            "status-compatibility",
+        ],
+        "the remaining products emit beside the already-declared ones, sorted by name: {pages:?}"
+    );
+    assert_eq!(
+        published["data"]["omitted"],
+        json!([
+            { "tier": "product", "name": "concept", "reason": "no-backing-document" },
+            { "tier": "product", "name": "example", "reason": "no-backing-document" },
+            { "tier": "product", "name": "faq", "reason": "no-backing-document" },
+            { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
+        ]),
+        "every remaining product is backed, so only the unbacked products are omitted: {published}"
+    );
+
+    let public = dir.path().join("docs/public");
+    let export: Value = serde_json::from_str(
+        &fs::read_to_string(public.join("publication.json")).expect("the export is written"),
+    )
+    .expect("the export is JSON");
+    let products = export["products"]
+        .as_array()
+        .expect("the export lists products");
+    assert_eq!(
+        products.len(),
+        11,
+        "the export names every declared product, emitted or not: {export}"
+    );
+
+    let mut attributed: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut rendered: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for product in products {
+        let name = product["name"].as_str().expect("each product names itself");
+        let documents = product["documents"]
+            .as_array()
+            .expect("each product lists its documents");
+        if product["emitted"] == json!(false) {
+            assert!(
+                documents.is_empty(),
+                "an omitted product attributes no document: {product}"
+            );
+            continue;
+        }
+        assert!(
+            !documents.is_empty(),
+            "an emitted product attributes at least one document: {product}"
+        );
+
+        let mut exported: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+        for document in documents {
+            let kind = document["kind"]
+                .as_str()
+                .expect("each document names its kind");
+            let ids: Vec<String> = document["event_ids"]
+                .as_array()
+                .expect("each document lists its event ids")
+                .iter()
+                .map(|id| {
+                    id.as_str()
+                        .expect("every exported event id is a string")
+                        .to_owned()
+                })
+                .collect();
+            assert!(
+                !ids.is_empty(),
+                "{name} attributes {kind} to at least one event id"
+            );
+            let existing = attributed
+                .entry(kind.to_owned())
+                .or_insert_with(|| ids.clone());
+            assert_eq!(
+                existing.as_slice(),
+                ids.as_slice(),
+                "every product composing {kind} attributes the same event ids"
+            );
+            exported.insert(kind, ids);
+        }
+
+        let page = match fs::read_to_string(public.join(format!("{name}.md"))) {
+            Ok(page) => page,
+            Err(error) => panic!("the {name} page is written: {error}"),
+        };
+        let block = format!("publication.product.{name}");
+        let exported_kinds: Vec<&str> = documents
+            .iter()
+            .map(|document| {
+                document["kind"]
+                    .as_str()
+                    .expect("each document names its kind")
+            })
+            .collect();
+        let sections = product_sections(&generated_block_body(&page, &block), admission(name));
+        let kinds: Vec<String> = sections.iter().map(|(kind, _)| kind.clone()).collect();
+        assert_eq!(
+            kinds, exported_kinds,
+            "the {name} page names exactly the documents the export attributes to it, in declaration order"
+        );
+
+        for (kind, section) in sections {
+            let ids = source_ids(&section);
+            if ids.is_empty() {
+                assert!(
+                    section.trim_start().starts_with("See ["),
+                    "the {name} section for {kind} cross-references the page rendering it: {section}"
+                );
+                continue;
+            }
+            // The assertion above establishes every rendered section names an
+            // exported document, so this row lookup cannot miss.
+            let expected = &exported[kind.as_str()];
+            assert_eq!(
+                ids.as_slice(),
+                expected.as_slice(),
+                "the {name} section for {kind} cites exactly its own product's exported event ids"
+            );
+            assert!(
+                rendered.insert(kind.clone(), ids).is_none(),
+                "exactly one page renders {kind}, so its facts appear once"
+            );
+        }
+    }
+
+    assert_eq!(
+        rendered, attributed,
+        "the pages and the export trace every document to the same event ids"
+    );
+    assert_eq!(
+        rendered.keys().cloned().collect::<Vec<_>>(),
+        [
+            "orientation.project-overview",
+            "orientation.research-map",
+            "reuse-handoff.reproduction-package",
+        ],
+        "the fixture compiles exactly three documents: {rendered:?}"
+    );
+
+    // A second publish from unchanged inputs rewrites nothing: every page and
+    // the export keep the bytes the first publish wrote.
+    let files: Vec<String> = pages
+        .iter()
+        .map(|name| format!("{name}.md"))
+        .chain(std::iter::once("publication.json".to_owned()))
+        .collect();
+    let mut before: Vec<Vec<u8>> = Vec::new();
+    for file in &files {
+        before.push(fs::read(public.join(file)).expect("the published file is readable"));
+    }
+
+    let second = assert_success(&run(&dir, &["publish"]));
+    assert_eq!(
+        second["data"]["recomputed"],
+        json!([]),
+        "a second publish recomputes nothing: {second}"
+    );
+    assert_eq!(
+        second["data"]["pages"], published["data"]["pages"],
+        "a second publish reports the same pages: {second}"
+    );
+    assert_eq!(
+        second["data"]["omitted"], published["data"]["omitted"],
+        "a second publish reports the same omissions: {second}"
+    );
+    for (file, bytes) in files.iter().zip(before) {
+        assert_eq!(
+            fs::read(public.join(file)).expect("the published file is readable"),
+            bytes,
+            "a second publish leaves {file} byte-identical"
+        );
+    }
+}
+
 /// An omitted product owns only its managed block: a document at that path
 /// without the block keeps every byte, while a page whose only content is the
 /// block is removed once the product loses its backing document.
@@ -2202,14 +2464,20 @@ fn publish_preserves_authored_pages_at_omitted_product_paths() {
     let authored_bytes = fs::read(public.join("how-to.md")).expect("the authored page is readable");
 
     let first = assert_success(&run(&dir, &["publish"]));
-    assert!(
-        public.join("getting-started.md").exists(),
-        "the backed getting-started page is written: {first}"
-    );
-    assert!(
-        public.join("overview.md").exists(),
-        "the backed overview page is written: {first}"
-    );
+    // Every product admitting the project overview is backed by it, since no
+    // other compiled document is present to back them.
+    let overview_backed = [
+        "getting-started",
+        "overview",
+        "release-migration",
+        "status-compatibility",
+    ];
+    for name in overview_backed {
+        assert!(
+            public.join(format!("{name}.md")).exists(),
+            "the {name} page backed by the project overview is written: {first}"
+        );
+    }
     assert_eq!(
         fs::read(public.join("how-to.md")).expect("the authored page is still readable"),
         authored_bytes,
@@ -2221,7 +2489,7 @@ fn publish_preserves_authored_pages_at_omitted_product_paths() {
     fs::remove_file(dir.path().join("docs/research/overview.md"))
         .expect("the compiled overview document is removable");
     let second = assert_success(&run(&dir, &["publish"]));
-    for name in ["getting-started", "overview"] {
+    for name in overview_backed {
         assert!(
             !public.join(format!("{name}.md")).exists(),
             "a newly omitted product removes the page that held only its block: {name}"
@@ -2237,8 +2505,8 @@ fn publish_preserves_authored_pages_at_omitted_product_paths() {
             .as_array()
             .expect("pages is a list")
             .len(),
-        3,
-        "only the packages and the research-map-backed reference remain: {second}"
+        4,
+        "only the packages, the architecture-design page and the research-map-backed reference remain: {second}"
     );
     assert_eq!(
         second["data"]["omitted"],
@@ -2249,6 +2517,8 @@ fn publish_preserves_authored_pages_at_omitted_product_paths() {
             { "tier": "product", "name": "getting-started", "reason": "no-backing-document" },
             { "tier": "product", "name": "how-to", "reason": "no-backing-document" },
             { "tier": "product", "name": "overview", "reason": "no-backing-document" },
+            { "tier": "product", "name": "release-migration", "reason": "no-backing-document" },
+            { "tier": "product", "name": "status-compatibility", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
         ]),
         "the products whose backing document disappeared are reported omitted: {second}"

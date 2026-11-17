@@ -504,9 +504,13 @@ pub fn read_documents(research_dir: &Path) -> Result<Documents, PublicationError
 }
 
 /// The `kaya/...` node ids named in a block body, sorted and deduplicated.
+///
+/// `@` stays inside a token because a `Source` reference carries its commit
+/// suffix: `kaya/Source/docs-src-index.md@43b606f` is one node id, not the
+/// path plus a trailing fragment.
 fn node_ids(body: &str) -> Vec<String> {
     let ids: BTreeSet<String> = body
-        .split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_' | '.')))
+        .split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_' | '.' | '@')))
         .filter(|token| token.starts_with("kaya/"))
         .map(str::to_owned)
         .collect();

@@ -41,7 +41,7 @@ code changes here. bd ticket mapping noted per phase.
       `reference`. (kaya-qp8)
 - [x] 3.7 Developer-guide products: `getting-started`, `how-to`, `concept`,
       `example`, `troubleshooting`, `faq`. (kaya-duv)
-- [ ] 3.8 Remaining products plus structured export: `status-compatibility`,
+- [x] 3.8 Remaining products plus structured export: `status-compatibility`,
       `release-migration`, `architecture-design`, one source for every format.
       (kaya-scq)
 - [ ] 3.9 Adapter-dependent reuse kinds: `technical-reference` (specodelic) and

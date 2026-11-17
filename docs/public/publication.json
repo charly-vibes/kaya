@@ -45,6 +45,95 @@
   ],
   "products": [
     {
+      "documents": [
+        {
+          "event_ids": [
+            "kaya/Artifact/0cd2fd6",
+            "kaya/Artifact/1e0c0d7",
+            "kaya/Artifact/510751b",
+            "kaya/Artifact/565343c",
+            "kaya/Artifact/59fea0a",
+            "kaya/Artifact/645a6b5",
+            "kaya/Artifact/687b6d9",
+            "kaya/Artifact/798376c",
+            "kaya/Artifact/904f37f",
+            "kaya/Artifact/a3ecdc2",
+            "kaya/Artifact/a68206a",
+            "kaya/Artifact/ab319d5",
+            "kaya/Artifact/d3bc2f4",
+            "kaya/Artifact/d56e106",
+            "kaya/Artifact/designs-2026-11-16-bootstrap-decisions-captured-in-openspec-changes-a",
+            "kaya/Artifact/designs-2026-11-16-green-kaya-10k-serde-event-with-closed-field-set",
+            "kaya/Artifact/designs-2026-11-16-green-kaya-5ea-requirement-scenarios-added-lay",
+            "kaya/Artifact/designs-2026-11-16-green-kaya-f2f-btreemap-graph-direction-grammar",
+            "kaya/Artifact/designs-2026-11-16-green-kaya-lb2-clap-cli-init-status-local-genesi",
+            "kaya/Artifact/designs-2026-11-16-green-kaya-vt9-justfile-recipes-and-two-workflows",
+            "kaya/Artifact/designs-2026-11-16-implement-every-ticket-as-one-tdd-ro5u-pipeline-ru",
+            "kaya/Artifact/designs-2026-11-16-kaya-motivation-design-documentation-that",
+            "kaya/Artifact/designs-2026-11-16-mvp-1-implementation-contract-orchestrated-2026-1",
+            "kaya/Artifact/designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep",
+            "kaya/Artifact/designs-2026-11-16-refactor-kaya-10k-resolve-resolve-effective-split",
+            "kaya/Artifact/designs-2026-11-16-refactor-kaya-5ea-front-matter-statement-now-enum",
+            "kaya/Artifact/designs-2026-11-16-refactor-kaya-f2f-attribute-merge-on-node-redefin",
+            "kaya/Artifact/designs-2026-11-16-refactor-kaya-lb2-envelope-kept-isolated-in-src-e",
+            "kaya/Artifact/designs-2026-11-16-refactor-kaya-lb2-no-production-refactor-needed",
+            "kaya/Artifact/designs-2026-11-16-refactor-kaya-vt9-ci-smoke-step-checks-bd-ah-spk",
+            "kaya/Artifact/e178048",
+            "kaya/Artifact/e2ada43",
+            "kaya/Artifact/e4c40ef",
+            "kaya/Artifact/e4e3aaa",
+            "kaya/Artifact/e5cf768",
+            "kaya/Artifact/fbd08ac",
+            "kaya/Artifact/plans-2026-11-16-plan-kaya-10k-event-serde-parse-line-to-line-wi",
+            "kaya/Artifact/plans-2026-11-16-plan-kaya-5ea-one-requirement-proposal-budget-is",
+            "kaya/Artifact/plans-2026-11-16-plan-kaya-f2f-entitytype-relationship-enums-node",
+            "kaya/Artifact/plans-2026-11-16-plan-kaya-lb2-desired-behavior-init-status-envelo",
+            "kaya/Artifact/plans-2026-11-16-plan-kaya-vt9-justfile-recipes-build-test-fmt-ch",
+            "kaya/Artifact/research-2026-11-16-orient-kaya-10k-closed-nine-field-kaya-event-v0-s",
+            "kaya/Artifact/research-2026-11-16-orient-kaya-5ea-promotion-rate-cap-requirement-fr",
+            "kaya/Artifact/research-2026-11-16-orient-kaya-f2f-closed-thirteen-entity-vocabulary",
+            "kaya/Artifact/research-2026-11-16-orient-kaya-lb2-crate-scaffold-with-kaya-init-sta",
+            "kaya/Artifact/research-2026-11-16-orient-kaya-vt9-just-ci-ci-yml-per-fleet-standa",
+            "kaya/Artifact/research-2026-11-16-origin-conversation-event-driven-research-docum",
+            "kaya/Artifact/research-2026-11-16-quality-ledger-kaya-10k-changed-src-event-rs-src",
+            "kaya/Artifact/research-2026-11-16-quality-ledger-kaya-5ea-changed-kaya-promotion-sp",
+            "kaya/Artifact/research-2026-11-16-quality-ledger-kaya-f2f-changed-src-model-rs-test",
+            "kaya/Artifact/research-2026-11-16-quality-ledger-kaya-lb2-changed-cargo-toml-src",
+            "kaya/Artifact/research-2026-11-16-quality-ledger-kaya-vt9-changed-justfile-github",
+            "kaya/Artifact/research-2026-11-16-red-kaya-10k-tests-event-rs-and-tests-ledger-rs-w",
+            "kaya/Artifact/research-2026-11-16-red-kaya-5ea-spec-linter-would-reject-unbound-pro",
+            "kaya/Artifact/research-2026-11-16-red-kaya-f2f-model-tests-written-first-expected",
+            "kaya/Artifact/research-2026-11-16-red-kaya-lb2-command-cargo-test-test-cli-expec",
+            "kaya/Artifact/research-2026-11-16-red-kaya-vt9-no-justfile-workflow-existed-just-c",
+            "kaya/Artifact/research-2026-11-16-ro5u-fixes-kaya-10k-read-verified-anchor-mandato",
+            "kaya/Artifact/research-2026-11-16-ro5u-fixes-kaya-5ea-pull-only-surfacing-constrain",
+            "kaya/Artifact/research-2026-11-16-ro5u-fixes-kaya-f2f-exact-direction-pairs-correc",
+            "kaya/Artifact/research-2026-11-16-ro5u-fixes-kaya-lb2-init-non-regular-file-refusal",
+            "kaya/Artifact/research-2026-11-16-ro5u-fixes-kaya-vt9-none-required-ci-recipe-re-r",
+            "kaya/Artifact/research-2026-11-16-ship-kaya-10k-committed-in-904f37f-family-ticket",
+            "kaya/Artifact/research-2026-11-16-ship-kaya-5ea-committed-a68206a-spec-follow-ups",
+            "kaya/Artifact/research-2026-11-16-ship-kaya-f2f-committed-e178048-904f37f-ticket",
+            "kaya/Artifact/research-2026-11-16-ship-kaya-lb2-cli-scaffold-shipped-in-commits-d3b",
+            "kaya/Artifact/research-2026-11-16-ship-kaya-vt9-committed-798376c-ticket-close-fol",
+            "kaya/Experiment/add-core-research-record",
+            "kaya/Hypothesis/H-001",
+            "kaya/Model/M-001",
+            "kaya/Question/mvp-1-acceptance",
+            "kaya/Source/docs-src-index.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-proposal.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-adapters-spec.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-event-layer.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f",
+            "kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f"
+          ],
+          "kind": "orientation.research-map"
+        }
+      ],
+      "emitted": true,
+      "name": "architecture-design",
+      "question": "how is it structured and why"
+    },
+    {
       "documents": [],
       "emitted": false,
       "name": "concept",
@@ -72,12 +161,12 @@
         },
         {
           "event_ids": [
-            "kaya/Source/docs-src-index.md",
-            "kaya/Source/openspec-changes-add-core-research-record-proposal.md",
-            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-adapters-spec.md",
-            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-event-layer.md",
-            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md",
-            "kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md"
+            "kaya/Source/docs-src-index.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-proposal.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-adapters-spec.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-event-layer.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f",
+            "kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f"
           ],
           "kind": "reuse-handoff.reproduction-package"
         }
@@ -90,12 +179,12 @@
       "documents": [
         {
           "event_ids": [
-            "kaya/Source/docs-src-index.md",
-            "kaya/Source/openspec-changes-add-core-research-record-proposal.md",
-            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-adapters-spec.md",
-            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-event-layer.md",
-            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md",
-            "kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md"
+            "kaya/Source/docs-src-index.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-proposal.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-adapters-spec.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-event-layer.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f",
+            "kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f"
           ],
           "kind": "reuse-handoff.reproduction-package"
         }
@@ -192,12 +281,12 @@
             "kaya/Hypothesis/H-001",
             "kaya/Model/M-001",
             "kaya/Question/mvp-1-acceptance",
-            "kaya/Source/docs-src-index.md",
-            "kaya/Source/openspec-changes-add-core-research-record-proposal.md",
-            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-adapters-spec.md",
-            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-event-layer.md",
-            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md",
-            "kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md"
+            "kaya/Source/docs-src-index.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-proposal.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-adapters-spec.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-event-layer.md@43b606f",
+            "kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f",
+            "kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f"
           ],
           "kind": "orientation.research-map"
         }
@@ -205,6 +294,32 @@
       "emitted": true,
       "name": "reference",
       "question": "what exactly is this"
+    },
+    {
+      "documents": [
+        {
+          "event_ids": [
+            "kaya/Question/mvp-1-acceptance"
+          ],
+          "kind": "orientation.project-overview"
+        }
+      ],
+      "emitted": true,
+      "name": "release-migration",
+      "question": "what changed and what must I do"
+    },
+    {
+      "documents": [
+        {
+          "event_ids": [
+            "kaya/Question/mvp-1-acceptance"
+          ],
+          "kind": "orientation.project-overview"
+        }
+      ],
+      "emitted": true,
+      "name": "status-compatibility",
+      "question": "what can I rely on"
     },
     {
       "documents": [],

@@ -588,13 +588,12 @@ fn cmd_build(
     ))
 }
 
-/// Products `kaya publish` declares: the project-site pair and the six
-/// developer-guide products. Every include is the product's admission row, so
-/// a declaration can never widen a product beyond its contract. The remaining
-/// products stay undeclared: `status-compatibility`, `release-migration`, and
-/// `architecture-design` belong to kaya-scq, and `tutorial` has no declared
-/// slice yet.
-const PUBLISHED_PRODUCTS: [&str; 8] = [
+/// Products `kaya publish` declares: the project-site pair, the six
+/// developer-guide products, and the status, release, and architecture
+/// products. Every include is the product's admission row, so a declaration can
+/// never widen a product beyond its contract. `tutorial` stays undeclared until
+/// its backing exploration documents have producers.
+const PUBLISHED_PRODUCTS: [&str; 11] = [
     "overview",
     "reference",
     "getting-started",
@@ -603,6 +602,9 @@ const PUBLISHED_PRODUCTS: [&str; 8] = [
     "example",
     "troubleshooting",
     "faq",
+    "status-compatibility",
+    "release-migration",
+    "architecture-design",
 ];
 
 /// Packages `kaya publish` declares, with their members in declaration order.
@@ -621,8 +623,14 @@ const PUBLISHED_PACKAGES: [(&str, &[&str]); 2] = [
     ),
 ];
 
-/// Compose the project-site and developer-guide packages over the compiled
-/// research documents.
+/// Compose the eleven declared products and both declared packages over the
+/// compiled research documents.
+///
+/// The products are `overview`, `reference`, `getting-started`, `how-to`,
+/// `concept`, `example`, `troubleshooting`, `faq`, `status-compatibility`,
+/// `release-migration`, and `architecture-design`. The packages are
+/// `project-site` (over `overview` and `reference`) and `developer-guide`
+/// (over the six `getting-started` through `faq` products).
 ///
 /// The document source is read once from `docs/research`; the publication
 /// layer refuses invalid declarations before writing, omits products without
