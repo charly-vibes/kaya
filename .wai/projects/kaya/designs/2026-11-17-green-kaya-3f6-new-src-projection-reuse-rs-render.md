@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-17-kaya-3f6-reuse-references, pipeline-step:green]
+---
+
+GREEN kaya-3f6: new src/projection/reuse.rs renders reference-only documents: reuse-handoff.reproduction-package (### Sources rows '- <id> — <path>@<commit>' from Source nodes, ### Commands rows from Run command/commands attributes) and reuse-handoff.handoff (### Handoffs rows '- <id> — <path>' from wai Artifact nodes with kind handoffs); both documents are vocabulary-validated before any write, written only on change, empty kinds omitted and their obsolete block removed. inputs(&graph) assembles references deterministically; cmd_build gates on existing reuse documents or present references so unrelated builds keep their envelope. docs/research/reproduction-package.md generated (6 committed Sources); handoff omitted. Verified: 192 tests, fmt/clippy clean, build idempotent (3 blocks unchanged), ledger bytes unchanged, ah check --run-tests 6 passed. Test-helper and acceptance-expectation corrections were made explicitly (body() empty-line filter; omitted array includes reuse-handoff/handoff).
