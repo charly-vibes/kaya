@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-17-kaya-qp8-publications-tracer, pipeline-step:green]
+---
+
+GREEN kaya-qp8: new src/publication/mod.rs with the three closed vocabularies, tier resolution (kaya.publications.tier_resolved naming value + all 29 names), reader-question and admission tables, Documents reader over compiled markdown, build() enforcing admission (kaya.publications.inadmissible_refused naming product/kind/row), package membership (kaya.publications.package_members naming member + package tier), justified emission (omitted no-backing-document, no page, stale page removed), fact-once cross-references, package link/unavailable navigation, deterministic page order, write-on-change and publication.json export from one source map. CLI: publish [--out docs/public] reading docs/research, declaring project-site over overview+reference. Generated docs/public/{reference.md,project-site.md,publication.json}; reference renders the research map, overview omitted as unavailable. Verified: 207 tests, fmt/clippy clean, publish byte-idempotent, ah check --run-tests 10 passed. Test-side clippy fixes were orchestrator-made (useless into_iter).
