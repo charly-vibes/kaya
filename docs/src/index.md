@@ -32,14 +32,20 @@ documentation compiler over it. It does not duplicate what those tools own.
               │                 Model · Experiment · Run · Artifact ·
               │                 Observation · Claim · Finding · Decision · Source
               ▼  [understand — typed, direction-fixed relationships]
-   documentation projections    research index, experiment reports,
-              ▼                 evidence dossiers, reproduction guides
+   document projections        record layer: four families, eleven kinds
+              │                 (orientation · exploration · understanding · reuse-handoff)
+              ▼  [compose]
+   publications                client layer: twelve reader-facing products,
+              ▼                 collections and packages
    [reveal — deterministic generation, authored sections preserved]
 ```
 
 Ledger, model and projections are deliberately separate: the ledger preserves
-what happened, the model says what it means, the projections present that
-meaning to different audiences.
+what happened, the model says what it means, and the projections present that
+meaning to different audiences. The record layer answers what we intended,
+what happened, what we learned and what we chose; the publication layer
+answers a visitor's questions. See [Documentation taxonomy](document-taxonomy.md)
+for the kinds, the products, their mapping, and what is deferred.
 
 ## Sources and authority
 

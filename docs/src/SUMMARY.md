@@ -1,6 +1,7 @@
 # Summary
 
 - [kaya — motivation & design](index.md)
+- [Documentation taxonomy](document-taxonomy.md)
 - [Status](status.md)
 
 ---

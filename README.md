@@ -91,8 +91,11 @@ kaya challenge <conclusion> --events <id>... --actor <name>
 
 The behavioral specification remains the openspec change
 [`add-core-research-record`](openspec/changes/add-core-research-record/proposal.md)
-(event, ledger, model, projection, promotion, adapters). Remaining milestones
-are tracked in the
+(event, ledger, model, projection, promotion, adapters), plus
+[`add-document-taxonomy`](openspec/changes/add-document-taxonomy/proposal.md)
+(the record-facing document kinds and the client-facing publications composed
+from them — see [Documentation taxonomy](docs/src/document-taxonomy.md)).
+Remaining milestones are tracked in the
 [change tasks](openspec/changes/add-core-research-record/tasks.md) and in
 beads (`bd ready` in a clone). This repository already dogfoods the compiler:
 [docs/research/](docs/research/index.md) is kaya's own compiled dossier.

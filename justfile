@@ -47,9 +47,9 @@ validate:
 spec-lint:
 	spk lint openspec/specs || test $? -eq 2
 
-# Validate the active OpenSpec change strictly
+# Validate active OpenSpec changes strictly
 spec-validate:
-	openspec validate add-core-research-record --strict
+	openspec validate --changes --strict
 
 # === CI ===
 
