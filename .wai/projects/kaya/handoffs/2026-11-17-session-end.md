@@ -35,9 +35,9 @@ phase: research
 ### git_status
 
 ```
- M .wai/pipeline-runs/tdd-ro5u-2026-11-17-kaya-duv-developer-products.yml
+ M .wai/pipeline-runs/tdd-ro5u-2026-11-17-kaya-scq-status-release-architecture.yml
 ?? .espectacular/state/
-?? .wai/projects/kaya/research/2026-11-17-ship-kaya-duv-feature-commit-developer-products.md
+?? .wai/projects/kaya/research/2026-11-17-ship-kaya-scq-feature-b76f007-eleven-declaration.md
 ?? .whisper/
 ```
 
@@ -48,7 +48,6 @@ phase: research
 ○ kaya-nx4 P1 Implement Hegel property tests
 ○ kaya-n50 P2 Cutover: replace hand-written overview and concept prose with generated products
 ○ kaya-rdr P2 Authorize crates.io publish for kaya
-○ kaya-scq P2 Status, release and architecture products plus structured export
 ○ kaya-8f4 P3 Publication pages use blocks outside the document vocabulary
 ○ kaya-aaz P3 Design thread: DocIR, doctests, documentation commit gate
 ○ kaya-cc9 P3 Document taxonomy: archive and deploy the change
@@ -56,7 +55,7 @@ phase: research
 ○ kaya-q6s P3 Understanding decision evidence has no Decision-to-Source link
 
 --------------------------------------------------------------------------------
-Total: 10 issues (10 open, 0 in progress)
+Total: 9 issues (9 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
