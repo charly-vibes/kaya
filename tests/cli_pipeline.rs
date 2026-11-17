@@ -339,13 +339,15 @@ fn build_writes_index_with_generated_block_and_artifact() {
         .as_array()
         .expect("recomputed is a list");
     assert!(
-        recomputed.iter().any(|name| name == "research-index"),
-        "a fresh index is recomputed: {recomputed:?}"
+        recomputed
+            .iter()
+            .any(|name| name == "orientation.research-map"),
+        "a fresh research map is recomputed: {recomputed:?}"
     );
 
     let index = fs::read_to_string(dir.path().join(INDEX)).expect("index exists");
     assert!(
-        index.contains("<!-- kaya:begin generated:research-index -->"),
+        index.contains("<!-- kaya:begin generated:orientation.research-map -->"),
         "index carries the generated block marker: {index}"
     );
     assert!(
@@ -358,7 +360,9 @@ fn build_writes_index_with_generated_block_and_artifact() {
         .as_array()
         .expect("unchanged is a list");
     assert!(
-        unchanged.iter().any(|name| name == "research-index"),
+        unchanged
+            .iter()
+            .any(|name| name == "orientation.research-map"),
         "a byte-identical rebuild is unchanged: {unchanged:?}"
     );
     assert_eq!(
@@ -775,8 +779,8 @@ fn build_expect_digest_pins_the_ledger() {
             .as_array()
             .expect("unchanged is a list")
             .iter()
-            .any(|name| name == "research-index"),
-        "the pinned rebuild leaves the index alone"
+            .any(|name| name == "orientation.research-map"),
+        "the pinned rebuild leaves the research map alone"
     );
 
     let bogus = "0".repeat(64);
@@ -871,7 +875,7 @@ fn build_accepts_committed_ledger_growth_with_complete_lines() {
             .as_array()
             .expect("recomputed is a list")
             .iter()
-            .any(|name| name == "research-index"),
+            .any(|name| name == "orientation.research-map"),
         "a complete committed-growth suffix is verified and built: {built}"
     );
 }

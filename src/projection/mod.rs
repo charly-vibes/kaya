@@ -13,7 +13,7 @@
 //! body and [`remove_generated`] deletes one, leaving the surrounding bytes
 //! untouched.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub mod index;
 pub mod report;
@@ -123,6 +123,28 @@ pub fn scan(doc: &str) -> Result<Vec<Block>, ProjectionError> {
             body: doc[span.body_start..span.body_end].to_owned(),
         })
         .collect())
+}
+
+/// Refuse any generated block whose name is outside the closed vocabulary or
+/// appears more than once in the document.
+///
+/// Every projection validates its document with this gate before rendering or
+/// writing: a legacy block name and a repeated generated name are both refused
+/// with the document left untouched.
+pub fn validate_generated_blocks(doc: &str) -> Result<(), ProjectionError> {
+    let mut seen = BTreeSet::new();
+    for block in scan(doc)? {
+        if let BlockKind::Generated(name) = block.kind {
+            report::classify_block(&name)?;
+            if !seen.insert(name.clone()) {
+                return Err(ProjectionError::new(
+                    LABEL_MANAGED_GRAMMAR,
+                    format!("duplicate generated block \"{name}\""),
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Replace the body of generated block `name` with `body`.

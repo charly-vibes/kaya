@@ -3,10 +3,12 @@
 <!-- kaya:authored -->
 Scope: this directory holds kaya's compiled research record for this
 repository. The index below is a projection of the ledger at
-`.kaya/ledger.jsonl`; it lists the Questions, Hypotheses, Experiments,
-Findings, Decisions, Artifacts, and Runs that admitted `kaya.event/v0`
-records describe. A dossier under `docs/research/experiments/` answers a
-research question from that same record.
+`.kaya/ledger.jsonl`: it lists the typed relationships between admitted
+`kaya.event/v0` entities, the admitted entities that have no relationship
+edges (except the Artifacts, Runs, and Sources carried by their own detail
+sections), and then those Artifact, Run, and Source detail sections. A
+dossier under `docs/research/experiments/` answers a research question from
+that same record.
 
 How to read provenance: every rendered line names a namespace-qualified node
 id (`<project>/<TYPE>/<key>`), and that id resolves through the ledger to the
@@ -21,9 +23,9 @@ a verdict.
 kaya owns only the bodies of `kaya:begin generated:<name>` /
 `kaya:end generated:<name>` blocks (generated) and `kaya:authored` /
 `kaya:end authored` blocks (human-owned). Every other byte — including other
-tools' managed blocks — is preserved verbatim. This file checks in no
-generated block: `kaya build` appends the `research-index` block on its first
-run and rewrites only that block afterwards.
+tools' managed blocks — is preserved verbatim. This file's generated block is
+`orientation.research-map`: `kaya build` appends it on its first run and
+rewrites only that block afterwards.
 <!-- kaya:end authored -->
 
 <!-- other-tool:begin -->
@@ -32,10 +34,11 @@ across every rebuild; it is here to prove the preservation in acceptance
 tests and in real use.
 <!-- other-tool:end -->
 
-<!-- kaya:begin generated:research-index -->
-- kaya/Experiment/add-core-research-record — Experiment — add-core-research-record
-- kaya/Hypothesis/H-001 — Hypothesis — development artifacts can compile into a trustworthy research dossier
-- kaya/Question/mvp-1-acceptance — Question — mvp-1-acceptance
+<!-- kaya:begin generated:orientation.research-map -->
+### Relationships
+- kaya/Hypothesis/H-001 -[predicts]-> kaya/Experiment/add-core-research-record
+- kaya/Model/M-001 -[realizes]-> kaya/Hypothesis/H-001
+- kaya/Question/mvp-1-acceptance -[investigates]-> kaya/Experiment/add-core-research-record
 
 ### Artifacts
 - kaya/Artifact/0cd2fd6 — 0cd2fd6af445980341e9687ca6ebb1b36882ba6c
@@ -114,5 +117,5 @@ tests and in real use.
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_76 nodes from 80 events._
-<!-- kaya:end generated:research-index -->
+_77 nodes from 80 events._
+<!-- kaya:end generated:orientation.research-map -->

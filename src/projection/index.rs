@@ -1,13 +1,15 @@
-//! The deterministic research index projection.
+//! The deterministic research map projection.
 //!
-//! [`build`] renders every Question, Hypothesis, Experiment, Finding and
-//! Decision node as one Markdown line, then appends Artifact, Run, and
-//! Source sections from their attributes, inside the `research-index`
-//! generated block. Only that block's bytes move: authored sections, foreign
-//! managed blocks, and uncategorized prose are preserved byte for byte. A
-//! rebuild whose rendered body already matches reports the block `unchanged`
-//! and leaves the file untouched.
+//! [`build`] renders every declared relationship as one typed edge, every
+//! admitted entity without an incident edge as one isolated row (except the
+//! Artifact, Run, and Source nodes carried by the attribute detail
+//! sections), then appends those Artifact, Run, and Source detail sections,
+//! inside the `orientation.research-map` generated block. Only that block's bytes move:
+//! authored sections, foreign managed blocks, and uncategorized prose are
+//! preserved byte for byte. A rebuild whose rendered body already matches
+//! reports the block `unchanged` and leaves the file untouched.
 
+use std::collections::BTreeSet;
 use std::io::ErrorKind;
 use std::path::Path;
 
@@ -15,46 +17,45 @@ use serde_json::Value;
 
 use crate::model::{EntityType, Graph, Node};
 
-use super::{BlockKind, ProjectionError, Summary, replace_generated, scan};
+use super::{
+    BlockKind, ProjectionError, Summary, replace_generated, scan, validate_generated_blocks,
+};
 
 /// Name of the generated block this projection owns.
-pub const INDEX_BLOCK: &str = "research-index";
+pub const RESEARCH_MAP_BLOCK: &str = "orientation.research-map";
 
-const INDEX_ENTITIES: [EntityType; 5] = [
-    EntityType::Question,
-    EntityType::Hypothesis,
-    EntityType::Experiment,
-    EntityType::Finding,
-    EntityType::Decision,
-];
-
-/// Build the research index at `path` from `graph`.
+/// Build the research map at `path` from `graph`.
 ///
-/// The file is created when missing. When the rendered `research-index`
-/// block already equals the file's block, nothing is written and the block
-/// is reported in [`Summary::unchanged`]; otherwise the block is replaced
-/// and reported in [`Summary::recomputed`]. [`Summary::sources`] maps the
-/// block name to every rendered node id. The trailing summary line reports
-/// `event_count` events, the number of ledger records the graph was built
-/// from.
+/// The existing document is validated against the closed generated-block
+/// vocabulary before any write (rendering is pure), so a legacy block is
+/// refused with the file untouched. The file is created when missing. When
+/// the rendered `orientation.research-map` block already equals the file's
+/// block, nothing is written and the block is reported in
+/// [`Summary::unchanged`]; otherwise the block is replaced and reported in
+/// [`Summary::recomputed`]. [`Summary::sources`] maps the block name to every
+/// rendered node id. The trailing summary line reports `event_count` events,
+/// the number of ledger records the graph was built from.
 pub fn build(graph: &Graph, path: &Path, event_count: usize) -> Result<Summary, ProjectionError> {
     let (rendered, sources) = render(graph, event_count);
     let mut summary = Summary::default();
-    summary.sources.insert(INDEX_BLOCK.to_owned(), sources);
+    summary
+        .sources
+        .insert(RESEARCH_MAP_BLOCK.to_owned(), sources);
 
     match read_existing(path)? {
         None => {
-            let document = replace_generated("", INDEX_BLOCK, &rendered)?;
+            let document = replace_generated("", RESEARCH_MAP_BLOCK, &rendered)?;
             write(path, &document)?;
-            summary.recomputed.push(INDEX_BLOCK.to_owned());
+            summary.recomputed.push(RESEARCH_MAP_BLOCK.to_owned());
         }
         Some(document) => {
+            validate_generated_blocks(&document)?;
             if generated_body(&document)?.as_deref() == Some(rendered.as_str()) {
-                summary.unchanged.push(INDEX_BLOCK.to_owned());
+                summary.unchanged.push(RESEARCH_MAP_BLOCK.to_owned());
             } else {
-                let updated = replace_generated(&document, INDEX_BLOCK, &rendered)?;
+                let updated = replace_generated(&document, RESEARCH_MAP_BLOCK, &rendered)?;
                 write(path, &updated)?;
-                summary.recomputed.push(INDEX_BLOCK.to_owned());
+                summary.recomputed.push(RESEARCH_MAP_BLOCK.to_owned());
             }
         }
     }
@@ -62,25 +63,24 @@ pub fn build(graph: &Graph, path: &Path, event_count: usize) -> Result<Summary, 
     Ok(summary)
 }
 
-/// Render the generated body and collect the node ids backing its lines.
+/// Render the generated body and collect the node ids backing its rows.
 fn render(graph: &Graph, event_count: usize) -> (String, Vec<String>) {
     let mut body = String::new();
-    let mut sources = Vec::new();
-    let mut rendered_nodes = 0usize;
+    let mut sources = BTreeSet::new();
 
-    for node in graph.nodes() {
-        if !INDEX_ENTITIES.contains(&node.entity) {
-            continue;
+    let relationships = relationship_section(graph, &mut sources);
+    if !relationships.is_empty() {
+        body.push_str("### Relationships\n");
+        body.push_str(&relationships);
+    }
+
+    let isolated = isolated_section(graph, &mut sources);
+    if !isolated.is_empty() {
+        if !body.is_empty() {
+            body.push('\n');
         }
-        body.push_str("- ");
-        body.push_str(&node.id);
-        body.push_str(" — ");
-        body.push_str(node.entity.as_str());
-        body.push_str(" — ");
-        body.push_str(&title_or_key(node));
-        body.push('\n');
-        sources.push(node.id.clone());
-        rendered_nodes += 1;
+        body.push_str("### Isolated\n");
+        body.push_str(&isolated);
     }
 
     let artifacts = artifact_section(graph);
@@ -88,13 +88,6 @@ fn render(graph: &Graph, event_count: usize) -> (String, Vec<String>) {
         body.push('\n');
         body.push_str("### Artifacts\n");
         body.push_str(&artifacts);
-        for node in graph
-            .nodes()
-            .filter(|node| node.entity == EntityType::Artifact)
-        {
-            sources.push(node.id.clone());
-            rendered_nodes += 1;
-        }
     }
 
     let runs = run_section(graph);
@@ -102,10 +95,6 @@ fn render(graph: &Graph, event_count: usize) -> (String, Vec<String>) {
         body.push('\n');
         body.push_str("### Runs\n");
         body.push_str(&runs);
-        for node in graph.nodes().filter(|node| node.entity == EntityType::Run) {
-            sources.push(node.id.clone());
-            rendered_nodes += 1;
-        }
     }
 
     let cited = source_section(graph);
@@ -113,23 +102,88 @@ fn render(graph: &Graph, event_count: usize) -> (String, Vec<String>) {
         body.push('\n');
         body.push_str("### Sources\n");
         body.push_str(&cited);
-        for node in graph
-            .nodes()
-            .filter(|node| node.entity == EntityType::Source)
-        {
-            sources.push(node.id.clone());
-            rendered_nodes += 1;
-        }
+    }
+
+    for node in graph.nodes().filter(|node| {
+        matches!(
+            node.entity,
+            EntityType::Artifact | EntityType::Run | EntityType::Source
+        )
+    }) {
+        sources.insert(node.id.clone());
     }
 
     body.push('\n');
     body.push_str(&format!(
-        "_{rendered_nodes} nodes from {event_count} events._\n"
+        "_{} nodes from {event_count} events._\n",
+        sources.len()
     ));
 
-    sources.sort();
-    sources.dedup();
-    (body, sources)
+    (body, sources.into_iter().collect())
+}
+
+/// Render every declared edge exactly once, sorted by `(from, relationship, to)`.
+fn relationship_section(graph: &Graph, sources: &mut BTreeSet<String>) -> String {
+    let mut edges: Vec<(&str, &str, &str)> = graph
+        .edges()
+        .map(|edge| {
+            (
+                edge.from.as_str(),
+                edge.relationship.as_str(),
+                edge.to.as_str(),
+            )
+        })
+        .collect();
+    edges.sort_unstable();
+    edges.dedup();
+
+    let mut section = String::new();
+    for (from, relationship, to) in edges {
+        section.push_str("- ");
+        section.push_str(from);
+        section.push_str(" -[");
+        section.push_str(relationship);
+        section.push_str("]-> ");
+        section.push_str(to);
+        section.push('\n');
+        sources.insert(from.to_owned());
+        sources.insert(to.to_owned());
+    }
+    section
+}
+
+/// Render admitted entities with no incident edge, sorted by id.
+///
+/// Artifact, Run, and Source nodes are skipped: the attribute detail sections
+/// below already carry those ids, so rendering them here would list them
+/// twice.
+fn isolated_section(graph: &Graph, sources: &mut BTreeSet<String>) -> String {
+    let mut incident: BTreeSet<&str> = BTreeSet::new();
+    for edge in graph.edges() {
+        incident.insert(edge.from.as_str());
+        incident.insert(edge.to.as_str());
+    }
+
+    let mut section = String::new();
+    for node in graph.nodes() {
+        if incident.contains(node.id.as_str())
+            || matches!(
+                node.entity,
+                EntityType::Artifact | EntityType::Run | EntityType::Source
+            )
+        {
+            continue;
+        }
+        section.push_str("- ");
+        section.push_str(&node.id);
+        section.push_str(" — ");
+        section.push_str(node.entity.as_str());
+        section.push_str(" — ");
+        section.push_str(&title_or_key(node));
+        section.push('\n');
+        sources.insert(node.id.clone());
+    }
+    section
 }
 
 fn artifact_section(graph: &Graph) -> String {
@@ -224,7 +278,7 @@ fn key(node: &Node) -> String {
 fn generated_body(document: &str) -> Result<Option<String>, ProjectionError> {
     let blocks = scan(document)?;
     Ok(blocks.into_iter().find_map(|block| match block.kind {
-        BlockKind::Generated(name) if name.as_str() == INDEX_BLOCK => Some(block.body),
+        BlockKind::Generated(name) if name.as_str() == RESEARCH_MAP_BLOCK => Some(block.body),
         _ => None,
     }))
 }

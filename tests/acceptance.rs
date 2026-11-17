@@ -39,8 +39,9 @@ const AUTHORED_BEGIN: &str = "<!-- kaya:authored -->";
 const AUTHORED_END: &str = "<!-- kaya:end authored -->";
 const FOREIGN_BEGIN: &str = "<!-- other-tool:begin -->";
 const FOREIGN_END: &str = "<!-- other-tool:end -->";
-const INDEX_BLOCK_BEGIN: &str = "<!-- kaya:begin generated:research-index -->";
-const INDEX_BLOCK_END: &str = "<!-- kaya:end generated:research-index -->";
+const INDEX_BLOCK_NAME: &str = "orientation.research-map";
+const INDEX_BLOCK_BEGIN: &str = "<!-- kaya:begin generated:orientation.research-map -->";
+const INDEX_BLOCK_END: &str = "<!-- kaya:end generated:orientation.research-map -->";
 const SPECIFICATION_BLOCK_BEGIN: &str =
     "<!-- kaya:begin generated:exploration.experiment-specification -->";
 const SPECIFICATION_BLOCK_END: &str =
@@ -118,6 +119,26 @@ fn names(envelope: &Value, field: &str) -> Vec<String> {
 
 fn lists(names: &[String], expected: &str) -> bool {
     names.iter().any(|name| name == expected)
+}
+
+/// Relationships the committed model seed declares, as the map renders them.
+///
+/// Line shape: `- <from> -[<relationship>]-> <to>`, sorted by
+/// `(from, relationship, to)`.
+const COMMITTED_EDGES: [&str; 3] = [
+    "- kaya/Hypothesis/H-001 -[predicts]-> kaya/Experiment/add-core-research-record",
+    "- kaya/Model/M-001 -[realizes]-> kaya/Hypothesis/H-001",
+    "- kaya/Question/mvp-1-acceptance -[investigates]-> kaya/Experiment/add-core-research-record",
+];
+
+/// Whether `document` carries the map's trailing `_N nodes from M events._` line.
+///
+/// The event count depends on what the adapters capture in the temp workspace,
+/// so acceptance asserts the shape, not the numbers.
+fn has_node_count_line(document: &str) -> bool {
+    document.lines().any(|line| {
+        line.starts_with('_') && line.contains(" nodes from ") && line.ends_with(" events._")
+    })
 }
 
 /// The exact bytes from `begin` through `end` in `document`.
@@ -306,8 +327,8 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     assert_eq!(build["envelope_kind"], json!("build"));
     let recomputed = names(&build, "recomputed");
     assert!(
-        lists(&recomputed, "research-index"),
-        "first build compiles the index: {build}"
+        lists(&recomputed, INDEX_BLOCK_NAME),
+        "first build compiles the research map: {build}"
     );
     assert!(
         lists(&recomputed, SPECIFICATION_NAME),
@@ -338,16 +359,32 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     assert!(index_after.contains(INDEX_BLOCK_END), "{index_after}");
     let generated_index = between(&index_after, INDEX_BLOCK_BEGIN, INDEX_BLOCK_END);
     assert!(
-        generated_index.contains(EXPERIMENT),
-        "the generated index lists the experiment"
+        generated_index.contains("### Relationships\n"),
+        "the generated map renders the relationship section: {generated_index}"
     );
+    for edge in COMMITTED_EDGES {
+        assert_eq!(
+            generated_index.matches(edge).count(),
+            1,
+            "every declared edge renders once with both endpoints and its type ({edge}): {generated_index}"
+        );
+    }
+    for endpoint in [EXPERIMENT, QUESTION, HYPOTHESIS] {
+        assert!(
+            generated_index.contains(endpoint),
+            "the generated map names endpoint {endpoint}: {generated_index}"
+        );
+    }
     assert!(
-        generated_index.contains(QUESTION),
-        "the generated index lists the question"
+        generated_index.contains("### Artifacts\n"),
+        "the generated map keeps the Artifacts section: {generated_index}"
     );
-    assert!(
-        generated_index.contains(HYPOTHESIS),
-        "the generated index lists the hypothesis"
+    assert_eq!(
+        generated_index
+            .matches("kaya/Source/docs-src-index.md@43b606f")
+            .count(),
+        1,
+        "an edgeless source renders once, in the Sources detail section: {generated_index}"
     );
     assert!(
         generated_index.contains("### Sources\n"),
@@ -360,6 +397,10 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
             "the generated index pins source {pinned}: {generated_index}"
         );
     }
+    assert!(
+        has_node_count_line(generated_index),
+        "the generated map ends with its `_N nodes from M events._` summary: {generated_index}"
+    );
     assert!(
         index_after.contains(foreign_block),
         "the foreign managed block survives the rebuild byte for byte"
@@ -471,8 +512,8 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
     );
     let unchanged = names(&rebuild, "unchanged");
     assert!(
-        lists(&unchanged, "research-index"),
-        "second build reports the index unchanged: {rebuild}"
+        lists(&unchanged, INDEX_BLOCK_NAME),
+        "second build reports the research map unchanged: {rebuild}"
     );
     assert!(
         lists(&unchanged, SPECIFICATION_NAME),
@@ -538,8 +579,8 @@ fn committed_ledger_builds_without_the_uncommitted_flag() {
     assert_eq!(build["envelope_kind"], json!("build"));
     let recomputed = names(&build, "recomputed");
     assert!(
-        lists(&recomputed, "research-index"),
-        "committed build compiles the index: {build}"
+        lists(&recomputed, INDEX_BLOCK_NAME),
+        "committed build compiles the research map: {build}"
     );
     assert!(
         lists(&recomputed, SPECIFICATION_NAME),
@@ -558,7 +599,27 @@ fn committed_ledger_builds_without_the_uncommitted_flag() {
     );
 
     let index = fs::read_to_string(root.join(INDEX)).expect("build wrote the index");
+    assert!(index.contains(INDEX_BLOCK_BEGIN), "{index}");
+    assert!(index.contains(INDEX_BLOCK_END), "{index}");
     let generated_index = between(&index, INDEX_BLOCK_BEGIN, INDEX_BLOCK_END);
+    assert!(
+        generated_index.contains("### Relationships\n"),
+        "the committed ledger's edges render: {generated_index}"
+    );
+    for edge in COMMITTED_EDGES {
+        assert_eq!(
+            generated_index.matches(edge).count(),
+            1,
+            "every declared edge renders once with both endpoints and its type ({edge}): {generated_index}"
+        );
+    }
+    assert_eq!(
+        generated_index
+            .matches("kaya/Source/docs-src-index.md@43b606f")
+            .count(),
+        1,
+        "an edgeless source renders once, in the Sources detail section: {generated_index}"
+    );
     for path in SOURCE_PATHS {
         let pinned = format!("{path}@{SOURCE_COMMIT}");
         assert!(
@@ -566,4 +627,8 @@ fn committed_ledger_builds_without_the_uncommitted_flag() {
             "the generated index pins source {pinned}: {generated_index}"
         );
     }
+    assert!(
+        has_node_count_line(generated_index),
+        "the generated map ends with its `_N nodes from M events._` summary: {generated_index}"
+    );
 }

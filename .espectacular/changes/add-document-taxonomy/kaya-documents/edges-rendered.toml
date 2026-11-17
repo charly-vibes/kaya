@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "edges-rendered"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "every_declared_edge_renders_once_with_both_endpoints_and_type"}]

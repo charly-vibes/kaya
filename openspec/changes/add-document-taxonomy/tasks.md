@@ -32,7 +32,7 @@ code changes here. bd ticket mapping noted per phase.
 - [ ] 3.2 Understanding slice: `findings-and-analysis` and `decision-record`.
       (kaya-249)
 - [ ] 3.3 Orientation slice: `project-overview`. (kaya-1b9)
-- [ ] 3.4 Research map: render typed edges with both endpoints; list isolated
+- [x] 3.4 Research map: render typed edges with both endpoints; list isolated
       entities. (kaya-i03)
 - [ ] 3.5 Reuse slice with existing adapters: `reproduction-package` and
       `handoff` from git and wai references. (kaya-3f6)

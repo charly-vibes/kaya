@@ -18,8 +18,8 @@ use std::path::Path;
 
 use crate::model::{EntityType, Graph, Relationship};
 use crate::projection::{
-    BlockKind, LABEL_MANAGED_GRAMMAR, ProjectionError, StaleBlock, Summary, remove_generated,
-    replace_generated, scan,
+    BlockKind, ProjectionError, StaleBlock, Summary, remove_generated, replace_generated, scan,
+    validate_generated_blocks,
 };
 use crate::promotion::PromotionState;
 
@@ -280,7 +280,7 @@ pub fn build(
 
     let mut document = read_existing(path)?.unwrap_or_default();
     if !document.is_empty() {
-        validate_blocks(&document)?;
+        validate_generated_blocks(&document)?;
     }
 
     let anchors: BTreeSet<String> = [experiment_id.to_string()].into_iter().collect();
@@ -343,24 +343,6 @@ pub fn build(
     }
 
     Ok(Built { summary, omitted })
-}
-
-/// Refuse any generated block whose name is outside the closed vocabulary or
-/// appears more than once in the document.
-fn validate_blocks(document: &str) -> Result<(), ProjectionError> {
-    let mut seen = BTreeSet::new();
-    for block in scan(document)? {
-        if let BlockKind::Generated(name) = block.kind {
-            classify_block(&name)?;
-            if !seen.insert(name.clone()) {
-                return Err(ProjectionError::new(
-                    LABEL_MANAGED_GRAMMAR,
-                    format!("duplicate generated block \"{name}\""),
-                ));
-            }
-        }
-    }
-    Ok(())
 }
 
 fn generated_body(document: &str, name: &str) -> Result<Option<String>, ProjectionError> {

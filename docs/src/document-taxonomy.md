@@ -57,14 +57,15 @@ The distinction that matters most: **what we intended to do is not the same as
 what we actually did.** `experiment-specification` and `experiment-record` are
 separate projections; neither is derived from the other.
 
-Status today: `research-map` and the report projections are partial — the index
-lists nodes without edges, and the report has a Runs section with no run
-events to render. Every other kind is absent. The report implements the
-specification/record split as two generated blocks: it compiles
-`exploration.experiment-specification` from declared intent and
+Status today: `orientation.research-map` renders every declared relationship as
+a typed edge naming both endpoints and lists admitted nodes that carry no
+edge, inside the `orientation.research-map` block of `docs/research/index.md`.
+The report implements the specification/record split as two generated blocks:
+it compiles `exploration.experiment-specification` from declared intent and
 `exploration.experiment-record` from runs, observations, findings, and
-interpretations, omitting any kind with no records. `exploration-brief` and
-`understanding.findings-and-analysis` are not generated yet.
+interpretations, omitting any kind with no records. Every other kind is absent:
+`exploration-brief` and `understanding.findings-and-analysis` are not
+generated yet.
 
 ## Publication layer: twelve products
 
