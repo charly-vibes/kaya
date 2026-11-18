@@ -46,6 +46,10 @@ docs: specs-docs
 record-verify:
 	cargo run --quiet -- check
 
+# Fail when the record's capture frontier is more than `bound` commits behind
+record-lag mode="fail" bound="25":
+	python3 scripts/record-lag.py --mode {{mode}} --bound {{bound}}
+
 # Validate spec ↔ test correspondence (espectacular, bin: ah)
 validate:
 	ah check

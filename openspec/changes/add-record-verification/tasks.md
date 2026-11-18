@@ -67,7 +67,7 @@ behavior. They may land after the command does.
 - [ ] 4.2 CI runs the identical `just record-check`; any job reading history
       uses `fetch-depth: 0`; `.gitattributes` pins LF for docs and a
       `.whisper/` ignore is added. (kaya-tm8)
-- [ ] 4.3 Lag gate reading `kaya check` facts: warn on PRs, fail on
+- [x] 4.3 Lag gate reading `kaya check` facts: warn on PRs, fail on
       `main`/release above the configured bound. (kaya-8dg)
 - [ ] 4.4 Scheduled capture on `main` (`import wai`, `import git`, `build`,
       `publish`) that commits the snapshot deliberately. (kaya-9go)
