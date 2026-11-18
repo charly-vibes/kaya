@@ -20,7 +20,7 @@ reads only inside the `publish` job. Without it the crates.io channel reports
 `disabled` and the release still succeeds.
 
 1. Create an API token at <https://crates.io/settings/tokens> with the
-   `publish-new` and `publish-update` scopes, limited to the `kaya` crate.
+   `publish-new` and `publish-update` scopes, limited to the `kaya-vibes` crate.
 2. Store it as a repository secret:
 
    ```sh
@@ -63,7 +63,7 @@ release summary reports `| crates | updated |` instead of `disabled`.
 5. Confirm the result:
 
    ```sh
-   cargo search kaya
+   cargo search kaya-vibes
    ```
 
    The release notes also link the crates.io version once the channel reports

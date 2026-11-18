@@ -67,5 +67,5 @@ written.
 
 ## Notes
 
-- Install: `cargo install --git https://github.com/charly-vibes/kaya kaya`.
+- Install: `cargo install --git https://github.com/charly-vibes/kaya kaya-vibes`.
   crates.io publication is deferred.

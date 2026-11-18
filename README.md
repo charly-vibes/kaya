@@ -70,11 +70,13 @@ The CLI is installed from this repository with a stable Rust toolchain
 (1.88 or newer):
 
 ```sh
-cargo install --git https://github.com/charly-vibes/kaya kaya
+cargo install --git https://github.com/charly-vibes/kaya kaya-vibes
 ```
 
 Publishing to crates.io is wired but runs only after maintainer authorization;
 see [RELEASING.md](RELEASING.md) for the token, tag and verification steps.
+The crates.io package is `kaya-vibes` (the bare name `kaya` belongs to an
+unrelated crate); the installed command is still `kaya`.
 
 ## FAQ
 
