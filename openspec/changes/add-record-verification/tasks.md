@@ -61,10 +61,10 @@ contract-test shape. One tdd-ro5u run per ticket.
 These consume `kaya check`; they are repository policy, not capability
 behavior. They may land after the command does.
 
-- [ ] 4.1 `just record-check` (check + lag + links) and lefthook wiring:
+- [x] 4.1 `just record-check` (check + lag + links) and lefthook wiring:
       `kaya check --index --fail-on-stale-authored` in pre-commit,
       `just record-verify` in pre-push. (kaya-3kg)
-- [ ] 4.2 CI runs the identical `just record-check`; any job reading history
+- [x] 4.2 CI runs the identical `just record-check`; any job reading history
       uses `fetch-depth: 0`; `.gitattributes` pins LF for docs and a
       `.whisper/` ignore is added. (kaya-tm8)
 - [x] 4.3 Lag gate reading `kaya check` facts: warn on PRs, fail on

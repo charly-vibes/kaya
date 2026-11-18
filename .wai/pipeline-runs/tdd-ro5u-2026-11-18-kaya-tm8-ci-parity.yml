@@ -1,0 +1,11 @@
+run_id: tdd-ro5u-2026-11-18-kaya-tm8-ci-parity
+pipeline: tdd-ro5u
+topic: kaya-tm8 CI parity
+created_at: '2026-11-18T19:48:06.784202401+00:00'
+current_step: 8
+approvals: {}
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

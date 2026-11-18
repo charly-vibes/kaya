@@ -49,6 +49,10 @@ links:
 release-claims:
 	python3 scripts/check-release-claims.py
 
+# Full record gate: verify, claims, links, lag (mode warn|fail)
+record-check mode="warn": record-verify release-claims links
+	python3 scripts/record-lag.py --mode {{mode}} --bound 25
+
 # === Spec gates ===
 
 # Verify the committed record against its projections without writing

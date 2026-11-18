@@ -34,6 +34,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
@@ -74,6 +76,14 @@ jobs:
       # Installed tools must run, not just install.
       - name: Smoke pinned tools
         run: bd --version && ah --version && spk --version && openspec validate add-core-research-record --strict
+
+      # Run the record gates: warn on pull requests, fail on main.
+      # This is the same `just record-check` developers run locally.
+      - name: Run record gates
+        run: |
+          mode=warn
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then mode=fail; fi
+          just record-check "$mode"
 
       # Run the exact same command as local development
       - name: Run CI pipeline
