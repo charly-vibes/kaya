@@ -13,7 +13,7 @@ Four tickets shipped in four tdd-ro5u runs, 8 commits ahead of origin, nothing p
 - kaya-lh1 (closed, cf2773b): technical-reference and knowledge-brief compile at the projection layer from Source `spec`/`entry` attributes; contract-verified, no ledger writes. Decoupled from the deferred adapters with explicit approval.
 - kaya-cc9 (closed, 55a9e2e): add-document-taxonomy archived; both layers deployed to openspec/specs with contracts in .espectacular (35/35 covered); book Design specs renders them via scripts/sync-specs.py; slug collision and long requirements resolved; strict spec validation green.
 - kaya-n50 (closed, 950e98e): overview cutover — docs/public/overview.md carries authored interpretation, README and the book point at it, zero duplicate sentences across the five docs.
-- kaya-rdr (open, eb4f2c9): crate scoped 482 -> 44 files, RELEASING.md runbook, workflow header updated. Publishing itself awaits the maintainer token and an authorized tag.
+- kaya-rdr (closed, eb4f2c9 + 6dcd9d2 + bb3cd72): crate scoped 482 -> 44 files, RELEASING.md runbook, workflow header updated. The crates.io name `kaya` is owned by an unrelated user (smasher164), so the package was renamed `kaya-vibes` (binary/lib stay `kaya`) with user approval. CARGO_REGISTRY_TOKEN was stored as a repo secret and tag v0.1.0 pushed: Release run 44314581694 succeeded, kaya-vibes 0.1.0 is on crates.io, and the GitHub Release carries all five binaries, checksums and provenance. The first run failed only on an invalid crates.io category slug (fixed in bb3cd72).
 
 ## Key Decisions
 
