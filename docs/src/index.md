@@ -7,6 +7,10 @@
 > Documentation that grows out of the work, rather than work that stops to
 > produce documentation.
 
+The reader-facing overview — what kaya is, why it matters, when to use it — is
+the compiled [overview page](../public/overview.md); this page is the long-form
+motivation and design rationale behind it.
+
 ## Why
 
 Software is a medium for thinking, but the thinking is usually lost: decisions

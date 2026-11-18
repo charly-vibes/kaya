@@ -10,54 +10,14 @@
 
 > A living record of exploration — kaya turns the artifacts a project already
 > produces into continuously generated, human-owned documentation.
-> **Why:** documentation drifts because it is written separately from the work
-> that makes it true. Kaya captures events, decisions, evidence and artifacts
-> from the tools used during development (wai, dont, whisper, specodelic, git,
-> test runners) and compiles them into documentation projections — so the
-> record grows out of the work instead of stopping it.
-> **Status:** [experimental](docs/src/status.md) · MVP-1 CLI implemented · [Motivation & design](docs/src/index.md)
+> **Status:** [experimental](docs/src/status.md) · MVP-1 CLI implemented
 
 Part of the [charly-vibes](https://github.com/charly-vibes) toolshed.
 
-## When to use
-
-- Use kaya when a repo's documentation must stay grounded in what actually
-  happened: decisions taken, experiments run, evidence collected.
-- Use kaya when onboarding (human or agent) should reconstruct *why* software
-  is the way it is, not just *what* it is.
-
-**Don't use it when** you need workflow management (`wai`), claim grounding
-(`dont`), a knowledge workspace (`whisper`/turu), or formal spec verification
-(`specodelic`) — kaya is a consumer and integrator of those tools' outputs,
-not a replacement for any of them. It assumes the tools it reads already own
-their own authoritative records.
-
-## The idea
-
-Kaya compiles what your tools already record into documentation: adapters
-translate tool outputs into a small event format (`kaya.event/v0`), an
-append-only ledger preserves them, a research model connects them, and
-deterministic projections render them — with generated and human-authored
-sections kept strictly apart:
-
-```markdown
-<!-- kaya:begin generated:run-summary -->
-18 tests passed, 2 failed. See RUN-003.
-<!-- kaya:end generated:run-summary -->
-
-<!-- kaya:authored -->
-The failures show structural checks cannot detect this
-category of semantic conflict.
-<!-- kaya:end authored -->
-```
-
-One design principle rules everything: **events are not conclusions**. Tools
-record that two tests failed; only a human (or an approved proposal) may
-conclude that a hypothesis was falsified. Generated sections never overwrite
-authored interpretation.
-
-The full motivation, architecture, design decisions and milestones live in
-[Motivation & design](docs/src/index.md).
+The overview — what kaya is, why it exists, and when to use it — is a
+[compiled page](docs/public/overview.md) emitted from this repository's own
+record and kept current by `kaya`. Motivation, architecture and design
+decisions live in the [book](docs/src/index.md).
 
 ## Status
 
@@ -89,15 +49,16 @@ kaya challenge <conclusion> --events <id>... --actor <name>
 - Promotion is human-approved and pull-based: `promote` and `challenge`
   require `--actor`, and pending counts surface in `status`/`build` output
   instead of as prompts. Events are not conclusions.
-- Every executed command prints exactly one JSON envelope to stdout, success
-  or failure; `--help` and `--version` print clap's own text.
+- Every executed command prints exactly one JSON envelope to stdout; the
+  envelope contract is described in [Status](docs/src/status.md).
 
 The behavioral specification remains the openspec change
 [`add-core-research-record`](openspec/changes/add-core-research-record/proposal.md)
-(event, ledger, model, projection, promotion, adapters), plus
-[`add-document-taxonomy`](openspec/changes/add-document-taxonomy/proposal.md)
-(the record-facing document kinds and the client-facing publications composed
-from them — see [Documentation taxonomy](docs/src/document-taxonomy.md)).
+(event, ledger, model, projection, promotion, adapters). The document taxonomy
+is archived and deployed as
+[`kaya-documents`](openspec/specs/kaya-documents/spec.md) and
+[`kaya-publications`](openspec/specs/kaya-publications/spec.md) — see
+[Documentation taxonomy](docs/src/document-taxonomy.md).
 Remaining milestones are tracked in the
 [change tasks](openspec/changes/add-core-research-record/tasks.md) and in
 beads (`bd ready` in a clone). This repository already dogfoods the compiler:

@@ -14,8 +14,11 @@ in-repo distillation
 (`.wai/projects/kaya/research/2026-11-16-origin-conversation-event-driven-research-docum.md`)
 kept six architectural decisions and pointed at this book, which named four
 projection outputs and specified none. This page recovers the taxonomy from
-the transcript; the behavioral contract lives in
-[`add-document-taxonomy`](../../openspec/changes/add-document-taxonomy/proposal.md).
+the transcript; the behavioral contract is deployed as
+[`kaya-documents`](../../openspec/specs/kaya-documents/spec.md) and
+[`kaya-publications`](../../openspec/specs/kaya-publications/spec.md), rendered
+in this book's Design specs section, and the reader-facing summary is the
+compiled [overview](../public/overview.md).
 
 | Revision in the conversation | What it added |
 |---|---|
