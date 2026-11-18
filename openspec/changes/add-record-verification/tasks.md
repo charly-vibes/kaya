@@ -11,10 +11,10 @@ contract-test shape. One tdd-ro5u run per ticket.
       `no-tests-declared` instead of `no-toml`. One TOML per scenario;
       slices are kaya-585 (worktree), kaya-a4e (index), kaya-8ot (facts),
       kaya-ntv (assertions and stale).
-- [ ] 1.1 Drift fixtures: corrupted managed block → `changed`; emitted
+- [x] 1.1 Drift fixtures: corrupted managed block → `changed`; emitted
       document absent → `missing`; managed document the projection would not
       emit → `extra`; clean record → empty drift, exit 0. (kaya-585)
-- [ ] 1.2 No-side-effects fixture: hash the tree and the ledger before and
+- [x] 1.2 No-side-effects fixture: hash the tree and the ledger before and
       after a check over a drifted record; assert identical and assert the
       drift was still reported. (kaya-585)
 - [ ] 1.3 Index fixtures: document drifted in the index only → fails; drifted
@@ -31,16 +31,16 @@ contract-test shape. One tdd-ro5u run per ticket.
 - [ ] 1.6 Staleness fixtures: supersede under a cited authored block with and
       without `--fail-on-stale-authored`; bytes unchanged in both cases;
       `build` still exits 0. (kaya-ntv)
-- [ ] 1.7 Exit fixtures: clean 0, violations 1, bad flag/missing path 2;
+- [x] 1.7 Exit fixtures: clean 0, violations 1, bad flag/missing path 2;
       exactly one envelope on stdout in every case. (kaya-585)
 
 ## 2. Green — make the tests pass
 
-- [ ] 2.1 Extract the expected-bytes stage from `build`/`publish` so `check`
+- [x] 2.1 Extract the expected-bytes stage from `build`/`publish` so `check`
       renders the same bytes without writing; no second renderer. (kaya-585)
 - [ ] 2.2 Add the index reader (`git show :<path>`) for the ledger and every
       projection document; treat an unstaged absent path as absent. (kaya-a4e)
-- [ ] 2.3 Add `kaya check` with `--root`, `--out`, `--publish-out`,
+- [x] 2.3 Add `kaya check` with `--root`, `--out`, `--publish-out`,
       `--expect-digest`; emit the `check` envelope with structured findings and
       the exit contract. `--index` lands in kaya-a4e. (kaya-585)
 - [ ] 2.4 Add the facts block (kaya-8ot) and the opt-in assertions

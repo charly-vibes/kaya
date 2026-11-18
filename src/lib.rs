@@ -13,3 +13,4 @@ pub mod model;
 pub mod projection;
 pub mod promotion;
 pub mod publication;
+pub mod verification;

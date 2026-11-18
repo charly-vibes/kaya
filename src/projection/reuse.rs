@@ -20,7 +20,7 @@
 //! the ledger yields no renderable row for it, never because a document is
 //! absent.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -87,6 +87,24 @@ pub struct Built {
     pub omitted: Vec<Omitted>,
 }
 
+/// One reuse document's planned bytes, before the write phase.
+///
+/// `document` is `None` when the projection leaves no file at `path`: a kind
+/// with no rows never creates one, and a removal that leaves only whitespace
+/// deletes the existing document. That makes the plan the whole answer for
+/// `kaya check`, which compares these bytes without writing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannedDocument {
+    /// Document path under the output directory.
+    pub path: PathBuf,
+    /// The document the projection leaves behind, or `None` for absence.
+    pub document: Option<String>,
+    /// Recomputed, unchanged, and source-map bookkeeping for this document.
+    pub summary: Summary,
+    /// Family-kinds with no source records, in block order.
+    pub omitted: Vec<Omitted>,
+}
+
 /// The four reuse documents under `out`, in canonical kind order, paired with
 /// their generated block names.
 pub fn documents(out: &Path) -> [(&'static str, PathBuf); 4] {
@@ -111,57 +129,95 @@ pub fn documents(out: &Path) -> [(&'static str, PathBuf); 4] {
 /// document. A removal that leaves only whitespace deletes the document
 /// instead of writing an empty one.
 pub fn build(inputs: &Inputs, out: &Path) -> Result<Built, ProjectionError> {
-    let [
-        (_, technical_path),
-        (_, reproduction_path),
-        (_, knowledge_path),
-        (_, handoff_path),
-    ] = documents(out);
-
-    // Every existing target is read and validated before any document is
-    // written, so a legacy block leaves all four documents byte-identical.
-    let mut technical_document = read_validated(&technical_path)?;
-    let mut reproduction_document = read_validated(&reproduction_path)?;
-    let mut knowledge_document = read_validated(&knowledge_path)?;
-    let mut handoff_document = read_validated(&handoff_path)?;
+    let mut existing: BTreeMap<PathBuf, Option<String>> = BTreeMap::new();
+    for (_, path) in documents(out) {
+        let document = read_validated(&path)?;
+        existing.insert(path, document);
+    }
 
     let mut summary = Summary::default();
     let mut omitted = Vec::new();
-
-    apply(
-        Kind::TechnicalReference,
-        &technical_path,
-        &mut technical_document,
-        render_technical_reference(inputs),
-        &mut summary,
-        &mut omitted,
-    )?;
-    apply(
-        Kind::ReproductionPackage,
-        &reproduction_path,
-        &mut reproduction_document,
-        render_reproduction(inputs),
-        &mut summary,
-        &mut omitted,
-    )?;
-    apply(
-        Kind::KnowledgeBrief,
-        &knowledge_path,
-        &mut knowledge_document,
-        render_knowledge_brief(inputs),
-        &mut summary,
-        &mut omitted,
-    )?;
-    apply(
-        Kind::Handoff,
-        &handoff_path,
-        &mut handoff_document,
-        render_handoff(inputs),
-        &mut summary,
-        &mut omitted,
-    )?;
+    for planned in plan(inputs, out, &existing)? {
+        let previous = existing.get(&planned.path).cloned().flatten();
+        match &planned.document {
+            None => {
+                if previous.is_some() {
+                    fs::remove_file(&planned.path)
+                        .map_err(|error| io_error("remove", &planned.path, error))?;
+                }
+            }
+            Some(document) => {
+                if previous.as_deref() != Some(document.as_str()) {
+                    write(&planned.path, document)?;
+                }
+            }
+        }
+        merge(&mut summary, planned.summary);
+        omitted.extend(planned.omitted);
+    }
 
     Ok(Built { summary, omitted })
+}
+
+/// The bytes each reuse document would hold, without touching the disk.
+///
+/// Every existing target in `existing` is validated against the closed block
+/// vocabulary before any document is planned, so a legacy or duplicate
+/// generated block refuses the whole family. A kind with rows replaces or
+/// appends its block only when the planned bytes differ from the existing
+/// document; a kind with no rows plans no file and removes a stale block,
+/// leaving `None` when the document is emptied. Planning is the whole
+/// projection, so `kaya check` compares these bytes without a second renderer.
+pub fn plan(
+    inputs: &Inputs,
+    out: &Path,
+    existing: &BTreeMap<PathBuf, Option<String>>,
+) -> Result<Vec<PlannedDocument>, ProjectionError> {
+    let targets = documents(out);
+    for (_, path) in &targets {
+        if let Some(Some(document)) = existing.get(path) {
+            validate_generated_blocks(document)?;
+        }
+    }
+
+    let [
+        (_, technical),
+        (_, reproduction),
+        (_, knowledge),
+        (_, handoff),
+    ] = targets;
+    let mut planned = Vec::with_capacity(4);
+    for (kind, path, rendered) in [
+        (
+            Kind::TechnicalReference,
+            technical,
+            render_technical_reference(inputs),
+        ),
+        (
+            Kind::ReproductionPackage,
+            reproduction,
+            render_reproduction(inputs),
+        ),
+        (
+            Kind::KnowledgeBrief,
+            knowledge,
+            render_knowledge_brief(inputs),
+        ),
+        (Kind::Handoff, handoff, render_handoff(inputs)),
+    ] {
+        let previous = existing.get(&path).cloned().flatten();
+        planned.push(plan_document(kind, path, previous, rendered)?);
+    }
+    Ok(planned)
+}
+
+/// Merge one document's summary into the family summary.
+fn merge(into: &mut Summary, from: Summary) {
+    into.recomputed.extend(from.recomputed);
+    into.unchanged.extend(from.unchanged);
+    for (block, ids) in from.sources {
+        into.sources.entry(block).or_default().extend(ids);
+    }
 }
 
 /// Read an existing target document and validate its managed blocks.
@@ -356,32 +412,37 @@ fn render_flat(references: &[SourceRef], title: &str) -> Option<Rendered> {
     })
 }
 
-/// Apply one kind's rendered rows (or its omission) to its target document.
-fn apply(
+/// Plan one kind's rendered rows (or its omission) for its target document.
+///
+/// A rendered block is reused when the existing bytes already carry it, and
+/// otherwise replaces or appends it; an unrendered kind reports one omission
+/// and removes its stale block, leaving `None` when that empties the document.
+fn plan_document(
     kind: Kind,
-    path: &Path,
-    document: &mut Option<String>,
+    path: PathBuf,
+    existing: Option<String>,
     rendered: Option<Rendered>,
-    summary: &mut Summary,
-    omitted: &mut Vec<Omitted>,
-) -> Result<(), ProjectionError> {
+) -> Result<PlannedDocument, ProjectionError> {
     let block = kind.block_name();
-    match rendered {
+    let mut summary = Summary::default();
+    let mut omitted = Vec::new();
+    let document = match rendered {
         Some(rendered) => {
-            let existing = match document {
+            let current = match &existing {
                 Some(document) => generated_body(document, &block)?,
                 None => None,
             };
-            if existing.as_deref() == Some(rendered.body.as_str()) {
+            let document = if current.as_deref() == Some(rendered.body.as_str()) {
                 summary.unchanged.push(block.clone());
+                existing
             } else {
-                let base = document.take().unwrap_or_default();
-                let next = replace_generated(&base, &block, &rendered.body)?;
-                write(path, &next)?;
-                *document = Some(next);
+                let next =
+                    replace_generated(existing.as_deref().unwrap_or(""), &block, &rendered.body)?;
                 summary.recomputed.push(block.clone());
-            }
+                Some(next)
+            };
             summary.sources.insert(block, rendered.sources);
+            document
         }
         None => {
             omitted.push(Omitted {
@@ -389,22 +450,27 @@ fn apply(
                 kind: kind.as_str(),
                 reason: REASON_NO_RECORDS,
             });
-            if let Some(existing) = document.as_ref()
-                && generated_body(existing, &block)?.is_some()
-            {
-                let next = remove_generated(existing, &block)?;
-                if next.trim().is_empty() {
-                    fs::remove_file(path).map_err(|error| io_error("remove", path, error))?;
-                    *document = None;
-                } else {
-                    write(path, &next)?;
-                    *document = Some(next);
+            match existing {
+                Some(document) if generated_body(&document, &block)?.is_some() => {
+                    let next = remove_generated(&document, &block)?;
+                    summary.recomputed.push(block);
+                    if next.trim().is_empty() {
+                        None
+                    } else {
+                        Some(next)
+                    }
                 }
-                summary.recomputed.push(block);
+                other => other,
             }
         }
-    }
-    Ok(())
+    };
+
+    Ok(PlannedDocument {
+        path,
+        document,
+        summary,
+        omitted,
+    })
 }
 
 /// Sorted, de-duplicated single-line reference rows: by id, then reference.

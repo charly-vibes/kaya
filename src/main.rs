@@ -27,7 +27,8 @@ use kaya::ledger::{AppendOutcome, Ledger, LedgerError, changed_event_ids, sha256
 use kaya::model::{self, EntityType, ModelError};
 use kaya::projection::{ProjectionError, StaleBlock, Summary, index, report, reuse};
 use kaya::promotion::{self, PromotionError, PromotionState};
-use kaya::publication::{self, Decl, Tier};
+use kaya::publication;
+use kaya::verification;
 
 /// Project-local directory holding kaya state.
 const KAYA_DIR: &str = ".kaya";
@@ -80,6 +81,21 @@ enum Command {
         /// Directory receiving the published pages and export
         #[arg(long, default_value = "docs/public", value_name = "DIR")]
         out: PathBuf,
+    },
+    /// Verify the committed record against the projections without writing
+    Check {
+        /// Repository root holding the ledger and both projection trees
+        #[arg(long, default_value = ".", value_name = "DIR")]
+        root: PathBuf,
+        /// Research projection directory, relative to the root
+        #[arg(long, default_value = "docs/research", value_name = "DIR")]
+        out: PathBuf,
+        /// Publication projection directory, relative to the root
+        #[arg(long, default_value = "docs/public", value_name = "DIR")]
+        publish_out: PathBuf,
+        /// Refuse to check unless the ledger's digest is exactly this hex value
+        #[arg(long, value_name = "HEX")]
+        expect_digest: Option<String>,
     },
     /// Approve a proposed assertion as a conclusion
     Promote {
@@ -147,6 +163,12 @@ fn main() -> ExitCode {
         Ok(cli) => cli,
         Err(err) => match err.kind() {
             ClapErrorKind::DisplayHelp | ClapErrorKind::DisplayVersion => err.exit(),
+            _ if invoked_check() => {
+                return emit_code(
+                    Envelope::error("error", "kaya.verification.usage", err.to_string()),
+                    2,
+                );
+            }
             _ => return emit(Envelope::error("error", "usage", err.to_string())),
         },
     };
@@ -160,6 +182,14 @@ fn main() -> ExitCode {
             allow_uncommitted,
         } => cmd_build(&out, expect_digest.as_deref(), allow_uncommitted),
         Command::Publish { out } => cmd_publish(&out),
+        Command::Check {
+            root,
+            out,
+            publish_out,
+            expect_digest,
+        } => {
+            return cmd_check(&root, &out, &publish_out, expect_digest.as_deref());
+        }
         Command::Promote {
             assertion_id,
             actor,
@@ -173,6 +203,14 @@ fn main() -> ExitCode {
     emit(outcome.unwrap_or_else(|(label, message)| Envelope::error("error", &label, message)))
 }
 
+/// Whether the invocation names the `check` subcommand.
+///
+/// A parse failure never yields the [`Command`] enum, so the raw argument is
+/// the only way to keep `check`'s usage failures in its own label namespace.
+fn invoked_check() -> bool {
+    std::env::args_os().nth(1).is_some_and(|arg| arg == "check")
+}
+
 /// Print exactly one envelope and map it onto the process exit code.
 fn emit(envelope: Envelope) -> ExitCode {
     let ok = envelope.ok;
@@ -182,6 +220,22 @@ fn emit(envelope: Envelope) -> ExitCode {
         Err(message) => {
             eprintln!("kaya: {message}");
             ExitCode::FAILURE
+        }
+    }
+}
+
+/// Print exactly one envelope and exit with the verdict it carries.
+///
+/// `check` is the one command whose success envelope can still mean drift, so
+/// the exit code is decided by the caller rather than by `ok`: usage and I/O
+/// failures print an error envelope and exit 2, an executed check exits with
+/// the drift verdict.
+fn emit_code(envelope: Envelope, code: u8) -> ExitCode {
+    match envelope.print() {
+        Ok(()) => ExitCode::from(code),
+        Err(message) => {
+            eprintln!("kaya: {message}");
+            ExitCode::from(2)
         }
     }
 }
@@ -588,78 +642,21 @@ fn cmd_build(
     ))
 }
 
-/// Products `kaya publish` declares: the project-site pair, the six
-/// developer-guide products, and the status, release, and architecture
-/// products. Every include is the product's admission row, so a declaration can
-/// never widen a product beyond its contract. `tutorial` stays undeclared until
-/// its backing exploration documents have producers.
-const PUBLISHED_PRODUCTS: [&str; 11] = [
-    "overview",
-    "reference",
-    "getting-started",
-    "how-to",
-    "concept",
-    "example",
-    "troubleshooting",
-    "faq",
-    "status-compatibility",
-    "release-migration",
-    "architecture-design",
-];
-
-/// Packages `kaya publish` declares, with their members in declaration order.
-const PUBLISHED_PACKAGES: [(&str, &[&str]); 2] = [
-    ("project-site", &["overview", "reference"]),
-    (
-        "developer-guide",
-        &[
-            "getting-started",
-            "how-to",
-            "concept",
-            "example",
-            "troubleshooting",
-            "faq",
-        ],
-    ),
-];
-
 /// Compose the eleven declared products and both declared packages over the
 /// compiled research documents.
 ///
-/// The products are `overview`, `reference`, `getting-started`, `how-to`,
-/// `concept`, `example`, `troubleshooting`, `faq`, `status-compatibility`,
-/// `release-migration`, and `architecture-design`. The packages are
-/// `project-site` (over `overview` and `reference`) and `developer-guide`
-/// (over the six `getting-started` through `faq` products).
-///
-/// The document source is read once from `docs/research`; the publication
-/// layer refuses invalid declarations before writing, omits products without
-/// a backing document, and exports the same attribution it renders. It also
-/// owns the write: each page is a `publication.<tier>.<name>` managed block
-/// inside its file, so published bytes stay compiler-owned without a second
-/// pass here.
+/// The declarations are [`publication::default_declarations`], so `kaya
+/// publish` and `kaya check` compile exactly the same tree. The document
+/// source is read once from `docs/research`; the publication layer refuses
+/// invalid declarations before writing, omits products without a backing
+/// document, and exports the same attribution it renders. It also owns the
+/// write: each page is a `publication.<tier>.<name>` managed block inside its
+/// file, so published bytes stay compiler-owned without a second pass here.
 fn cmd_publish(out: &Path) -> Result<Envelope, Failure> {
     let documents =
         publication::read_documents(Path::new("docs/research")).map_err(publication_failure)?;
 
-    let declarations: Vec<Decl> = PUBLISHED_PRODUCTS
-        .iter()
-        .map(|name| Decl {
-            tier: Tier::Product,
-            name: (*name).to_owned(),
-            includes: publication::admission(name)
-                .iter()
-                .map(|kind| (*kind).to_owned())
-                .collect(),
-            members: Vec::new(),
-        })
-        .chain(PUBLISHED_PACKAGES.iter().map(|(name, members)| Decl {
-            tier: Tier::Package,
-            name: (*name).to_owned(),
-            includes: Vec::new(),
-            members: members.iter().map(|member| (*member).to_owned()).collect(),
-        }))
-        .collect();
+    let declarations = publication::default_declarations();
 
     let built = publication::build(&declarations, &documents, out).map_err(publication_failure)?;
 
@@ -725,6 +722,29 @@ fn cmd_publish(out: &Path) -> Result<Envelope, Failure> {
             "documents": documents,
         }),
     ))
+}
+
+/// Verify the record without writing: the expected bytes come from the same
+/// planners `build` and `publish` use, compared against the worktree.
+///
+/// `check` reports drift in its own success envelope and lets the exit code
+/// carry the verdict: 0 clean, 1 drift, 2 usage or I/O failure. It creates no
+/// directory, appends no event, and evaluates no threshold.
+fn cmd_check(root: &Path, out: &Path, publish_out: &Path, expect_digest: Option<&str>) -> ExitCode {
+    match verification::check(root, out, publish_out, expect_digest) {
+        Ok(outcome) => {
+            let code = outcome.exit_code();
+            let envelope = Envelope::ok(
+                "check",
+                json!({
+                    "drift": outcome.drift,
+                    "stale": [],
+                }),
+            );
+            emit_code(envelope, code)
+        }
+        Err(error) => emit_code(Envelope::error("error", &error.label, error.message), 2),
+    }
 }
 
 /// Flag authored blocks in one compiled document whose cited evidence moved.

@@ -37,31 +37,51 @@ pub const RESEARCH_MAP_BLOCK: &str = "orientation.research-map";
 /// rendered node id. The trailing summary line reports `event_count` events,
 /// the number of ledger records the graph was built from.
 pub fn build(graph: &Graph, path: &Path, event_count: usize) -> Result<Summary, ProjectionError> {
+    let existing = read_existing(path)?;
+    let (document, summary) = plan(graph, path, existing.as_deref(), event_count)?;
+    if existing.as_deref() != Some(document.as_str()) {
+        write(path, &document)?;
+    }
+    Ok(summary)
+}
+
+/// The bytes and bookkeeping `build` would commit, without touching the disk.
+///
+/// Planning is the whole projection: the returned document is exactly what
+/// `build` writes when it differs from `existing`, so `kaya check` can compare
+/// the expected bytes against the worktree without a second renderer. `path`
+/// names the document being planned and is accepted for symmetry with the
+/// writer; planning itself never reads or writes it.
+pub fn plan(
+    graph: &Graph,
+    _path: &Path,
+    existing: Option<&str>,
+    event_count: usize,
+) -> Result<(String, Summary), ProjectionError> {
     let (rendered, sources) = render(graph, event_count);
     let mut summary = Summary::default();
     summary
         .sources
         .insert(RESEARCH_MAP_BLOCK.to_owned(), sources);
 
-    match read_existing(path)? {
+    let document = match existing {
         None => {
-            let document = replace_generated("", RESEARCH_MAP_BLOCK, &rendered)?;
-            write(path, &document)?;
             summary.recomputed.push(RESEARCH_MAP_BLOCK.to_owned());
+            replace_generated("", RESEARCH_MAP_BLOCK, &rendered)?
         }
         Some(document) => {
-            validate_generated_blocks(&document)?;
-            if generated_body(&document)?.as_deref() == Some(rendered.as_str()) {
+            validate_generated_blocks(document)?;
+            if generated_body(document)?.as_deref() == Some(rendered.as_str()) {
                 summary.unchanged.push(RESEARCH_MAP_BLOCK.to_owned());
+                document.to_owned()
             } else {
-                let updated = replace_generated(&document, RESEARCH_MAP_BLOCK, &rendered)?;
-                write(path, &updated)?;
                 summary.recomputed.push(RESEARCH_MAP_BLOCK.to_owned());
+                replace_generated(document, RESEARCH_MAP_BLOCK, &rendered)?
             }
         }
-    }
+    };
 
-    Ok(summary)
+    Ok((document, summary))
 }
 
 /// Render the generated body and collect the node ids backing its rows.

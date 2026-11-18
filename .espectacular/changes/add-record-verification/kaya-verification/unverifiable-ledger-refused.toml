@@ -1,0 +1,9 @@
+id = "unverifiable-ledger-refused"
+description = ""
+archetype = ""
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "check_refuses_unverifiable_ledger"}]

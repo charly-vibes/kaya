@@ -1,0 +1,9 @@
+id = "clean-record"
+description = ""
+archetype = ""
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "check_clean_record_exits_zero"}]

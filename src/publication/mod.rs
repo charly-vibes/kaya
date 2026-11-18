@@ -373,6 +373,71 @@ pub struct Decl {
     pub members: Vec<String>,
 }
 
+/// Products `kaya publish` declares: the project-site pair, the six
+/// developer-guide products, and the status, release, and architecture
+/// products. Every include is the product's admission row, so a declaration can
+/// never widen a product beyond its contract. `tutorial` stays undeclared until
+/// its backing exploration documents have producers.
+const DEFAULT_PRODUCTS: [&str; 11] = [
+    "overview",
+    "reference",
+    "getting-started",
+    "how-to",
+    "concept",
+    "example",
+    "troubleshooting",
+    "faq",
+    "status-compatibility",
+    "release-migration",
+    "architecture-design",
+];
+
+/// Packages `kaya publish` declares, with their members in declaration order.
+const DEFAULT_PACKAGES: [(&str, &[&str]); 2] = [
+    ("project-site", &["overview", "reference"]),
+    (
+        "developer-guide",
+        &[
+            "getting-started",
+            "how-to",
+            "concept",
+            "example",
+            "troubleshooting",
+            "faq",
+        ],
+    ),
+];
+
+/// The declarations `kaya publish` composes, and the ones `kaya check`
+/// expects: eleven products and two packages over the compiled research
+/// documents.
+///
+/// The products are `overview`, `reference`, `getting-started`, `how-to`,
+/// `concept`, `example`, `troubleshooting`, `faq`, `status-compatibility`,
+/// `release-migration`, and `architecture-design`. The packages are
+/// `project-site` (over `overview` and `reference`) and `developer-guide`
+/// (over the six `getting-started` through `faq` products).
+pub fn default_declarations() -> Vec<Decl> {
+    DEFAULT_PRODUCTS
+        .iter()
+        .map(|name| Decl {
+            tier: Tier::Product,
+            name: (*name).to_owned(),
+            includes: admission(name)
+                .iter()
+                .map(|kind| (*kind).to_owned())
+                .collect(),
+            members: Vec::new(),
+        })
+        .chain(DEFAULT_PACKAGES.iter().map(|(name, members)| Decl {
+            tier: Tier::Package,
+            name: (*name).to_owned(),
+            includes: Vec::new(),
+            members: members.iter().map(|member| (*member).to_owned()).collect(),
+        }))
+        .collect()
+}
+
 /// A product omitted from the tree because it has no backing document.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Omitted {
@@ -457,50 +522,77 @@ pub fn read_documents(research_dir: &Path) -> Result<Documents, PublicationError
             Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
             Err(error) => return Err(PublicationError::io("read", &path, error)),
         };
-        let blocks = scan(&text).map_err(|error| {
-            PublicationError::new(
-                LABEL_IO,
-                format!(
-                    "failed to parse \"{}\": {}: {}",
-                    path.display(),
-                    error.label,
-                    error.message
-                ),
-            )
-        })?;
-        let mut seen: BTreeSet<String> = BTreeSet::new();
-        for block in blocks {
-            let BlockKind::Generated(name) = block.kind else {
-                continue;
-            };
-            if !seen.insert(name.clone()) {
-                return Err(PublicationError::duplicate_block(&path, &name));
-            }
-            if !DOCUMENT_KINDS.contains(&name.as_str()) {
-                continue;
-            }
-            // An empty block is no more a document than a missing one: it must
-            // neither back a product nor shadow a populated block later in the
-            // read order.
-            if block.body.trim().is_empty() {
-                continue;
-            }
-            if documents.contains_key(&name) {
-                continue;
-            }
-            let event_ids = node_ids(&block.body);
-            documents.insert(
-                name.clone(),
-                DocumentRef {
-                    kind: name,
-                    body: block.body,
-                    event_ids,
-                },
-            );
-        }
+        collect_documents(&mut documents, &path, &text)?;
     }
 
     Ok(Documents(documents))
+}
+
+/// Read compiled documents from an explicit sequence of paths and texts.
+///
+/// The caller owns the read order, so `kaya check` feeds the documents it
+/// expects the projection to emit in exactly the order `read_documents` uses.
+/// The parsing rules are shared with [`read_documents`]: only generated blocks
+/// in the document vocabulary are kept, a repeated block inside one file is
+/// refused, and the first populated block wins across files.
+pub fn read_documents_from(
+    files: impl IntoIterator<Item = (PathBuf, String)>,
+) -> Result<Documents, PublicationError> {
+    let mut documents = BTreeMap::new();
+    for (path, text) in files {
+        collect_documents(&mut documents, &path, &text)?;
+    }
+    Ok(Documents(documents))
+}
+
+/// Collect one compiled document's generated blocks into `documents`.
+fn collect_documents(
+    documents: &mut BTreeMap<String, DocumentRef>,
+    path: &Path,
+    text: &str,
+) -> Result<(), PublicationError> {
+    let blocks = scan(text).map_err(|error| {
+        PublicationError::new(
+            LABEL_IO,
+            format!(
+                "failed to parse \"{}\": {}: {}",
+                path.display(),
+                error.label,
+                error.message
+            ),
+        )
+    })?;
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    for block in blocks {
+        let BlockKind::Generated(name) = block.kind else {
+            continue;
+        };
+        if !seen.insert(name.clone()) {
+            return Err(PublicationError::duplicate_block(path, &name));
+        }
+        if !DOCUMENT_KINDS.contains(&name.as_str()) {
+            continue;
+        }
+        // An empty block is no more a document than a missing one: it must
+        // neither back a product nor shadow a populated block later in the
+        // read order.
+        if block.body.trim().is_empty() {
+            continue;
+        }
+        if documents.contains_key(&name) {
+            continue;
+        }
+        let event_ids = node_ids(&block.body);
+        documents.insert(
+            name.clone(),
+            DocumentRef {
+                kind: name,
+                body: block.body,
+                event_ids,
+            },
+        );
+    }
+    Ok(())
 }
 
 /// The `kaya/...` node ids named in a block body, sorted and deduplicated.
@@ -525,6 +617,66 @@ fn node_ids(body: &str) -> Vec<String> {
 /// inside whatever document already exists at that path, so authored bytes
 /// outside the block survive and only the block is compiler-owned.
 pub fn build(decls: &[Decl], docs: &Documents, out: &Path) -> Result<Built, PublicationError> {
+    let plan = plan(decls, docs, out, read_text, read_bytes)?;
+
+    fs::create_dir_all(out).map_err(|error| PublicationError::io("create", out, error))?;
+
+    let mut summary = Summary::default();
+    for page in &plan.pages {
+        if page.previous.as_deref() == Some(page.document.as_str()) {
+            summary.unchanged.push(page.block.clone());
+        } else {
+            write_atomic(&page.path, page.document.as_bytes())?;
+            summary.recomputed.push(page.block.clone());
+        }
+    }
+    if plan.export_previous.as_deref() == Some(plan.export.as_slice()) {
+        summary.unchanged.push(EXPORT_FILE.to_owned());
+    } else {
+        write_atomic(&plan.export_path, &plan.export)?;
+        summary.recomputed.push(EXPORT_FILE.to_owned());
+    }
+
+    // Only after every page and the export are in place are pages for omitted
+    // products removed, so a failed write never leaves the tree missing a page
+    // it failed to replace.
+    for removal in &plan.removals {
+        match (&removal.previous, &removal.document) {
+            (Some(_), None) => {
+                fs::remove_file(&removal.path)
+                    .map_err(|error| PublicationError::io("remove", &removal.path, error))?;
+            }
+            (Some(previous), Some(document)) if previous != document => {
+                write_atomic(&removal.path, document.as_bytes())?;
+            }
+            _ => {}
+        }
+    }
+
+    Ok(Built {
+        pages: plan.pages.into_iter().map(|page| page.page).collect(),
+        omitted: plan.omitted,
+        summary,
+    })
+}
+
+/// The expected publication tree, computed without writing a byte.
+///
+/// Every declaration is resolved, every include checked against its admission
+/// row, every page rendered, and the export encoded before any target is
+/// touched, so an invalid declaration or an encode failure refuses the whole
+/// tree. The plan carries, per target, the bytes already on disk and the bytes
+/// the build would leave there — which is exactly what `kaya check` compares.
+/// `read_text` and `read_bytes` supply the existing tree; `kaya check` passes
+/// closures that report nothing, so the plan is the canonical expected tree
+/// rather than an edit of whatever happens to exist.
+pub fn plan(
+    decls: &[Decl],
+    docs: &Documents,
+    out: &Path,
+    mut read_text: impl FnMut(&Path) -> Result<Option<String>, PublicationError>,
+    mut read_bytes: impl FnMut(&Path) -> Result<Option<Vec<u8>>, PublicationError>,
+) -> Result<Plan, PublicationError> {
     // The source map is a map from kind to document; a document filed under a
     // key it does not name itself is a refusal, never a silent relabeling.
     for (key, document) in &docs.0 {
@@ -671,8 +823,7 @@ pub fn build(decls: &[Decl], docs: &Documents, out: &Path) -> Result<Built, Publ
     // tree is safe here, and nothing is written until every page document and
     // the export are in hand, so an encode failure cannot desynchronise the
     // Markdown pages from the structured export.
-    let mut planned: Vec<Planned> = Vec::new();
-    let mut pages: Vec<Page> = Vec::new();
+    let mut planned: Vec<PlannedPage> = Vec::new();
     for (name, tier, content) in rendered {
         let block = block_name(tier, &name);
         let path = out.join(format!("{name}.md"));
@@ -682,20 +833,20 @@ pub fn build(decls: &[Decl], docs: &Documents, out: &Path) -> Result<Built, Publ
         // untouched, while the block always holds exactly one rendering.
         let document = replace_generated(previous.as_deref().unwrap_or(""), &block, &content)
             .map_err(|error| compose_error(&path, error))?;
-        planned.push(Planned {
+        planned.push(PlannedPage {
+            page: Page {
+                name: name.clone(),
+                path: path.clone(),
+                question: match tier {
+                    Tier::Product => reader_question(&name),
+                    _ => None,
+                },
+                documents: composed.get(&name).cloned().unwrap_or_default(),
+            },
             block,
-            path: path.clone(),
+            path,
             document,
             previous,
-        });
-        pages.push(Page {
-            name: name.clone(),
-            path,
-            question: match tier {
-                Tier::Product => reader_question(&name),
-                _ => None,
-            },
-            documents: composed.get(&name).cloned().unwrap_or_default(),
         });
     }
 
@@ -707,38 +858,26 @@ pub fn build(decls: &[Decl], docs: &Documents, out: &Path) -> Result<Built, Publ
     let export_path = out.join(EXPORT_FILE);
     let export_previous = read_bytes(&export_path)?;
 
-    // Phase two: write each changed target through a sibling temporary file
-    // and rename it into place. Unchanged targets are not touched at all, so a
-    // second build over the same inputs rewrites nothing.
-    fs::create_dir_all(out).map_err(|error| PublicationError::io("create", out, error))?;
-
-    let mut summary = Summary::default();
-    for page in planned {
-        if page.previous.as_deref() == Some(page.document.as_str()) {
-            summary.unchanged.push(page.block);
-        } else {
-            write_atomic(&page.path, page.document.as_bytes())?;
-            summary.recomputed.push(page.block);
-        }
-    }
-    if export_previous.as_deref() == Some(bytes.as_slice()) {
-        summary.unchanged.push(EXPORT_FILE.to_owned());
-    } else {
-        write_atomic(&export_path, &bytes)?;
-        summary.recomputed.push(EXPORT_FILE.to_owned());
-    }
-
-    // Only after every page and the export are in place are pages for omitted
-    // products removed, so a failed write never leaves the tree missing a page
-    // it failed to replace.
+    // Phase two plans the pages an omitted product would have occupied: a
+    // document the build never wrote is not ours and is left untouched, while
+    // a document carrying the page's managed block is stripped or unlinked.
+    let mut removals = Vec::new();
     for entry in &omitted {
-        remove_page(out, Tier::Product, &entry.name)?;
+        removals.push(plan_removal(
+            out,
+            Tier::Product,
+            &entry.name,
+            &mut read_text,
+        )?);
     }
 
-    Ok(Built {
-        pages,
+    Ok(Plan {
+        pages: planned,
+        removals,
+        export: bytes,
+        export_path,
+        export_previous,
         omitted,
-        summary,
     })
 }
 
@@ -746,15 +885,46 @@ pub fn build(decls: &[Decl], docs: &Documents, out: &Path) -> Result<Built, Publ
 const EXPORT_FILE: &str = "publication.json";
 
 /// One page's planned document, before the write phase.
-struct Planned {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannedPage {
+    /// Page metadata as the build reports it.
+    pub page: Page,
     /// The managed block the page's content belongs to.
-    block: String,
+    pub block: String,
     /// Final path of the page.
-    path: PathBuf,
+    pub path: PathBuf,
     /// The whole document to write, block included.
-    document: String,
+    pub document: String,
     /// The document already on disk, when there is one.
-    previous: Option<String>,
+    pub previous: Option<String>,
+}
+
+/// One omitted page's planned removal, before the write phase.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannedRemoval {
+    /// Path of the page an omitted publication would have occupied.
+    pub path: PathBuf,
+    /// The bytes already on disk, when there is a file.
+    pub previous: Option<String>,
+    /// The document to leave behind; `None` unlinks the page.
+    pub document: Option<String>,
+}
+
+/// Every byte one publication build produces, before anything is written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Plan {
+    /// Emitted pages, sorted by name, with their bytes before and after.
+    pub pages: Vec<PlannedPage>,
+    /// Omitted products' page removals, sorted by name.
+    pub removals: Vec<PlannedRemoval>,
+    /// The structured export exactly as it is written.
+    pub export: Vec<u8>,
+    /// Path of the structured export.
+    pub export_path: PathBuf,
+    /// The export bytes already on disk, when there is a file.
+    pub export_previous: Option<Vec<u8>>,
+    /// Products omitted for want of a backing document.
+    pub omitted: Vec<Omitted>,
 }
 
 /// The managed-block name a page's content belongs to.
@@ -820,34 +990,52 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), PublicationError> {
     })
 }
 
-/// Remove the page of an omitted publication without destroying authored bytes.
+/// Plan the removal of an omitted publication's page without destroying authored bytes.
 ///
 /// A document that does not carry this page's managed block is not ours: a
 /// file the build never wrote at that path is authored, even when its name
-/// matches a now-omitted product, so it is left byte-identical. A document
-/// carrying the block is unlinked when the block is all it holds and otherwise
-/// keeps every byte outside the block.
-fn remove_page(out: &Path, tier: Tier, name: &str) -> Result<(), PublicationError> {
+/// matches a now-omitted product, so its bytes are planned unchanged. A
+/// document carrying the block is planned unlinked when the block is all it
+/// holds and otherwise keeps every byte outside the block.
+fn plan_removal(
+    out: &Path,
+    tier: Tier,
+    name: &str,
+    read_text: &mut impl FnMut(&Path) -> Result<Option<String>, PublicationError>,
+) -> Result<PlannedRemoval, PublicationError> {
     let path = out.join(format!("{name}.md"));
-    let Some(document) = read_text(&path)? else {
-        return Ok(());
-    };
     let block = block_name(tier, name);
-    let carries_block = scan(&document)
+    let previous = read_text(&path)?;
+    let Some(document) = previous.as_deref() else {
+        return Ok(PlannedRemoval {
+            path,
+            previous: None,
+            document: None,
+        });
+    };
+    let carries_block = scan(document)
         .map_err(|error| compose_error(&path, error))?
         .iter()
         .any(|found| matches!(&found.kind, BlockKind::Generated(existing) if existing == &block));
     if !carries_block {
-        return Ok(());
+        return Ok(PlannedRemoval {
+            path,
+            previous: previous.clone(),
+            document: previous,
+        });
     }
     let stripped =
-        remove_generated(&document, &block).map_err(|error| compose_error(&path, error))?;
-    if stripped.trim().is_empty() {
-        fs::remove_file(&path).map_err(|error| PublicationError::io("remove", &path, error))?;
+        remove_generated(document, &block).map_err(|error| compose_error(&path, error))?;
+    let document = if stripped.trim().is_empty() {
+        None
     } else {
-        write_atomic(&path, stripped.as_bytes())?;
-    }
-    Ok(())
+        Some(stripped)
+    };
+    Ok(PlannedRemoval {
+        path,
+        previous,
+        document,
+    })
 }
 
 /// Render a managed-block refusal as a publication refusal naming the file.

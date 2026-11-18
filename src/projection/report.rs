@@ -267,6 +267,23 @@ pub struct Built {
     pub omitted: Vec<Omitted>,
 }
 
+/// The bytes and bookkeeping a projection would commit, without touching disk.
+///
+/// The document is exactly what the writer would leave at the target when it
+/// differs from the existing bytes, so `kaya check` compares the compiled
+/// record without a second renderer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Planned {
+    /// The whole document the projection produces.
+    pub document: String,
+    /// Recomputed, unchanged, stale, and source-map bookkeeping.
+    pub summary: Summary,
+    /// Family-kinds with no source records, in block order.
+    pub omitted: Vec<Omitted>,
+    /// Whether the document differs from the existing bytes.
+    pub changed: bool,
+}
+
 /// Build the experiment report at `path`.
 ///
 /// Validates every generated block already in the document against the closed
@@ -283,6 +300,29 @@ pub fn build(
     path: &Path,
     promotion: &PromotionState,
 ) -> Result<Built, ProjectionError> {
+    let existing = read_existing(path)?;
+    let planned = plan(graph, experiment_id, existing.as_deref(), promotion)?;
+    if planned.changed {
+        write(path, &planned.document)?;
+    }
+    Ok(Built {
+        summary: planned.summary,
+        omitted: planned.omitted,
+    })
+}
+
+/// The bytes and bookkeeping `build` would commit, without touching disk.
+///
+/// The existing document, when present, is validated against the closed block
+/// vocabulary before anything is rendered; the returned document is exactly
+/// what `build` writes when `changed` is true and equals `existing` otherwise,
+/// so `kaya check` compares the compiled bytes without a second renderer.
+pub fn plan(
+    graph: &Graph,
+    experiment_id: &str,
+    existing: Option<&str>,
+    promotion: &PromotionState,
+) -> Result<Planned, ProjectionError> {
     if experiment_id.trim().is_empty() {
         return Err(ProjectionError::new(
             LABEL_EXPERIMENT,
@@ -290,7 +330,7 @@ pub fn build(
         ));
     }
 
-    let mut document = read_existing(path)?.unwrap_or_default();
+    let mut document = existing.unwrap_or_default().to_owned();
     if !document.is_empty() {
         validate_generated_blocks(&document)?;
     }
@@ -350,11 +390,12 @@ pub fn build(
         }
     }
 
-    if changed {
-        write(path, &document)?;
-    }
-
-    Ok(Built { summary, omitted })
+    Ok(Planned {
+        document,
+        summary,
+        omitted,
+        changed,
+    })
 }
 
 /// Build the project-level understanding document at `path`.
@@ -371,19 +412,27 @@ pub fn build(
 /// The summary is keyed by block name — one document covers the project, not
 /// one per experiment — and the source map traces every rendered id.
 pub fn build_understanding(graph: &Graph, path: &Path) -> Result<Built, ProjectionError> {
-    let mut summary = Summary::default();
-    let mut omitted = Vec::new();
-    commit_project_document(
-        read_project_document(path)?,
-        path,
+    let existing = read_existing(path)?;
+    let planned = plan_understanding(graph, existing.as_deref())?;
+    commit_project_document(path, &planned)?;
+    Ok(Built {
+        summary: planned.summary,
+        omitted: planned.omitted,
+    })
+}
+
+/// The bytes and bookkeeping `build_understanding` would commit.
+pub fn plan_understanding(
+    graph: &Graph,
+    existing: Option<&str>,
+) -> Result<Planned, ProjectionError> {
+    plan_project_document(
+        existing,
         vec![
             (Kind::FindingsAndAnalysis, render_findings(graph)),
             (Kind::DecisionRecord, render_decision(graph)),
         ],
-        &mut summary,
-        &mut omitted,
-    )?;
-    Ok(Built { summary, omitted })
+    )
 }
 
 /// Build the project overview at `path`.
@@ -401,48 +450,44 @@ pub fn build_understanding(graph: &Graph, path: &Path) -> Result<Built, Projecti
 /// representation of "nothing to orient the reader". The summary is keyed by
 /// the block name and the source map traces every rendered id.
 pub fn build_overview(graph: &Graph, path: &Path) -> Result<Built, ProjectionError> {
-    let mut summary = Summary::default();
-    let mut omitted = Vec::new();
-    commit_project_document(
-        read_project_document(path)?,
-        path,
+    let existing = read_existing(path)?;
+    let planned = plan_overview(graph, existing.as_deref())?;
+    commit_project_document(path, &planned)?;
+    Ok(Built {
+        summary: planned.summary,
+        omitted: planned.omitted,
+    })
+}
+
+/// The bytes and bookkeeping `build_overview` would commit.
+pub fn plan_overview(graph: &Graph, existing: Option<&str>) -> Result<Planned, ProjectionError> {
+    plan_project_document(
+        existing,
         vec![(Kind::ProjectOverview, render_overview(graph))],
-        &mut summary,
-        &mut omitted,
-    )?;
-    Ok(Built { summary, omitted })
+    )
 }
 
-/// Read a project-level document, refusing a block outside the closed
-/// vocabulary before a single byte can be rewritten.
-fn read_project_document(path: &Path) -> Result<String, ProjectionError> {
-    let document = read_existing(path)?.unwrap_or_default();
-    if !document.is_empty() {
-        validate_generated_blocks(&document)?;
-    }
-    Ok(document)
-}
-
-/// Apply the project-level commit policy: one document, one write, one delete.
+/// The pure project-level commit policy shared by the writer and `kaya check`.
 ///
 /// `blocks` names the document's kinds in canonical order. A rendered block
 /// replaces or appends its body and records its ids under the block name; an
 /// unrendered kind is reported omitted and its obsolete block removed. Kind
 /// order is part of the document contract, so a block that is newly declared
 /// while a later block already exists drops that later block first: canonical
-/// order then never depends on build history. `summary` and `omitted`
-/// accumulate across kinds, so the whole document is committed once.
-///
-/// A document left holding only whitespace is deleted rather than written
-/// empty — absence already maps to success, so a concurrent removal is not a
-/// failure. A document whose blocks all match is not rewritten at all.
-fn commit_project_document(
-    mut document: String,
-    path: &Path,
+/// order then never depends on build history. The existing document, when
+/// present, is validated against the closed block vocabulary before anything
+/// is rendered.
+fn plan_project_document(
+    existing: Option<&str>,
     blocks: Vec<(Kind, Option<RenderedBlock>)>,
-    summary: &mut Summary,
-    omitted: &mut Vec<Omitted>,
-) -> Result<(), ProjectionError> {
+) -> Result<Planned, ProjectionError> {
+    let mut document = existing.unwrap_or_default().to_owned();
+    if !document.is_empty() {
+        validate_generated_blocks(&document)?;
+    }
+
+    let mut summary = Summary::default();
+    let mut omitted = Vec::new();
     let mut changed = false;
 
     for (index, (kind, rendered)) in blocks.iter().enumerate() {
@@ -486,14 +531,29 @@ fn commit_project_document(
         }
     }
 
-    if document.trim().is_empty() {
+    Ok(Planned {
+        document,
+        summary,
+        omitted,
+        changed,
+    })
+}
+
+/// Commit a planned project-level document: write only on change, and delete
+/// a document the projection emptied rather than leaving a blank file.
+///
+/// A document left holding only whitespace is deleted rather than written
+/// empty — absence already maps to success, so a concurrent removal is not a
+/// failure. A document whose blocks all match is not rewritten at all.
+fn commit_project_document(path: &Path, planned: &Planned) -> Result<(), ProjectionError> {
+    if planned.document.trim().is_empty() {
         match fs::remove_file(path) {
             Ok(()) => {}
             Err(error) if error.kind() == ErrorKind::NotFound => {}
             Err(error) => return Err(io_error("remove", path, error)),
         }
-    } else if changed {
-        write(path, &document)?;
+    } else if planned.changed {
+        write(path, &planned.document)?;
     }
 
     Ok(())
