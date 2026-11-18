@@ -8,7 +8,7 @@
 > produce documentation.
 
 The reader-facing overview — what kaya is, why it matters, when to use it — is
-the compiled [overview page](../public/overview.md); this page is the long-form
+the compiled [overview page](public/overview.md); this page is the long-form
 motivation and design rationale behind it.
 
 ## Why

@@ -36,7 +36,9 @@ jobs:
           tool: mdbook
 
       - name: Build docs
-        run: mdbook build
+        run: |
+          mdbook build
+          python3 scripts/build-publications.py
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

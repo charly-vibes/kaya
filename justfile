@@ -36,9 +36,10 @@ lint: fmt-check
 specs-docs:
 	python3 scripts/sync-specs.py
 
-# Build the mdBook
+# Build the mdBook and place the publication tree inside the artifact
 docs: specs-docs
 	mdbook build
+	python3 scripts/build-publications.py
 
 # === Spec gates ===
 
