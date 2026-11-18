@@ -34,6 +34,9 @@ kaya import test --report <path>   # observe one libtest JSONL run
 kaya import model --file <seed>    # record research-structure events from JSONL
 kaya build                         # compile docs/research (index + experiment reports)
 kaya build --expect-digest <hex>   # refuse to build unless the ledger matches
+kaya check                         # verify projections without writing
+kaya check --index                 # verify the staged tree a hook would commit
+kaya acknowledge <document> --block <name> --events <id>... --actor <name>
 kaya promote <assertion> --actor <name>
 kaya challenge <conclusion> --events <id>... --actor <name>
 ```
@@ -46,6 +49,12 @@ kaya challenge <conclusion> --events <id>... --actor <name>
   reuse-handoff reference documents; it rewrites only its own generated
   blocks, preserves authored bytes verbatim, and leaves a document absent
   when its kinds have no records.
+- Authored prose may cite ledger evidence with a
+  `<!-- kaya:cites <event-id> -->` marker inside a `kaya:authored` block.
+  Every cited id must exist in the ledger. When a correction supersedes a
+  cited id, the block is reported stale; a human clears it with
+  `kaya acknowledge <document> --block <name> --events <id>...`, which records
+  one `verification.acknowledged` event and never edits authored bytes.
 - Promotion is human-approved and pull-based: `promote` and `challenge`
   require `--actor`, and pending counts surface in `status`/`build` output
   instead of as prompts. Events are not conclusions.

@@ -1,0 +1,11 @@
+run_id: tdd-ro5u-2026-11-18-kaya-7hm-authored-staleness
+pipeline: tdd-ro5u
+topic: kaya-7hm authored staleness
+created_at: '2026-11-18T17:23:05.611710197+00:00'
+current_step: 8
+approvals: {}
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

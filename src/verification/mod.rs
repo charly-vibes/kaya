@@ -4,10 +4,11 @@
 //! without writing a byte, so a repository can gate on drift before it ships.
 //! Responsibilities: read the ledger from an invocation root and refuse any
 //! history git cannot verify, replan every research and publication document
-//! through the same pure planners its writer uses, compare the expected bytes
-//! with the worktree — or with the git index under `--index` — per managed
-//! block and per document, and report the requested assertions and the stale
-//! authored blocks the verified facts expose.
+//! through the same pure planners its writer uses, validate that each authored
+//! citation names a recorded event, compare the expected bytes with the
+//! worktree — or with the git index under `--index` — per managed block and per
+//! document, and report the requested assertions and the stale authored blocks
+//! the verified facts expose.
 //! Rationale: verification is the inverse of compilation, never a second
 //! implementation of it — sharing the planners means a `check` finding names
 //! exactly the bytes `build` or `publish` would rewrite, and a clean run is
@@ -505,7 +506,8 @@ pub fn check(
     let (expected, omitted) = plan_research(&source, &out, &events, &graph, &promotion)?;
 
     let mut drift = Vec::new();
-    compare_research(&source, &out, &expected, &mut drift)?;
+    let known_ids: BTreeSet<String> = events.iter().map(|event| event.id.clone()).collect();
+    compare_research(&source, &out, &expected, &known_ids, &mut drift)?;
     compare_publication(&source, &out, &publish_out, &expected, &mut drift)?;
 
     drift.sort_by(|left, right| {
@@ -823,7 +825,12 @@ fn plan_research(
 
     let index_path = out.join("index.md");
     let existing = source.read_text(&index_path)?;
-    let (document, _summary) = index::plan(graph, &index_path, existing.as_deref(), events.len())?;
+    let (document, _summary) = index::plan(
+        graph,
+        &index_path,
+        existing.as_deref(),
+        report::recorded_event_count(events),
+    )?;
     expected.insert(index_path, document);
 
     let experiments = out.join("experiments");
@@ -882,13 +889,20 @@ fn omitted_kind(omitted: &report::Omitted) -> String {
 }
 
 /// Compare every expected research document with the source's bytes.
+///
+/// Each document's authored citations are validated first: a marker naming an
+/// id the verified ledger does not record is a `kaya.projection.citation_marker`
+/// refusal, not drift, because the bytes it would have been compared against
+/// rest on evidence that does not exist.
 fn compare_research(
     source: &Source,
     out: &Path,
     expected: &BTreeMap<PathBuf, String>,
+    known_ids: &BTreeSet<String>,
     drift: &mut Vec<Entry>,
 ) -> Result<(), VerificationError> {
     for (path, document) in expected {
+        report::validate_citations(document, &source.relative(path), known_ids)?;
         match source.read_text(path)? {
             Some(actual) => compare_document(source, path, document, &actual, drift)?,
             None => drift.push(source.entry(path, None, "missing")),

@@ -184,13 +184,15 @@ pub fn stale(
     if changed.is_empty() {
         return Vec::new();
     }
-    // No acknowledgments are recorded yet, so every changed citation is stale.
-    let acknowledged = BTreeMap::new();
     let mut stale = Vec::new();
     for (path, document) in expected {
         let reported = source.relative(path);
+        // Coverage is per document: an acknowledgment of `authored-1` here says
+        // nothing about `authored-1` in a sibling document.
+        let acknowledged = report::acknowledged(events, &reported);
+        let blocks = report::stale_authored(document, &changed, &acknowledged);
         stale.extend(
-            report::stale_authored(document, &changed, &acknowledged)
+            report::unacknowledged(blocks, &acknowledged)
                 .iter()
                 .map(|block| Stale::from_block(reported.clone(), block)),
         );

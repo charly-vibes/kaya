@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "acknowledgment-clears-the-covered-ids"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "acknowledgment_clears_covered_ids"}]

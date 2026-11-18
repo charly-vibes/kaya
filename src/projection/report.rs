@@ -7,8 +7,9 @@
 //! observed execution (`experiment-record`), render the project overview from
 //! Project, Question, and Finding records, render findings and decision
 //! records with their evidence, replace only those generated blocks, report
-//! empty kinds as omitted, and flag authored blocks whose cited evidence
-//! moved.
+//! empty kinds as omitted, validate the citation markers authored blocks
+//! declare, and flag authored blocks whose cited evidence moved without being
+//! acknowledged.
 //! Rationale: the report is a compilation artifact — same inputs, same
 //! bytes; human prose survives regeneration untouched; interpretation is
 //! shown with its promotion status so a proposal never reads as a verdict.
@@ -18,6 +19,9 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
 
+use serde_json::Value;
+
+use crate::event::Event;
 use crate::model::{EntityType, Graph, Relationship};
 use crate::projection::{
     ProjectionError, StaleBlock, Summary, generated_body, io_error, read_existing,
@@ -46,6 +50,12 @@ pub const REASON_NO_RECORDS: &str = "no-records";
 pub const LABEL_UNKNOWN_KIND: &str = "kaya.documents.unknown_kind_refused";
 /// Label refusing a generated block outside the closed block vocabulary.
 pub const LABEL_LEGACY_BLOCK: &str = "kaya.documents.legacy_block_refused";
+/// Label refusing a citation marker naming an id the ledger does not record.
+pub const LABEL_CITATION_MARKER: &str = "kaya.projection.citation_marker";
+/// Event type recording a human's acknowledgment of an authored block.
+pub const ACKNOWLEDGED_EVENT: &str = "verification.acknowledged";
+/// Subject type an acknowledgment names: the document, not a graph node.
+pub const DOCUMENT_SUBJECT: &str = "Document";
 
 const AUTHORED_BEGIN: &str = "<!-- kaya:authored -->";
 const AUTHORED_END: &str = "<!-- kaya:end authored -->";
@@ -564,9 +574,10 @@ fn commit_project_document(path: &Path, planned: &Planned) -> Result<(), Project
 /// Authored blocks are numbered in document order as `authored-1`,
 /// `authored-2`, … and may contain `<!-- kaya:cites id1 id2 -->` markers.
 /// A block is stale when a cited id appears in `changed_events` and that
-/// block's acknowledgment entry does not cover exactly the changed cited
-/// ids. The returned evidence is the sorted, de-duplicated changed ids. The
-/// document is never modified.
+/// block's acknowledgment entry does not cover exactly the changed cited ids.
+/// The returned evidence is the sorted, de-duplicated changed ids — the
+/// block's review state, not the unreviewed remainder [`unacknowledged`]
+/// derives. The document is never modified.
 pub fn stale_authored(
     doc: &str,
     changed_events: &[String],
@@ -608,6 +619,43 @@ pub fn stale_authored(
         });
     }
     stale
+}
+
+/// Narrow a stale report to the changed ids no acknowledgment covers.
+///
+/// Coverage is per id, so reviewing one changed id of a block leaves the rest
+/// named. An acknowledged id that the block no longer cites is inert: it is
+/// not in the report to begin with. A block whose every changed id is covered
+/// disappears, because an entry with no evidence is not a finding.
+pub fn unacknowledged(
+    stale: Vec<StaleBlock>,
+    acknowledged: &BTreeMap<String, Vec<String>>,
+) -> Vec<StaleBlock> {
+    let mut remaining = Vec::new();
+    for block in stale {
+        let covered: BTreeSet<&str> = acknowledged
+            .get(&block.block)
+            .map(|ids| {
+                ids.iter()
+                    .map(String::as_str)
+                    .filter(|id| !id.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let evidence: Vec<String> = block
+            .evidence
+            .into_iter()
+            .filter(|id| !covered.contains(id.as_str()))
+            .collect();
+        if evidence.is_empty() {
+            continue;
+        }
+        remaining.push(StaleBlock {
+            block: block.block,
+            evidence,
+        });
+    }
+    remaining
 }
 
 /// One non-empty rendered block: its body and the ids backing it.
@@ -944,22 +992,216 @@ fn authored_blocks(doc: &str) -> Vec<(String, String)> {
     blocks
 }
 
-/// Citation ids collected from every well-formed `kaya:cites` marker.
-fn cited_ids(body: &str) -> BTreeSet<String> {
-    let mut ids = BTreeSet::new();
+/// Every well-formed `kaya:cites` marker in `body`: its bytes and its ids.
+///
+/// The marker text is kept verbatim so a refusal can quote exactly what the
+/// author wrote. A marker with no ids is well-formed and cites nothing.
+fn citation_markers(body: &str) -> Vec<(&str, Vec<String>)> {
+    let mut markers = Vec::new();
     let mut cursor = 0usize;
     while let Some(found) = body[cursor..].find(CITES_PREFIX) {
-        let start = cursor + found + CITES_PREFIX.len();
-        let Some(relative_end) = body[start..].find(MARKER_END) else {
+        let marker_start = cursor + found;
+        let ids_start = marker_start + CITES_PREFIX.len();
+        let Some(relative_end) = body[ids_start..].find(MARKER_END) else {
             break;
         };
-        let end = start + relative_end;
-        for id in body[start..end].split_whitespace() {
-            if !id.is_empty() {
-                ids.insert(id.to_string());
+        let ids_end = ids_start + relative_end;
+        let marker_end = ids_end + MARKER_END.len();
+        let ids = body[ids_start..ids_end]
+            .split_whitespace()
+            .filter(|id| !id.is_empty())
+            .map(str::to_owned)
+            .collect();
+        markers.push((&body[marker_start..marker_end], ids));
+        cursor = marker_end;
+    }
+    markers
+}
+
+/// Citation ids collected from every well-formed `kaya:cites` marker.
+fn cited_ids(body: &str) -> BTreeSet<String> {
+    citation_markers(body)
+        .into_iter()
+        .flat_map(|(_, ids)| ids)
+        .collect()
+}
+
+/// Normalize a document label for comparison across the CLI and the ledger.
+///
+/// The same document reaches the record as `docs/research/index.md`,
+/// `./docs/research/index.md`, or with Windows separators; an acknowledgment
+/// names one spelling, so every comparison uses this form.
+pub fn document_label(label: &str) -> String {
+    let mut normalized = label.replace('\\', "/");
+    while normalized.starts_with("./") {
+        normalized.replace_range(..2, "");
+    }
+    normalized
+}
+
+/// The canonical label of a document, relative to the current directory.
+///
+/// The path and the current directory are both canonicalized, the working
+/// directory prefix is stripped, and the remainder is `/`-joined. This is the
+/// spelling `kaya build` and `kaya acknowledge` share: a document named by an
+/// absolute path and the same document named relatively produce one label, so
+/// an acknowledgment covers the document whose staleness the build reports.
+/// When either canonicalization fails — an absent file, an unreadable working
+/// directory — the displayed path is normalized instead.
+pub fn document_label_for(path: &Path) -> String {
+    let canonical = fs::canonicalize(path);
+    let cwd = std::env::current_dir().and_then(fs::canonicalize);
+    match (canonical, cwd) {
+        (Ok(canonical), Ok(cwd)) => match canonical.strip_prefix(&cwd) {
+            Ok(relative) => document_label(&relative.display().to_string()),
+            Err(_) => document_label(&canonical.display().to_string()),
+        },
+        _ => document_label(&path.display().to_string()),
+    }
+}
+
+/// The ordinal names of a document's authored blocks, in document order.
+pub fn authored_block_names(doc: &str) -> Result<Vec<String>, ProjectionError> {
+    Ok(authored_blocks(doc)
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect())
+}
+
+/// Refuse any citation marker inside an authored block that names an unknown id.
+///
+/// Only authored blocks are interpreted: a `kaya:cites` marker in ordinary
+/// prose is prose, never a claim, and is left alone. Inside a block the marker
+/// declares the evidence the block rests on, so an id the ledger does not
+/// record would make every later staleness report a guess — the refusal names
+/// the document, the marker bytes, and the offending id.
+pub fn validate_citations(
+    doc: &str,
+    label: &str,
+    known: &BTreeSet<String>,
+) -> Result<(), ProjectionError> {
+    for (_, body) in authored_blocks(doc) {
+        for (marker, ids) in citation_markers(&body) {
+            for id in ids {
+                if known.contains(&id) {
+                    continue;
+                }
+                return Err(ProjectionError::new(
+                    LABEL_CITATION_MARKER,
+                    format!(
+                        "{label}: citation marker `{marker}` names unknown event id `{id}`: \
+                         every id in an authored block must be recorded in the ledger"
+                    ),
+                ));
             }
         }
-        cursor = end + MARKER_END.len();
     }
-    ids
+    Ok(())
+}
+
+/// The ledger events that describe the record, not its verification bookkeeping.
+///
+/// `verification.*` events say what a human reviewed; they are not graph
+/// evidence, so they never change a generated block. The map's event count
+/// ignores them for that reason, which is also why replaying an acknowledgment
+/// regenerates byte-identical documents.
+pub fn recorded_event_count(events: &[Event]) -> usize {
+    events
+        .iter()
+        .filter(|event| !event.r#type.starts_with("verification."))
+        .count()
+}
+
+/// The correction that most recently superseded each target id.
+///
+/// A correction is any event whose `data.supersedes` names a target as a
+/// string or an array of strings; correction events themselves are
+/// instructions, not observations, and are only recorded here by id. Ledger
+/// order decides: a later correction wins, so each target maps to the
+/// correction that most recently superseded it. Targets never superseded are
+/// absent.
+pub fn latest_corrections(events: &[Event]) -> BTreeMap<String, String> {
+    let mut latest = BTreeMap::new();
+    for event in events {
+        let Some(data) = event.data.as_object() else {
+            continue;
+        };
+        match data.get("supersedes") {
+            Some(Value::String(target)) => {
+                latest.insert(target.clone(), event.id.clone());
+            }
+            Some(Value::Array(targets)) => {
+                for target in targets.iter().filter_map(Value::as_str) {
+                    latest.insert(target.to_owned(), event.id.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    latest
+}
+
+/// The acknowledged ids of one document, keyed by authored block name.
+///
+/// Only `verification.acknowledged` events about this document count, and a
+/// block's entries merge: two acknowledgments covering different changed ids
+/// reviewed the same block twice, not half of it. The merged ids are sorted
+/// and de-duplicated, so coverage depends on the ids reviewed, never on the
+/// order their events were recorded.
+///
+/// Coverage is version-aware: an id whose entry does not name the correction
+/// currently superseding it has changed since it was reviewed, so it is
+/// dropped and its block becomes stale again. An id no correction supersedes
+/// is immutable and stays covered by any acknowledgment naming it.
+pub fn acknowledged(events: &[Event], document: &str) -> BTreeMap<String, Vec<String>> {
+    let wanted = document_label(document);
+    let latest = latest_corrections(events);
+    let mut merged: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+
+    for event in events {
+        if event.r#type != ACKNOWLEDGED_EVENT || event.subject.r#type != DOCUMENT_SUBJECT {
+            continue;
+        }
+        if document_label(&event.subject.id) != wanted {
+            continue;
+        }
+        let Some(data) = event.data.as_object() else {
+            continue;
+        };
+        let Some(block) = data.get("block").and_then(|value| value.as_str()) else {
+            continue;
+        };
+        if block.is_empty() {
+            continue;
+        }
+        let reviewed: BTreeMap<&str, &str> = data
+            .get("reviewed")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .filter_map(|(target, correction)| {
+                correction
+                    .as_str()
+                    .map(|correction| (target.as_str(), correction))
+            })
+            .collect();
+        let ids = data
+            .get("events")
+            .and_then(|value| value.as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|id| id.as_str())
+            .filter(|id| !id.is_empty())
+            .filter(|id| match latest.get(*id) {
+                Some(correction) => reviewed.get(*id).copied() == Some(correction.as_str()),
+                None => true,
+            })
+            .map(str::to_owned);
+        merged.entry(block.to_owned()).or_default().extend(ids);
+    }
+
+    merged
+        .into_iter()
+        .map(|(block, ids)| (block, ids.into_iter().collect()))
+        .collect()
 }

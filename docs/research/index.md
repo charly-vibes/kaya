@@ -26,6 +26,10 @@ kaya owns only the bodies of `kaya:begin generated:<name>` /
 tools' managed blocks — is preserved verbatim. This file's generated block is
 `orientation.research-map`: `kaya build` appends it on its first run and
 rewrites only that block afterwards.
+
+Authored blocks may cite ledger evidence with a `kaya:cites` marker. This
+page cites the record's founding acceptance question
+<!-- kaya:cites evt-b64818d83f41e6892fda19b1fc -->.
 <!-- kaya:end authored -->
 
 <!-- other-tool:begin -->

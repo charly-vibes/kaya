@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "correction-ages-a-block"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "correction_ages_a_block"}]

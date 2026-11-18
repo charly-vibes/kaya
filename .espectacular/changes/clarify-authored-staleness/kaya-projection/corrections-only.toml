@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "corrections-only"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "new_evidence_does_not_age_a_block"}]

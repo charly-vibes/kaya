@@ -215,7 +215,7 @@ pub fn parse_line(line: &str) -> Result<Event, EventError> {
         return Err(EventError::new(
             LABEL_TYPE,
             format!(
-                "type \"{event_type}\" is not namespaced; the type grammar is at least three dotted lowercase segments <domain>.<subject>.<outcome>, for example experiment.run.completed"
+                "type \"{event_type}\" is not namespaced; the type grammar is at least three dotted lowercase segments <domain>.<subject>.<outcome>, for example experiment.run.completed — the single two-segment exception is verification.acknowledged, the human acknowledgment record"
             ),
         ));
     }
@@ -504,6 +504,13 @@ fn nested_string<'a>(
 }
 
 fn is_namespaced(event_type: &str) -> bool {
+    // The type grammar is at least three dotted lowercase segments,
+    // <domain>.<subject>.<outcome>. The single exception is the acknowledgment
+    // requirement's `verification.acknowledged`: a two-segment
+    // human-verification record with no finer outcome to name.
+    if event_type == "verification.acknowledged" {
+        return true;
+    }
     let segments: Vec<&str> = event_type.split('.').collect();
     segments.len() >= 3 && segments.iter().copied().all(is_lower_segment)
 }

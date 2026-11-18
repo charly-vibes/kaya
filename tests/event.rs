@@ -123,6 +123,7 @@ fn bare_and_short_types_are_refused() {
     for bad in [
         "created",
         "run.completed",
+        "experiment.run",
         "Experiment.Run.Completed",
         "experiment..completed",
         "experiment.run.Completed",
@@ -138,12 +139,21 @@ fn bare_and_short_types_are_refused() {
             "{}",
             err.message
         );
+        assert!(
+            err.message.contains("verification.acknowledged"),
+            "the refusal names the single exception: {}",
+            err.message
+        );
     }
 }
 
 #[test]
-fn three_segment_lowercase_types_are_accepted() {
-    for good in ["experiment.run.completed", "model.entity.created"] {
+fn namespaced_lowercase_types_are_accepted() {
+    for good in [
+        "experiment.run.completed",
+        "model.entity.created",
+        "verification.acknowledged",
+    ] {
         let line = edited(|record| {
             record.insert("type".to_owned(), json!(good));
         });

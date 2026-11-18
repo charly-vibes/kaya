@@ -3,11 +3,12 @@
 //! The MVP-1 CLI: `init` bootstraps the ledger, `status` reports its shape and
 //! pending proposals, `import` pulls observations from a source adapter or
 //! model events from a seed file, `build` compiles the docs projections, and
-//! `promote`/`challenge` append human promotion events. Every invocation prints
-//! exactly one genesis-style JSON envelope to stdout; failures print an error
-//! envelope labeled with the failure class — a CLI class (`usage`,
-//! `missing-ledger`, `ledger-io`, `build-io`, `not-a-file`) or the label raised
-//! by the library that refused the run.
+//! `promote`/`challenge` append human promotion events, while `acknowledge`
+//! records that a human reviewed an authored block's changed evidence. Every
+//! invocation prints exactly one genesis-style JSON envelope to stdout;
+//! failures print an error envelope labeled with the failure class — a CLI
+//! class (`usage`, `missing-ledger`, `ledger-io`, `build-io`, `not-a-file`) or
+//! the label raised by the library that refused the run.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs::{self, File, OpenOptions};
@@ -22,7 +23,7 @@ use sha2::{Digest, Sha256};
 
 use kaya::adapters::{AdapterError, git, testrunner, wai};
 use kaya::envelope::Envelope;
-use kaya::event::{Actor, ActorType, Event, parse_line};
+use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, new_id, parse_line};
 use kaya::ledger::{AppendOutcome, Ledger, LedgerError, changed_event_ids, sha256_hex};
 use kaya::model::{self, EntityType, ModelError};
 use kaya::projection::{ProjectionError, StaleBlock, Summary, index, report, reuse};
@@ -128,6 +129,23 @@ enum Command {
         #[arg(long, value_name = "NAME")]
         actor: String,
     },
+    /// Acknowledge an authored block's changed evidence as reviewed
+    Acknowledge {
+        /// Document carrying the authored block
+        document: PathBuf,
+        /// Authored block name, e.g. `authored-1`
+        #[arg(long, value_name = "NAME")]
+        block: String,
+        /// Event ids the acknowledgment covers
+        #[arg(long = "events", required = true, num_args = 1.., value_name = "ID")]
+        events: Vec<String>,
+        /// Name of the acknowledging human
+        #[arg(long, value_name = "NAME")]
+        actor: String,
+        /// Actor kind; only `human` may acknowledge authored evidence
+        #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
+        actor_type: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -175,11 +193,18 @@ fn main() -> ExitCode {
         Ok(cli) => cli,
         Err(err) => match err.kind() {
             ClapErrorKind::DisplayHelp | ClapErrorKind::DisplayVersion => err.exit(),
-            _ if invoked_check() => {
+            _ if invoked("check") => {
                 return emit_code(
                     Envelope::error("error", "kaya.verification.usage", err.to_string()),
                     2,
                 );
+            }
+            _ if invoked("acknowledge") => {
+                return emit(Envelope::error(
+                    "error",
+                    "kaya.acknowledge.usage",
+                    err.to_string(),
+                ));
             }
             _ => return emit(Envelope::error("error", "usage", err.to_string())),
         },
@@ -227,16 +252,24 @@ fn main() -> ExitCode {
             events,
             actor,
         } => cmd_challenge(&conclusion_id, &events, &actor),
+        Command::Acknowledge {
+            document,
+            block,
+            events,
+            actor,
+            actor_type,
+        } => cmd_acknowledge(&document, &block, &events, &actor, &actor_type),
     };
     emit(outcome.unwrap_or_else(|(label, message)| Envelope::error("error", &label, message)))
 }
 
-/// Whether the invocation names the `check` subcommand.
+/// Whether the invocation names `name` as its subcommand.
 ///
 /// A parse failure never yields the [`Command`] enum, so the raw argument is
-/// the only way to keep `check`'s usage failures in its own label namespace.
-fn invoked_check() -> bool {
-    std::env::args_os().nth(1).is_some_and(|arg| arg == "check")
+/// the only way to keep a subcommand's usage failures in its own label
+/// namespace.
+fn invoked(name: &str) -> bool {
+    std::env::args_os().nth(1).is_some_and(|arg| arg == name)
 }
 
 /// Print exactly one envelope and map it onto the process exit code.
@@ -363,8 +396,8 @@ fn open_ledger() -> Result<Ledger, Failure> {
 
 /// A human actor named on the command line.
 ///
-/// The CLI has no way to name a tool or agent actor: promotion commands are
-/// the one human door into the record.
+/// The CLI has no way to name a tool or agent actor: promotion and
+/// acknowledgment are the human doors into the record.
 fn human_actor(name: &str) -> Actor {
     Actor {
         r#type: ActorType::Human,
@@ -550,6 +583,7 @@ fn cmd_build(
 ) -> Result<Envelope, Failure> {
     let (events, ledger_digest) = read_build_ledger(expect_digest, allow_uncommitted)?;
     let changed_ids = changed_event_ids(&events);
+    let known_ids: BTreeSet<String> = events.iter().map(|event| event.id.clone()).collect();
 
     let graph = model::build(&events).map_err(model_failure)?;
     let state = PromotionState::from_events(&events).map_err(promotion_failure)?;
@@ -561,9 +595,9 @@ fn cmd_build(
         )
     })?;
     let index_path = out.join("index.md");
-    let mut summary =
-        index::build(&graph, &index_path, events.len()).map_err(projection_failure)?;
-    flag_stale_authored(&mut summary, &index_path, &changed_ids)?;
+    let mut summary = index::build(&graph, &index_path, report::recorded_event_count(&events))
+        .map_err(projection_failure)?;
+    flag_stale_authored(&mut summary, &index_path, &changed_ids, &known_ids, &events)?;
 
     let experiments: Vec<String> = graph
         .nodes()
@@ -586,7 +620,13 @@ fn cmd_build(
                 .map_err(projection_failure)?;
             omitted.extend(built.omitted);
             merge_summary(&mut summary, built.summary);
-            flag_stale_authored(&mut summary, &report_path, &changed_ids)?;
+            flag_stale_authored(
+                &mut summary,
+                &report_path,
+                &changed_ids,
+                &known_ids,
+                &events,
+            )?;
         }
     }
 
@@ -598,7 +638,13 @@ fn cmd_build(
         report::build_understanding(&graph, &understanding_path).map_err(projection_failure)?;
     omitted.extend(built.omitted);
     merge_summary(&mut summary, built.summary);
-    flag_stale_authored(&mut summary, &understanding_path, &changed_ids)?;
+    flag_stale_authored(
+        &mut summary,
+        &understanding_path,
+        &changed_ids,
+        &known_ids,
+        &events,
+    )?;
 
     // The overview is the orientation slice of the same graph: Project,
     // Question, and current Findings, or no document at all.
@@ -606,7 +652,13 @@ fn cmd_build(
     let built = report::build_overview(&graph, &overview_path).map_err(projection_failure)?;
     omitted.extend(built.omitted);
     merge_summary(&mut summary, built.summary);
-    flag_stale_authored(&mut summary, &overview_path, &changed_ids)?;
+    flag_stale_authored(
+        &mut summary,
+        &overview_path,
+        &changed_ids,
+        &known_ids,
+        &events,
+    )?;
 
     // The reuse projection always runs, even when the ledger holds no reuse
     // references: an existing document's stale blocks and legacy names are
@@ -617,7 +669,7 @@ fn cmd_build(
     omitted.extend(built.omitted);
     merge_summary(&mut summary, built.summary);
     for (_, path) in reuse::documents(out) {
-        flag_stale_authored(&mut summary, &path, &changed_ids)?;
+        flag_stale_authored(&mut summary, &path, &changed_ids, &known_ids, &events)?;
     }
 
     let mut recomputed = summary.recomputed;
@@ -794,18 +846,21 @@ fn cmd_check(
     }
 }
 
-/// Flag authored blocks in one compiled document whose cited evidence moved.
+/// Validate and report the authored blocks of one compiled document.
 ///
 /// The document is read back after compilation, never rewritten, so authored
-/// bytes stay exactly as the human left them.
+/// bytes stay exactly as the human left them. Its citation markers are checked
+/// first — always, even when nothing changed — because staleness over a
+/// citation of an id the ledger does not record would report on evidence that
+/// does not exist. Only then are changed citations reported, minus the ids a
+/// human acknowledged for this document and block.
 fn flag_stale_authored(
     summary: &mut Summary,
     path: &Path,
     changed_ids: &[String],
+    known_ids: &BTreeSet<String>,
+    events: &[Event],
 ) -> Result<(), Failure> {
-    if changed_ids.is_empty() {
-        return Ok(());
-    }
     let document = match fs::read_to_string(path) {
         Ok(document) => document,
         // A report can legitimately be absent: when both kinds have no
@@ -819,11 +874,16 @@ fn flag_stale_authored(
             ));
         }
     };
-    summary.stale.extend(report::stale_authored(
-        &document,
-        changed_ids,
-        &BTreeMap::new(),
-    ));
+    let label = report::document_label_for(path);
+    report::validate_citations(&document, &label, known_ids).map_err(projection_failure)?;
+    if changed_ids.is_empty() {
+        return Ok(());
+    }
+    let acknowledged = report::acknowledged(events, &label);
+    let stale = report::stale_authored(&document, changed_ids, &acknowledged);
+    summary
+        .stale
+        .extend(report::unacknowledged(stale, &acknowledged));
     Ok(())
 }
 
@@ -1027,4 +1087,224 @@ fn cmd_challenge(
 
     ledger.append(&challenge).map_err(ledger_failure)?;
     Ok(Envelope::ok("challenge", json!({ "event": challenge })))
+}
+
+/// Append a human acknowledgment of one authored block's changed evidence.
+///
+/// This is the writer the staleness report reads: exactly one
+/// `verification.acknowledged` event naming the document, the block, and the
+/// ids reviewed. Only a human may acknowledge — the record is a claim that a
+/// person read the evidence. Every refusal happens before the append, so a
+/// rejected invocation leaves the ledger byte-identical. An equivalent
+/// acknowledgment already recorded is reported with `appended: false` and the
+/// stored event, so repeating the command appends nothing. Authored bytes are
+/// never touched and nothing is rebuilt: the next `build` or `check` reflects
+/// the acknowledgment.
+fn cmd_acknowledge(
+    document: &Path,
+    block: &str,
+    event_ids: &[String],
+    actor_name: &str,
+    actor_type: &str,
+) -> Result<Envelope, Failure> {
+    if actor_type != "human" {
+        return Err(failure(
+            "kaya.acknowledge.tool_actor",
+            format!(
+                "actor type \"{actor_type}\" may not acknowledge authored evidence; \
+                 only a human can acknowledge what a human wrote"
+            ),
+        ));
+    }
+
+    let canonical = fs::canonicalize(document).ok();
+    let canonical_cwd = std::env::current_dir()
+        .ok()
+        .and_then(|dir| fs::canonicalize(dir).ok());
+    let label = report::document_label_for(document);
+    if let (Some(canonical), Some(cwd)) = (&canonical, &canonical_cwd)
+        && canonical.strip_prefix(cwd).is_err()
+    {
+        return Err(failure(
+            "kaya.acknowledge.unknown_document",
+            format!(
+                "unknown document \"{label}\": it lies outside the working directory {}",
+                cwd.display()
+            ),
+        ));
+    }
+    match fs::metadata(document) {
+        Ok(metadata) if metadata.is_file() => {}
+        Ok(_) => {
+            return Err(failure(
+                "kaya.acknowledge.unknown_document",
+                format!("unknown document \"{label}\": the path is not a file"),
+            ));
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            return Err(failure(
+                "kaya.acknowledge.unknown_document",
+                format!("unknown document \"{label}\": {error}"),
+            ));
+        }
+        Err(error) => {
+            return Err(failure(
+                "kaya.acknowledge.document_io",
+                format!("failed to inspect \"{label}\": {error}"),
+            ));
+        }
+    }
+
+    let text = fs::read_to_string(document).map_err(|error| {
+        failure(
+            "kaya.acknowledge.document_io",
+            format!("failed to read \"{label}\": {error}"),
+        )
+    })?;
+    let blocks = report::authored_block_names(&text).map_err(projection_failure)?;
+    if !blocks.iter().any(|name| name == block) {
+        let available = if blocks.is_empty() {
+            "it carries none".to_owned()
+        } else {
+            format!("the document carries {}", blocks.join(", "))
+        };
+        return Err(failure(
+            "kaya.acknowledge.unknown_block",
+            format!("\"{label}\" has no authored block \"{block}\": {available}"),
+        ));
+    }
+
+    let mut ledger = Ledger::open(LEDGER_PATH).map_err(acknowledge_ledger_failure)?;
+    let (events, _recovery) = ledger
+        .read_recovered()
+        .map_err(acknowledge_ledger_failure)?;
+
+    let known: BTreeSet<&str> = events.iter().map(|event| event.id.as_str()).collect();
+    for id in event_ids {
+        if !known.contains(id.as_str()) {
+            return Err(failure(
+                "kaya.acknowledge.unknown_event",
+                format!(
+                    "unknown event id \"{id}\": an acknowledgment covers evidence the ledger records"
+                ),
+            ));
+        }
+    }
+    let covered: Vec<String> = event_ids
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let latest = report::latest_corrections(&events);
+    let reviewed: BTreeMap<String, String> = covered
+        .iter()
+        .filter_map(|id| {
+            latest
+                .get(id)
+                .map(|correction| (id.clone(), correction.clone()))
+        })
+        .collect();
+
+    if let Some(existing) = equivalent_acknowledgment(&events, &label, block, &covered, &reviewed) {
+        return Ok(Envelope::ok(
+            "acknowledge",
+            json!({ "event": existing, "appended": false }),
+        ));
+    }
+
+    let acknowledgment = Event {
+        id: new_id(),
+        schema: SCHEMA_V0.to_owned(),
+        r#type: report::ACKNOWLEDGED_EVENT.to_owned(),
+        timestamp: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        actor: human_actor(actor_name),
+        subject: Subject {
+            r#type: report::DOCUMENT_SUBJECT.to_owned(),
+            id: label.clone(),
+        },
+        data: json!({ "block": block, "events": covered, "reviewed": reviewed }),
+        provenance: Provenance {
+            tool: "kaya".to_owned(),
+            version: env!("CARGO_PKG_VERSION").to_owned(),
+            reference: label,
+        },
+        artifacts: Vec::new(),
+    };
+    let outcome = ledger
+        .append(&acknowledgment)
+        .map_err(acknowledge_ledger_failure)?;
+
+    Ok(Envelope::ok(
+        "acknowledge",
+        json!({
+            "event": acknowledgment,
+            "appended": outcome == AppendOutcome::Appended,
+        }),
+    ))
+}
+
+/// The recorded acknowledgment covering exactly `(document, block, ids,
+/// reviewed)`, if any.
+///
+/// Replay is a no-op only when the id sets and the reviewed correction map
+/// match: acknowledging a subset again is a second, narrower review, and the
+/// same ids after a newer correction reviewed a version the human has not
+/// seen.
+fn equivalent_acknowledgment<'a>(
+    events: &'a [Event],
+    document: &str,
+    block: &str,
+    ids: &[String],
+    reviewed: &BTreeMap<String, String>,
+) -> Option<&'a Event> {
+    let wanted: BTreeSet<&str> = ids.iter().map(String::as_str).collect();
+    events.iter().find(|event| {
+        if event.r#type != report::ACKNOWLEDGED_EVENT
+            || event.subject.r#type != report::DOCUMENT_SUBJECT
+            || report::document_label(&event.subject.id) != document
+        {
+            return false;
+        }
+        let Some(data) = event.data.as_object() else {
+            return false;
+        };
+        if data.get("block").and_then(|value| value.as_str()) != Some(block) {
+            return false;
+        }
+        let stored: BTreeSet<&str> = data
+            .get("events")
+            .and_then(|value| value.as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|id| id.as_str())
+            .filter(|id| !id.is_empty())
+            .collect();
+        if stored != wanted {
+            return false;
+        }
+        let stored_reviewed: BTreeMap<&str, &str> = data
+            .get("reviewed")
+            .and_then(|value| value.as_object())
+            .into_iter()
+            .flatten()
+            .filter_map(|(target, correction)| {
+                correction
+                    .as_str()
+                    .map(|correction| (target.as_str(), correction))
+            })
+            .collect();
+        stored_reviewed.len() == reviewed.len()
+            && reviewed.iter().all(|(target, correction)| {
+                stored_reviewed.get(target.as_str()).copied() == Some(correction.as_str())
+            })
+    })
+}
+
+/// A ledger refusal inside `kaya acknowledge`, kept in the command's namespace.
+fn acknowledge_ledger_failure(error: LedgerError) -> Failure {
+    failure(
+        "kaya.acknowledge.ledger",
+        format!("{}: {}", error.label, error.message),
+    )
 }

@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "marker-outside-an-authored-block-ignored"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "citation_marker_outside_authored_block_inert"}]
