@@ -45,6 +45,10 @@ docs: specs-docs
 links:
 	python3 scripts/check-links.py
 
+# Fail when status/README release claims contradict Cargo.toml
+release-claims:
+	python3 scripts/check-release-claims.py
+
 # === Spec gates ===
 
 # Verify the committed record against its projections without writing

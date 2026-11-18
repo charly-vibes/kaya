@@ -16,7 +16,7 @@ Part of the [charly-vibes](https://github.com/charly-vibes) toolshed.
 
 The overview — what kaya is, why it exists, and when to use it — is a
 [compiled page](docs/public/overview.md) emitted from this repository's own
-record and kept current by `kaya`. Motivation, architecture and design
+record that `kaya` compiles and verifies. Motivation, architecture and design
 decisions live in the [book](docs/src/index.md).
 
 ## Status

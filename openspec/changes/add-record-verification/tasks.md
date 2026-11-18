@@ -52,7 +52,7 @@ contract-test shape. One tdd-ro5u run per ticket.
 
 - [x] 3.1 One comparison core shared by worktree and index modes; no mode
       branch inside the renderer. (kaya-585)
-- [ ] 3.2 Documentation: command table in README; `docs/src/status.md`
+- [x] 3.2 Documentation: command table in README; `docs/src/status.md`
       implemented list and its capability count (six → seven); the hook example
       that uses `check --index`, never `build`. (kaya-gh2)
 
@@ -71,7 +71,7 @@ behavior. They may land after the command does.
       `main`/release above the configured bound. (kaya-8dg)
 - [ ] 4.4 Scheduled capture on `main` (`import wai`, `import git`, `build`,
       `publish`) that commits the snapshot deliberately. (kaya-9go)
-- [ ] 4.5 Link check over the built book (kaya-nwv) and the release-claim check for
+- [x] 4.5 Link check over the built book (kaya-nwv) and the release-claim check for
       `docs/src/status.md` (kaya-gh2).
 - [ ] 4.6 Publication tree reachable from the deployed docs (copy into the
       book or a second Pages job). (kaya-2b0)
