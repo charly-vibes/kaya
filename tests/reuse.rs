@@ -216,9 +216,14 @@ fn inputs_selects_references_from_the_graph() {
     let ledger_before = fs::read(&ledger).expect("the ledger is readable");
 
     let built = build(&inputs, &out).expect("the selected references build");
-    assert!(
-        built.omitted.is_empty(),
-        "both documents have references: {:?}",
+    let omitted: Vec<&str> = built.omitted.iter().map(|entry| entry.kind).collect();
+    assert_eq!(
+        omitted,
+        vec![
+            Kind::TechnicalReference.as_str(),
+            Kind::KnowledgeBrief.as_str(),
+        ],
+        "only the adapter-backed kinds are empty: {:?}",
         built.omitted
     );
 
@@ -389,11 +394,23 @@ fn blank_attributes_are_treated_as_absent() {
     let built = build(&inputs, &out).expect("the surviving command builds");
     assert_eq!(
         built.omitted,
-        vec![Omitted {
-            family: "reuse-handoff",
-            kind: "handoff",
-            reason: REASON_NO_RECORDS,
-        }],
+        vec![
+            Omitted {
+                family: "reuse-handoff",
+                kind: "technical-reference",
+                reason: REASON_NO_RECORDS,
+            },
+            Omitted {
+                family: "reuse-handoff",
+                kind: "knowledge-brief",
+                reason: REASON_NO_RECORDS,
+            },
+            Omitted {
+                family: "reuse-handoff",
+                kind: "handoff",
+                reason: REASON_NO_RECORDS,
+            },
+        ],
         "the blank handoff path leaves the handoff kind empty"
     );
     assert!(
@@ -423,7 +440,17 @@ fn blank_attributes_are_treated_as_absent() {
         vec![
             Omitted {
                 family: "reuse-handoff",
+                kind: "technical-reference",
+                reason: REASON_NO_RECORDS,
+            },
+            Omitted {
+                family: "reuse-handoff",
                 kind: "reproduction-package",
+                reason: REASON_NO_RECORDS,
+            },
+            Omitted {
+                family: "reuse-handoff",
+                kind: "knowledge-brief",
                 reason: REASON_NO_RECORDS,
             },
             Omitted {
@@ -570,7 +597,17 @@ fn removing_the_last_block_deletes_the_document() {
         vec![
             Omitted {
                 family: "reuse-handoff",
+                kind: "technical-reference",
+                reason: REASON_NO_RECORDS,
+            },
+            Omitted {
+                family: "reuse-handoff",
                 kind: "reproduction-package",
+                reason: REASON_NO_RECORDS,
+            },
+            Omitted {
+                family: "reuse-handoff",
+                kind: "knowledge-brief",
                 reason: REASON_NO_RECORDS,
             },
             Omitted {
@@ -579,7 +616,7 @@ fn removing_the_last_block_deletes_the_document() {
                 reason: REASON_NO_RECORDS,
             },
         ],
-        "both empty kinds are reported"
+        "every empty kind is reported"
     );
 }
 
@@ -651,6 +688,8 @@ foreign bytes
 #[test]
 fn second_build_reports_both_blocks_unchanged() {
     let inputs = Inputs {
+        specs: Vec::new(),
+        entries: Vec::new(),
         revisions: vec![source("alpha/Source/one", "src/main.rs@9f2c1a")],
         commands: vec![source("alpha/Run/one", "cargo test")],
         handoffs: vec![source(
@@ -729,12 +768,24 @@ fn handoff_renders_wai_artifact_references() {
     let built = build(&inputs, &out).expect("a handoff document builds");
     assert_eq!(
         built.omitted,
-        vec![Omitted {
-            family: "reuse-handoff",
-            kind: "reproduction-package",
-            reason: REASON_NO_RECORDS,
-        }],
-        "the empty reproduction package is reported exactly once"
+        vec![
+            Omitted {
+                family: "reuse-handoff",
+                kind: "technical-reference",
+                reason: REASON_NO_RECORDS,
+            },
+            Omitted {
+                family: "reuse-handoff",
+                kind: "reproduction-package",
+                reason: REASON_NO_RECORDS,
+            },
+            Omitted {
+                family: "reuse-handoff",
+                kind: "knowledge-brief",
+                reason: REASON_NO_RECORDS,
+            },
+        ],
+        "the empty adapter-backed and reproduction kinds are reported exactly once"
     );
     assert_eq!(
         built.summary.recomputed,
@@ -799,7 +850,17 @@ fn empty_kinds_are_omitted_and_write_no_file() {
         vec![
             Omitted {
                 family: "reuse-handoff",
+                kind: "technical-reference",
+                reason: REASON_NO_RECORDS,
+            },
+            Omitted {
+                family: "reuse-handoff",
                 kind: "reproduction-package",
+                reason: REASON_NO_RECORDS,
+            },
+            Omitted {
+                family: "reuse-handoff",
+                kind: "knowledge-brief",
                 reason: REASON_NO_RECORDS,
             },
             Omitted {
@@ -887,9 +948,14 @@ fn building_writes_markdown_only() {
         ..Inputs::default()
     };
     let built = build(&inputs, &out).expect("a reuse projection builds");
-    assert!(
-        built.omitted.is_empty(),
-        "both kinds have references: {:?}",
+    let omitted: Vec<&str> = built.omitted.iter().map(|entry| entry.kind).collect();
+    assert_eq!(
+        omitted,
+        vec![
+            Kind::TechnicalReference.as_str(),
+            Kind::KnowledgeBrief.as_str(),
+        ],
+        "only the adapter-backed kinds are empty: {:?}",
         built.omitted
     );
 

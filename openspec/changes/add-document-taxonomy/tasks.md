@@ -44,8 +44,9 @@ code changes here. bd ticket mapping noted per phase.
 - [x] 3.8 Remaining products plus structured export: `status-compatibility`,
       `release-migration`, `architecture-design`, one source for every format.
       (kaya-scq)
-- [ ] 3.9 Adapter-dependent reuse kinds: `technical-reference` (specodelic) and
-      `knowledge-brief` (turu). Blocked on kaya-24c and kaya-syx. (kaya-lh1)
+- [x] 3.9 Adapter-dependent reuse kinds: `technical-reference` (specodelic) and
+      `knowledge-brief` (turu). Delivered at the projection layer from reference
+      attributes; ledger ingestion stays with kaya-24c and kaya-syx. (kaya-lh1)
 - [ ] 3.10 Editorial cutover: replace hand-written overview and concept prose
       with generated products plus authored blocks. HITL. (kaya-n50)
 - [ ] 3.11 Publish authorization: crates.io credentials and release channel.

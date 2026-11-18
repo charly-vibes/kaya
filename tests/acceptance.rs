@@ -371,6 +371,16 @@ fn mvp1_three_question_dossier_compiles_from_the_repository_record() {
                 "reason": "no-records",
             },
             {
+                "family": "reuse-handoff",
+                "kind": "knowledge-brief",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "technical-reference",
+                "reason": "no-records",
+            },
+            {
                 "family": "understanding",
                 "kind": "decision-record",
                 "reason": "no-records",

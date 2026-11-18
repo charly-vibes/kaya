@@ -1,7 +1,8 @@
 //! The reuse-handoff reference projections.
 //!
-//! Purpose: compile reproduction-package and handoff documents that point at
-//! authoritative sources instead of copying their payloads.
+//! Purpose: compile technical-reference, reproduction-package, knowledge-brief
+//! and handoff documents that point at authoritative sources instead of
+//! copying their payloads.
 //! Responsibilities: render deterministic reference rows from graph inputs,
 //! validate existing documents against the closed block vocabulary before any
 //! write, replace only the family-owned generated blocks, omit empty kinds
@@ -30,16 +31,24 @@ use crate::projection::{
     replace_generated, validate_generated_blocks, write,
 };
 
+/// Generated block carrying the technical-reference spec ids.
+pub const TECHNICAL_REFERENCE_BLOCK: &str = "reuse-handoff.technical-reference";
 /// Generated block carrying the reproduction-package references.
 pub const REPRODUCTION_BLOCK: &str = "reuse-handoff.reproduction-package";
+/// Generated block carrying the knowledge-brief entry ids.
+pub const KNOWLEDGE_BRIEF_BLOCK: &str = "reuse-handoff.knowledge-brief";
 /// Generated block carrying the handoff references.
 pub const HANDOFF_BLOCK: &str = "reuse-handoff.handoff";
 
 /// Label refusing a reuse attribute that cannot become a reference.
 pub const LABEL_REUSE_ATTRIBUTE: &str = "kaya.projection.reuse_attribute";
 
+/// File receiving the technical-reference block, under the output directory.
+const TECHNICAL_REFERENCE_FILE: &str = "technical-reference.md";
 /// File receiving the reproduction-package block, under the output directory.
 const REPRODUCTION_FILE: &str = "reproduction-package.md";
+/// File receiving the knowledge-brief block, under the output directory.
+const KNOWLEDGE_BRIEF_FILE: &str = "knowledge-brief.md";
 /// File receiving the handoff block, under the output directory.
 const HANDOFF_FILE: &str = "handoff.md";
 
@@ -56,6 +65,10 @@ pub struct SourceRef {
 /// Inputs assembled from the modelled graph by the caller.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Inputs {
+    /// Specodelic spec ids, rendered as the id itself.
+    pub specs: Vec<SourceRef>,
+    /// Turu/whisper entry ids, rendered as the id itself.
+    pub entries: Vec<SourceRef>,
     /// Source-node references, rendered as `path@commit`.
     pub revisions: Vec<SourceRef>,
     /// Run command references, one row per command.
@@ -74,11 +87,16 @@ pub struct Built {
     pub omitted: Vec<Omitted>,
 }
 
-/// The two reuse documents under `out`, paired with their generated block
-/// names.
-pub fn documents(out: &Path) -> [(&'static str, PathBuf); 2] {
+/// The four reuse documents under `out`, in canonical kind order, paired with
+/// their generated block names.
+pub fn documents(out: &Path) -> [(&'static str, PathBuf); 4] {
     [
+        (
+            TECHNICAL_REFERENCE_BLOCK,
+            out.join(TECHNICAL_REFERENCE_FILE),
+        ),
         (REPRODUCTION_BLOCK, out.join(REPRODUCTION_FILE)),
+        (KNOWLEDGE_BRIEF_BLOCK, out.join(KNOWLEDGE_BRIEF_FILE)),
         (HANDOFF_BLOCK, out.join(HANDOFF_FILE)),
     ]
 }
@@ -93,25 +111,44 @@ pub fn documents(out: &Path) -> [(&'static str, PathBuf); 2] {
 /// document. A removal that leaves only whitespace deletes the document
 /// instead of writing an empty one.
 pub fn build(inputs: &Inputs, out: &Path) -> Result<Built, ProjectionError> {
-    let [(_, reproduction_path), (_, handoff_path)] = documents(out);
+    let [
+        (_, technical_path),
+        (_, reproduction_path),
+        (_, knowledge_path),
+        (_, handoff_path),
+    ] = documents(out);
 
-    let mut reproduction_document = read_existing(&reproduction_path)?;
-    if let Some(document) = &reproduction_document {
-        validate_generated_blocks(document)?;
-    }
-    let mut handoff_document = read_existing(&handoff_path)?;
-    if let Some(document) = &handoff_document {
-        validate_generated_blocks(document)?;
-    }
+    // Every existing target is read and validated before any document is
+    // written, so a legacy block leaves all four documents byte-identical.
+    let mut technical_document = read_validated(&technical_path)?;
+    let mut reproduction_document = read_validated(&reproduction_path)?;
+    let mut knowledge_document = read_validated(&knowledge_path)?;
+    let mut handoff_document = read_validated(&handoff_path)?;
 
     let mut summary = Summary::default();
     let mut omitted = Vec::new();
 
     apply(
+        Kind::TechnicalReference,
+        &technical_path,
+        &mut technical_document,
+        render_technical_reference(inputs),
+        &mut summary,
+        &mut omitted,
+    )?;
+    apply(
         Kind::ReproductionPackage,
         &reproduction_path,
         &mut reproduction_document,
         render_reproduction(inputs),
+        &mut summary,
+        &mut omitted,
+    )?;
+    apply(
+        Kind::KnowledgeBrief,
+        &knowledge_path,
+        &mut knowledge_document,
+        render_knowledge_brief(inputs),
         &mut summary,
         &mut omitted,
     )?;
@@ -127,20 +164,46 @@ pub fn build(inputs: &Inputs, out: &Path) -> Result<Built, ProjectionError> {
     Ok(Built { summary, omitted })
 }
 
+/// Read an existing target document and validate its managed blocks.
+fn read_validated(path: &Path) -> Result<Option<String>, ProjectionError> {
+    let document = read_existing(path)?;
+    if let Some(document) = &document {
+        validate_generated_blocks(document)?;
+    }
+    Ok(document)
+}
+
 /// Assemble reuse inputs from the modelled graph.
 ///
-/// Sources contribute one revision row when both `path` and `commit` are
-/// present and non-blank; runs contribute one command row per `command`
-/// string or `commands` array entry; artifacts whose `kind` is `handoffs`
-/// contribute one row per path. An absent or blank attribute skips the node,
-/// while a present non-string attribute — or a `commands` array holding a
-/// non-string entry — is refused with [`LABEL_REUSE_ATTRIBUTE`] naming the
-/// node and attribute. Graph iteration order keeps the result deterministic.
+/// Sources contribute a specodelic spec id from `spec`, a turu/whisper entry
+/// id from `entry`, and a revision row when both `path` and `commit` are
+/// present and non-blank; the three selections are independent, so one source
+/// may carry several. Runs contribute one command row per `command` string or
+/// `commands` array entry; artifacts whose `kind` is `handoffs` contribute one
+/// row per path. An absent or blank attribute skips that selection, while a
+/// present non-string attribute — or a `commands` array holding a non-string
+/// entry — is refused with [`LABEL_REUSE_ATTRIBUTE`] naming the node and
+/// attribute. Graph iteration order keeps the result deterministic.
 pub fn inputs(graph: &Graph) -> Result<Inputs, ProjectionError> {
     let mut inputs = Inputs::default();
     for node in graph.nodes() {
         match node.entity {
             EntityType::Source => {
+                if let Some(spec) = non_blank(string_attribute(&node.id, &node.attributes, "spec")?)
+                {
+                    inputs.specs.push(SourceRef {
+                        id: node.id.clone(),
+                        reference: spec.to_owned(),
+                    });
+                }
+                if let Some(entry) =
+                    non_blank(string_attribute(&node.id, &node.attributes, "entry")?)
+                {
+                    inputs.entries.push(SourceRef {
+                        id: node.id.clone(),
+                        reference: entry.to_owned(),
+                    });
+                }
                 let Some(path) = non_blank(string_attribute(&node.id, &node.attributes, "path")?)
                 else {
                     continue;
@@ -254,17 +317,38 @@ fn render_reproduction(inputs: &Inputs) -> Option<Rendered> {
     })
 }
 
+/// Render the technical-reference block from specodelic spec ids.
+fn render_technical_reference(inputs: &Inputs) -> Option<Rendered> {
+    render_flat(&inputs.specs, "Specs")
+}
+
+/// Render the knowledge-brief block from turu/whisper entry ids.
+fn render_knowledge_brief(inputs: &Inputs) -> Option<Rendered> {
+    render_flat(&inputs.entries, "Entries")
+}
+
 /// Render the handoff block from handoff artifact references.
 fn render_handoff(inputs: &Inputs) -> Option<Rendered> {
-    let handoffs = rows(&inputs.handoffs);
-    if handoffs.is_empty() {
+    render_flat(&inputs.handoffs, "Handoffs")
+}
+
+/// Render one single-section reference kind: the sorted rows under `title`
+/// and the distinct node ids backing them. No rows renders nothing.
+fn render_flat(references: &[SourceRef], title: &str) -> Option<Rendered> {
+    let rows = rows(references);
+    if rows.is_empty() {
         return None;
     }
 
     let mut body = String::new();
-    push_section(&mut body, "Handoffs", &handoffs);
+    push_section(&mut body, title, &rows);
 
-    let sources: BTreeSet<String> = inputs.handoffs.iter().map(|row| row.id.clone()).collect();
+    // A blank reference renders no row, so its node must not be attributed.
+    let sources: BTreeSet<String> = references
+        .iter()
+        .filter(|row| !row.reference.trim().is_empty())
+        .map(|row| row.id.clone())
+        .collect();
 
     Some(Rendered {
         body,

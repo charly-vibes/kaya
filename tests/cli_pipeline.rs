@@ -851,7 +851,17 @@ fn omitted_kinds_reported_once_in_build_envelope() {
             },
             {
                 "family": "reuse-handoff",
+                "kind": "knowledge-brief",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
                 "kind": "reproduction-package",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "technical-reference",
                 "reason": "no-records",
             },
             {
@@ -979,7 +989,17 @@ fn omitted_kinds_are_sorted_and_deduped_across_experiments() {
             },
             {
                 "family": "reuse-handoff",
+                "kind": "knowledge-brief",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
                 "kind": "reproduction-package",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "technical-reference",
                 "reason": "no-records",
             },
             {
@@ -1052,7 +1072,17 @@ fn build_tolerates_a_missing_report_when_corrections_exist() {
             },
             {
                 "family": "reuse-handoff",
+                "kind": "knowledge-brief",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
                 "kind": "reproduction-package",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "technical-reference",
                 "reason": "no-records",
             },
             {
@@ -1141,7 +1171,17 @@ fn ledger_assertions_do_not_create_a_record_block_for_a_runless_experiment() {
             },
             {
                 "family": "reuse-handoff",
+                "kind": "knowledge-brief",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
                 "kind": "reproduction-package",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "technical-reference",
                 "reason": "no-records",
             },
             {
@@ -1346,7 +1386,17 @@ fn build_writes_reference_documents_and_leaves_the_ledger_unchanged() {
             },
             {
                 "family": "reuse-handoff",
+                "kind": "knowledge-brief",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
                 "kind": "reproduction-package",
+                "reason": "no-records",
+            },
+            {
+                "family": "reuse-handoff",
+                "kind": "technical-reference",
                 "reason": "no-records",
             },
             {

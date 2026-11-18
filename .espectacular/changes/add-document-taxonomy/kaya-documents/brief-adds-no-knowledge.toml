@@ -1,0 +1,14 @@
+tool_version = "0.12.3"
+
+id = "brief-adds-no-knowledge"
+description = "A knowledge-brief is assembled from turu entry references: the ledger gains no entity and every rendered item names its entry id."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "knowledge_brief_names_every_entry_id" },
+  { flags = "ledger_gains_no_entity_and_only_markdown_is_written" },
+]
