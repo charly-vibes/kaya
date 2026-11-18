@@ -52,6 +52,12 @@ contract-test shape. bd ticket mapping noted per phase.
 ## Archive checklist
 
 - [ ] All scenarios have executing contract tests (`ah check --run-tests`).
-- [ ] `spk lint openspec/specs` clean after the archive companion deploys
-      the six layers.
-- [ ] bd tickets closed with scenario references.
+      Exception: the turu-bundle scenario stays unbound until the deferred
+      turu adapter (kaya-syx, MVP-2); `kaya-adapters` is therefore held back
+      from `openspec/specs/` at archive time and its contracts parked under
+      `.espectacular/changes/archive/2026-11-18-add-core-research-record/`.
+      The other 103 scenarios pass (103 passed, 0 execution failures).
+- [x] `spk lint openspec/specs` clean after the archive companion deploys
+      the six layers (0 issues; one advisory observability warning).
+- [x] bd tickets closed with scenario references (kaya-lb2 … kaya-9go; red
+      scenarios in each ticket description, close reasons cite validation).

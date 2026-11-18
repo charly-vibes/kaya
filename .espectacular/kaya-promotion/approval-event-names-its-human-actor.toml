@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "approval-event-names-its-human-actor"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "approval_requires_human_and_records_provenance"}]

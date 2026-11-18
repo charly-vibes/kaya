@@ -87,15 +87,16 @@ kaya challenge <conclusion> --events <id>... --actor <name>
   the products; the nightly Record workflow commits the snapshot on main and
   skips its own `chore(record):` commits.
 
-The behavioral specification remains the openspec change
-[`add-core-research-record`](openspec/changes/add-core-research-record/proposal.md)
-(event, ledger, model, projection, promotion, adapters). The document taxonomy
-is archived and deployed as
+The behavioral specification was specified by the archived openspec change
+[`add-core-research-record`](openspec/changes/archive/2026-11-18-add-core-research-record/proposal.md)
+(event, ledger, model, projection, promotion, adapters) and is deployed as
+capability specs under [`openspec/specs/`](openspec/specs) — the document
+taxonomy as
 [`kaya-documents`](openspec/specs/kaya-documents/spec.md) and
 [`kaya-publications`](openspec/specs/kaya-publications/spec.md) — see
-[Documentation taxonomy](docs/src/document-taxonomy.md).
-Remaining milestones are tracked in the
-[change tasks](openspec/changes/add-core-research-record/tasks.md) and in
+[Documentation taxonomy](docs/src/document-taxonomy.md). `kaya-adapters`
+deploys once the deferred turu adapter (kaya-syx) binds its last scenario.
+Remaining milestones are tracked in
 beads (`bd ready` in a clone). This repository already dogfoods the compiler:
 [docs/research/](docs/research/index.md) is kaya's own compiled dossier.
 

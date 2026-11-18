@@ -1,0 +1,153 @@
+---
+id: kaya.model
+kind: intent
+statement: "THE kaya.model capability SHALL connect admitted events into a research graph over a closed thirteen-entity vocabulary with a closed set of typed, direction-fixed relationships, refusing unknown entities, unknown relationships, dangling references, and influence cycles, with namespace-qualified node ids so ledgers compose across repositories."
+---
+
+# kaya-model Specification
+
+## Purpose
+The research vocabulary: a closed set of thirteen entity kinds and typed,
+direction-fixed relationships that connect admitted events into a graph of the
+research. This capability refuses unknown entities, unknown relationships,
+dangling references, and influence cycles, and namespace-qualifies node ids so
+ledgers from different repositories compose without collision.
+
+## Constraints
+
+| id                       | kind      | expr                                                                                                                                                                                                                     | traces_to |
+|--------------------------|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|
+| vocabulary_closed        | invariant | `node types are exactly {Project, Question, Idea, Hypothesis, Model, Experiment, Run, Artifact, Observation, Claim, Finding, Decision, Source} — another type is a labeled refusal`                                          | [[kaya.model]] |
+| relationship_set_closed  | invariant | `relationships come from the closed set {investigates, predicts, executes, observes, supports, challenges, influences, realizes, derives} — growth only by a schema revision`                                                 | [[kaya.model]] |
+| references_resolve       | invariant | `every relationship endpoint resolves to an existing node — a dangling endpoint is a labeled refusal naming it`                                                                                                               | [[kaya.model]] |
+| influence_acyclic        | invariant | `the subgraph of influences and derives edges is acyclic — a cycle is a labeled refusal naming its members`                                                                                                                   | [[kaya.model]] |
+| direction_fixed          | invariant | `each relationship's direction is fixed by grammar: Run executes Experiment, Observation observes Run, Finding derives from Observation, Decision influenced by Finding, Model realizes Hypothesis — reversed edges are refusals, never coercions` | [[kaya.model]] |
+| namespaced_ids           | invariant | `node ids are <project>/<TYPE>/<key> — distinct ledgers compose without collision`                                                                                                                                            | [[kaya.model]] |
+
+## Model
+
+### States
+- `building`
+- `built`
+- `refused`
+
+### Transitions
+
+| id       | from      | to       | guard                                                                                  |
+|----------|-----------|----------|----------------------------------------------------------------------------------------|
+| admit    | building  | building | [[kaya.model.vocabulary_closed]] ∧ [[kaya.model.relationship_set_closed]] ∧ [[kaya.model.direction_fixed]] |
+| link     | building  | built    | [[kaya.model.references_resolve]] ∧ [[kaya.model.influence_acyclic]] ∧ [[kaya.model.namespaced_ids]] |
+| reject   | building  | refused  | `a guard violation is recorded with the offending node, relationship, or cycle`          |
+
+## Properties
+
+| id                           | kind | derives_from                            | generator                          | predicate                                      |
+|------------------------------|------|-----------------------------------------|------------------------------------|------------------------------------------------|
+| unknown_entity_refused       | unit | [[kaya.model.vocabulary_closed]]        | `node_of_foreign_type()`           | `build ⇒ refusal naming the type`               |
+| unknown_relationship_refused | unit | [[kaya.model.relationship_set_closed]]  | `edge_of_foreign_type()`           | `build ⇒ refusal naming the relationship`       |
+| dangling_ref_refused         | unit | [[kaya.model.references_resolve]]       | `edge_to_absent_node()`            | `build ⇒ refusal naming the endpoint`           |
+| influence_cycle_refused      | unit | [[kaya.model.influence_acyclic]]        | `two_node_influence_cycle()`       | `build ⇒ refusal naming the cycle`              |
+| direction_grammar_checked    | unit | [[kaya.model.direction_fixed]]          | `reversed_executes_edge()`         | `build ⇒ refusal naming the direction rule`     |
+| graph_round_trip             | unit | [[kaya.model.namespaced_ids]]           | `arbitrary_built_graph()`          | `serialize ∘ read == identity`                  |
+
+## Requirements
+
+### Requirement: Closed research vocabulary
+
+The research graph SHALL use exactly the entity types Project, Question,
+Idea, Hypothesis, Model, Experiment, Run, Artifact, Observation, Claim,
+Finding, Decision, Source — a node of any other type is a labeled refusal.
+Node ids SHALL be namespace-qualified (`<project>/<TYPE>/<key>`) so ledgers
+from different repositories compose without collision.
+
+#### Scenario: Relationship naming an absent entity type refused
+
+- **WHEN** a graph build encounters a node typed `Task`
+- **THEN** the build refuses with a labeled error naming the unknown type
+  and the closed thirteen-type set
+
+#### Scenario: Namespace-qualified ids compose
+
+- **WHEN** two ledgers from different projects both define node
+  `EXP-001`
+- **THEN** their qualified ids (`alpha/Experiment/EXP-001`,
+  `beta/Experiment/EXP-001`) remain distinct through any merge
+
+### Requirement: Typed relationship closure
+
+Relationships SHALL come from the closed typed set — investigates,
+predicts, executes, observes, supports, challenges, influences, realizes,
+derives — with direction fixed by the relationship (for example a Run
+executes an Experiment, never the reverse). A reference to a node that does
+not exist is a labeled refusal; influence and derives edges SHALL remain
+acyclic.
+
+#### Scenario: Relationship outside the closed set refused
+
+- **WHEN** an event asserts a relationship outside the closed set
+- **THEN** the graph build refuses naming the unknown relationship
+
+#### Scenario: Dangling reference refused
+
+- **WHEN** a Claim references a Finding id absent from the ledger
+- **THEN** the graph build refuses naming the dangling reference
+
+#### Scenario: Influence edge forming a cycle refused
+
+- **WHEN** Decision A influences Decision B and B influences A
+- **THEN** the graph build refuses naming the cycle's members — influence
+  cannot become circular
+
+### Requirement: Direction discipline
+
+Relationship direction SHALL follow the vocabulary's fixed grammar: a Run
+executes an Experiment; an Observation observes a Run; a Finding derives
+from Observations; a Decision is influenced by Findings; an Implementation
+Model realizes a Hypothesis. Reversed edges are labeled refusals, not
+coercions.
+
+#### Scenario: Reversed edge refused
+
+- **WHEN** an event asserts `Experiment X executes Run Y`
+- **THEN** the graph build refuses naming the direction rule for executes
+
+### Requirement: Property coverage mirror
+
+Every property row in the layer sidecar SHALL be verified by exactly one
+dedicated scenario.
+
+#### Scenario: unknown_entity_refused
+
+- **WHEN** a node carries a type outside the closed set
+- **THEN** the build refuses naming the type
+- **VERIFIES** [[kaya.model.vocabulary_closed]]
+
+#### Scenario: unknown_relationship_refused
+
+- **WHEN** a relationship outside the closed set is asserted
+- **THEN** the build refuses naming the relationship
+- **VERIFIES** [[kaya.model.relationship_set_closed]]
+
+#### Scenario: dangling_ref_refused
+
+- **WHEN** a reference names an absent node
+- **THEN** the build refuses naming the dangling reference
+- **VERIFIES** [[kaya.model.references_resolve]]
+
+#### Scenario: influence_cycle_refused
+
+- **WHEN** influence edges form a cycle
+- **THEN** the build refuses naming the cycle members
+- **VERIFIES** [[kaya.model.influence_acyclic]]
+
+#### Scenario: direction_grammar_checked
+
+- **WHEN** a reversed executes edge is asserted
+- **THEN** the build refuses naming the direction rule
+- **VERIFIES** [[kaya.model.direction_fixed]]
+
+#### Scenario: graph_round_trip
+
+- **WHEN** a built graph is serialized and re-read
+- **THEN** nodes, relationships, and ids are identical
+- **VERIFIES** [[kaya.model.namespaced_ids]]

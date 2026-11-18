@@ -1,0 +1,156 @@
+---
+id: kaya.event
+kind: intent
+statement: "WHEN a capture source records a research event, THE kaya.event schema SHALL validate it as one kaya.event/v0 record over a closed field set with provenance and a namespaced event type, and SHALL refuse records that carry interpretation instead of observation."
+---
+
+# kaya-event Specification
+
+## Purpose
+The schema half of the research record: every fact kaya stores arrives as one
+`kaya.event/v0` record. This capability defines the closed nine-field record
+format with provenance and namespaced event types, so capture adapters and the
+ledger share one validation contract, and interpretation stays out of captured
+facts — events observe; conclusions belong to `kaya.promotion`.
+
+## Constraints
+
+| id                      | kind      | expr                                                                                                                                                                                                 | traces_to |
+|-------------------------|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|
+| field_set_closed        | invariant | `a record's fields are exactly {id, schema, type, timestamp, actor, subject, data, provenance, artifacts} — an unknown field is a labeled refusal, never ignored`                                      | [[kaya.event]] |
+| schema_version_pinned   | invariant | `the schema field equals kaya.event/v0; records naming another version are refused at ingest naming the supported set — the set grows only by a new schema revision`                                   | [[kaya.event]] |
+| stable_ids              | invariant | `every record id is unique within its ledger and never reused — a colliding non-identical record is a labeled refusal`                                                                                 | [[kaya.event]] |
+| timestamp_rfc3339       | invariant | `timestamp is RFC 3339 UTC — a non-conforming timestamp is a labeled refusal naming the field`                                                                                                          | [[kaya.event]] |
+| provenance_present      | invariant | `provenance names the emitting source (tool or human origin) and a reference (commit, artifact path, or session id) resolvable outside the ledger`                                                     | [[kaya.event]] |
+| type_namespaced         | invariant | `type is a dotted namespaced path <domain>.<subject>.<outcome> (for example experiment.run.completed) — an unnamespaced type is a labeled refusal`                                                     | [[kaya.event]] |
+| observation_only        | invariant | `a capture event records observations (counts, paths, references, statuses as emitted by its source) and carries no top-level interpretation field in data — promotion.* records are the sanctioned interpretation channel; hypothesis verdicts and conclusions outside it are promotion's territory, not the schema's` | [[kaya.event]] |
+| envelope_independence   | extension_point | `kaya.event/v0 records are ledger payloads, distinct from CLI command envelopes (genesis conventions); the seam where CLI I/O wraps events is declared here and revisited after the first end-to-end dossier` | [[kaya.event]] |
+
+## Model
+
+### States
+- `raw`
+- `validated`
+- `refused`
+
+### Transitions
+
+| id       | from       | to         | guard                                                                        |
+|----------|------------|------------|------------------------------------------------------------------------------|
+| parse    | raw        | validated  | [[kaya.event.field_set_closed]] ∧ [[kaya.event.schema_version_pinned]] ∧ [[kaya.event.type_namespaced]] |
+| stamp    | validated  | validated  | [[kaya.event.timestamp_rfc3339]] ∧ [[kaya.event.provenance_present]] ∧ [[kaya.event.observation_only]] |
+| reject   | raw        | refused    | `¬([[kaya.event.field_set_closed]] ∧ [[kaya.event.schema_version_pinned]] ∧ [[kaya.event.stable_ids]])` |
+
+## Properties
+
+| id                         | kind | derives_from                          | generator                        | predicate                                                              |
+|----------------------------|------|---------------------------------------|----------------------------------|------------------------------------------------------------------------|
+| unknown_version_refused    | unit | [[kaya.event.schema_version_pinned]]  | `record_with_unknown_schema()`   | `ingest ⇒ labeled refusal ∧ no ledger write`                            |
+| missing_provenance_refused | unit | [[kaya.event.provenance_present]]     | `record_without_provenance()`    | `ingest ⇒ refusal naming provenance`                                    |
+| id_reuse_refused           | unit | [[kaya.event.stable_ids]]             | `stored_id_with_changed_body()`  | `ingest ⇒ refusal naming the colliding id`                              |
+| well_formed_round_trip     | unit | [[kaya.event.field_set_closed]]       | `arbitrary_valid_record()`       | `parse ∘ serialize == identity on canonical lines; non-canonical input is normalized to the canonical form` |
+| timestamp_rfc3339_checked   | unit | [[kaya.event.timestamp_rfc3339]]      | `record_with_loose_timestamp()`  | `ingest ⇒ refusal naming timestamp`                                     |
+| field_set_closed_checked   | unit | [[kaya.event.field_set_closed]]       | `record_with_extra_field()`      | `ingest ⇒ refusal naming the extra field`                               |
+| type_namespaced_checked     | unit | [[kaya.event.type_namespaced]]        | `record_with_bare_type()`        | `ingest ⇒ refusal naming the type grammar`                              |
+| facts_not_verdicts          | unit | [[kaya.event.observation_only]]       | `record_with_verdict_field()`    | `capture ⇒ refusal pointing at promotion for interpretation`             |
+| envelope_seam_declared      | unit | [[kaya.event.envelope_independence]]  | `cli_envelope_fixture()`         | `CLI I/O uses genesis envelopes while ledger rows stay kaya.event/v0`    |
+
+## Requirements
+
+### Requirement: Event record schema
+
+A `kaya.event/v0` record SHALL carry exactly the fields `id`, `schema`,
+`type`, `timestamp`, `actor`, `subject`, `data`, `provenance`, `artifacts`,
+where `type` is a namespaced dotted path (for example
+`experiment.run.completed`), `timestamp` is RFC 3339 UTC, and `actor` names
+its type (`tool`, `human`, or `agent`) plus a name. Ingest SHALL refuse
+records with unknown schema versions, missing provenance, reused ids, or
+fields outside the closed set.
+
+#### Scenario: Well-formed record validates
+
+- **WHEN** a record with the nine closed fields, schema `kaya.event/v0`, an
+  RFC 3339 UTC timestamp, a typed actor, and provenance naming tool plus
+  reference is ingested
+- **THEN** it validates and is passed to the ledger for admission
+
+#### Scenario: Unknown schema version refused
+
+- **WHEN** a record declares `schema: kaya.event/v9`
+- **THEN** ingest refuses it with a labeled error naming the unsupported
+  version and the supported set
+
+#### Scenario: Extra field refused
+
+- **WHEN** a record carries a tenth field outside the closed set
+- **THEN** ingest refuses it naming the unexpected field — the field set
+  grows only by a new schema revision
+
+#### Scenario: Changed bytes under a stored id refused
+
+- **WHEN** a record's `id` equals an id already present in the ledger but
+  the record is not byte-identical to the stored event
+- **THEN** ingest refuses it naming the colliding id
+
+### Requirement: Events carry provenance, not conclusions
+
+Every event SHALL record what happened (counts, paths, references) and
+SHALL NOT record an interpretation of what it means — a run-completed event
+reports passed/failed counts and never states that a hypothesis was
+falsified. Interpretation belongs to `kaya.promotion`.
+
+#### Scenario: Run event states counts only
+
+- **WHEN** a test-runner adapter emits an `experiment.run.completed` event
+- **THEN** `data` carries the pass/fail/skip counts and artifact references,
+  and no field names a hypothesis verdict
+
+#### Scenario: Interpretation in an event is rejected at capture
+
+- **WHEN** a capture call includes a conclusion-style field (for example
+  `verdict: hypothesis-false`) outside the closed field set
+- **THEN** the capture refuses it and points at the promotion command for
+  interpretation
+
+### Requirement: Property coverage mirror
+
+Every property row in the layer sidecar SHALL be verified by exactly one
+dedicated scenario.
+
+#### Scenario: unknown_version_refused
+
+- **WHEN** an unknown-schema-version fixture is ingested
+- **THEN** the refusal is labeled and no ledger write occurs
+- **VERIFIES** [[kaya.event.unknown_version_refused]]
+
+#### Scenario: missing_provenance_refused
+
+- **WHEN** a record without `provenance` is ingested
+- **THEN** the refusal names the missing field
+- **VERIFIES** [[kaya.event.missing_provenance_refused]]
+
+#### Scenario: id_reuse_refused
+
+- **WHEN** a non-identical record reuses a stored id
+- **THEN** the refusal names the colliding id
+- **VERIFIES** [[kaya.event.id_reuse_refused]]
+
+#### Scenario: field_set_closed_checked
+
+- **WHEN** a record with an extra field is ingested
+- **THEN** the refusal names the field and cites the closed set
+- **VERIFIES** [[kaya.event.field_set_closed]]
+
+#### Scenario: well_formed_round_trips
+
+- **WHEN** a canonical valid record passes ingest validation
+- **THEN** the parsed value serializes back to the identical input bytes,
+  and a non-canonical record is accepted and normalized to the canonical
+  form
+- **VERIFIES** [[kaya.event.well_formed_round_trip]]
+
+#### Scenario: timestamp_rfc3339_checked
+
+- **WHEN** a record carries a non-RFC-3339 timestamp
+- **THEN** ingest refuses it naming the timestamp field
+- **VERIFIES** [[kaya.event.timestamp_rfc3339]]

@@ -50,7 +50,7 @@ Semantics before enforcement: this change defines what "stale" means; the
       (`ah check --changes clarify-authored-staleness --run-tests` reports no
       `no-toml` or `no-tests-declared`).
 - [x] `spk lint` clean on the layer.
-- [ ] Layer merge verified: deployed `kaya.projection` layer carries the six
+- [x] Layer merge verified: deployed `kaya.projection` layer carries the six
       existing constraints plus `citation_markers`, `staleness_scope`, and
       `acknowledgment_effect`; no property is lost regardless of archive
       order.

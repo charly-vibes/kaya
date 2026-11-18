@@ -2,8 +2,12 @@
 
 **kaya** is **experimental**: exploratory; may be renamed or sunset.
 
-The behavioral specification is the openspec change
-[`add-core-research-record`](https://github.com/charly-vibes/kaya/blob/main/openspec/changes/add-core-research-record/proposal.md)
+The behavioral specification is deployed as capability specs under
+[`openspec/specs/`](https://github.com/charly-vibes/kaya/tree/main/openspec/specs),
+specified by the archived changes
+[`add-core-research-record`](https://github.com/charly-vibes/kaya/blob/main/openspec/changes/archive/2026-11-18-add-core-research-record/proposal.md)
+and
+[`add-record-verification`](https://github.com/charly-vibes/kaya/blob/main/openspec/changes/archive/2026-11-18-add-record-verification/proposal.md)
 — seven capabilities (event, ledger, model, projection, promotion, adapters, verification),
 each with lint-clean specodelic layers and scenario-level red-test shapes.
 MVP-1 implements those capabilities end to end as a static research compiler.
@@ -11,10 +15,10 @@ MVP-1 implements those capabilities end to end as a static research compiler.
 | Area | Status | Notes |
 |---|---|---|
 | Architecture | implemented (MVP-1) | Four subsystems: capture adapters (`src/adapters`), research ledger (`src/ledger.rs`), research model (`src/model.rs`), documentation projections (`src/projection`) |
-| Event format | [implemented (draft)](https://github.com/charly-vibes/kaya/blob/main/openspec/changes/add-core-research-record/specs/kaya-event/spec.md) | `kaya.event/v0` — closed 9-field schema, append-only JSONL, provenance-preserving, observation-only |
-| Research vocabulary | [implemented](https://github.com/charly-vibes/kaya/blob/main/openspec/changes/add-core-research-record/specs/kaya-model/spec.md) | 13 entities, 9 typed direction-fixed relationships; relationships over entity count |
+| Event format | [implemented (draft)](https://github.com/charly-vibes/kaya/blob/main/openspec/specs/kaya-event/spec.md) | `kaya.event/v0` — closed 9-field schema, append-only JSONL, provenance-preserving, observation-only |
+| Research vocabulary | [implemented](https://github.com/charly-vibes/kaya/blob/main/openspec/specs/kaya-model/spec.md) | 13 entities, 9 typed direction-fixed relationships; relationships over entity count |
 | CLI | implemented | `kaya init`, `kaya status`, `kaya import` (wai, git, test), `kaya build [--out] [--expect-digest]`, `kaya check [--index]`, `kaya acknowledge`, `kaya promote`, `kaya challenge` |
-| Integrations | wai, git, test runner implemented; dont, whisper (turu), specodelic [specified](https://github.com/charly-vibes/kaya/blob/main/openspec/changes/add-core-research-record/specs/kaya-adapters/spec.md), not implemented | Adapters translate tool outputs into `kaya.event/v0`; the remaining sources have encoded specs but no adapter |
+| Integrations | wai, git, test runner implemented; dont, whisper (turu), specodelic [specified](https://github.com/charly-vibes/kaya/blob/main/openspec/changes/archive/2026-11-18-add-core-research-record/specs/kaya-adapters/spec.md), not implemented | Adapters translate tool outputs into `kaya.event/v0`; the remaining sources have encoded specs but no adapter |
 | Document taxonomy | implemented and deployed (eleven record kinds, publications) | [Record layer: four families, eleven kinds; publication layer: twelve products, collections, packages](specs/kaya-documents.md) ([publications](specs/kaya-publications.md)). Implemented: `research-map`, `project-overview`, `experiment-specification`, `experiment-record`, `findings-and-analysis`, `decision-record`, `technical-reference`, `reproduction-package`, `knowledge-brief`, `handoff`; `kaya publish` declares all eleven non-tutorial products (`overview`, `reference`, `getting-started`, `how-to`, `concept`, `example`, `troubleshooting`, `faq`, `status-compatibility`, `release-migration`, `architecture-design`), emits the backed ones and both the `project-site` and `developer-guide` packages, and reports unbacked products as omissions instead of stubbing them. `exploration-brief`, `technical-reference`, `knowledge-brief` remain specified. See [Documentation taxonomy](document-taxonomy.md) |
 | Docs | buildable, deploy workflow present | `book.toml` + `theme/charly.css` at root; `.github/workflows/docs.yml` builds the book and deploys it to GitHub Pages on push to `main` |
 | CI | implemented | `just ci` (cargo test, fmt + clippy, mdbook build, `ah check`, `spk lint`, `openspec validate --strict`) run by `.github/workflows/ci.yml`; lefthook gates `ah check`, `spk lint`, and `pretender` on commit |
