@@ -217,6 +217,7 @@ tests and in real use.
 - kaya/Artifact/e8dcfcb — e8dcfcb9740720143958d6ffbe672ee3b9aa2592
 - kaya/Artifact/eb4f2c9 — eb4f2c98e2c6201803b8a5a8ec81207bb6a1ac7a
 - kaya/Artifact/ec6371e — ec6371e1cdad62d26f8f2104618f49416ae9967d
+- kaya/Artifact/ecb28f8 — ecb28f8dc84a8e18552c17e2bfbf0e3dd0ca3cc8
 - kaya/Artifact/ed2474f — ed2474fb56318a36230a34922d5eef2e312829b6
 - kaya/Artifact/ed9adef — ed9adefbeaff44438d60c4bcd07532f0e4a01b66
 - kaya/Artifact/f2709ac — f2709ac34c57a2489f778b4dde40579c69f1dc12
@@ -481,5 +482,5 @@ tests and in real use.
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_437 nodes from 536 events._
+_438 nodes from 537 events._
 <!-- kaya:end generated:orientation.research-map -->
