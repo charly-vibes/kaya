@@ -5,6 +5,40 @@ edition = "2024"
 rust-version = "1.88"
 license = "Apache-2.0"
 repository = "https://github.com/charly-vibes/kaya"
+readme = "README.md"
+description = "A living record of exploration: compile the artifacts a project already produces into continuously generated, human-owned documentation"
+keywords = ["documentation", "research", "provenance", "knowledge", "cli"]
+categories = ["development-tools", "documentation"]
+# The crate is the compiler; the research workspace, agent configuration, spec
+# corpus and release tooling belong to the repository, not to consumers.
+exclude = [
+    ".agents",
+    ".beads",
+    ".genesis",
+    ".gitignore",
+    ".claude",
+    ".codex",
+    ".cursor",
+    ".espectacular",
+    ".github",
+    ".kaya",
+    ".wai",
+    ".whisper",
+    "book",
+    "book.toml",
+    "docs",
+    "justfile",
+    "lefthook.yml",
+    "openspec",
+    "scripts",
+    "theme",
+    "update-homebrew.py",
+    "update-scoop.py",
+    "versions.ddl.toml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "RELEASING.md",
+]
 
 [lib]
 name = "kaya"

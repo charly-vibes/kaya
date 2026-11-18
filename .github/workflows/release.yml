@@ -22,10 +22,11 @@
 #   TAP_GITHUB_TOKEN     (publish) — PAT with contents:write on homebrew-charly
 #                                    and scoop-charly only
 #
-# crates.io publish is token-gated because publish authorization is still
-# outstanding (beads kaya-dgz): a missing token is reported as a disabled
-# channel, never as a failed release. Tagging and pushing a tag are release
-# actions and require explicit human authorization.
+# crates.io publish is token-gated: a missing CARGO_REGISTRY_TOKEN is reported
+# as a disabled channel, never as a failed release. Authorization, token
+# storage, tag verification, retry and yank steps live in RELEASING.md.
+# Tagging and pushing a tag are release actions and require explicit human
+# authorization for every release.
 
 name: Release
 

@@ -73,7 +73,8 @@ The CLI is installed from this repository with a stable Rust toolchain
 cargo install --git https://github.com/charly-vibes/kaya kaya
 ```
 
-Publication to crates.io is deferred; install from git until then.
+Publishing to crates.io is wired but runs only after maintainer authorization;
+see [RELEASING.md](RELEASING.md) for the token, tag and verification steps.
 
 ## FAQ
 
@@ -118,4 +119,5 @@ exact command, and lefthook gates the same spec checks on commit and push.
 
 - [Motivation & design](docs/src/index.md)
 - [Status](docs/src/status.md)
+- [Releasing](RELEASING.md)
 - Apache-2.0 — see [LICENSE](LICENSE)
