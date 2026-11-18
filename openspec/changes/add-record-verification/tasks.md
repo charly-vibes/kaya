@@ -25,10 +25,10 @@ contract-test shape. One tdd-ro5u run per ticket.
       `events_by_source` uses the `wai`/`git`/`test-runner`/`model` keys (the
       seed's human actor never appears), and emitted/omitted kinds are dotted
       `family.kind` names with no duplicate spelling. (kaya-8ot)
-- [ ] 1.5 Assertion fixtures: `--require-kind` over an omitted dotted kind →
+- [x] 1.5 Assertion fixtures: `--require-kind` over an omitted dotted kind →
       violation with `no-records`; `--require-source test-runner` over a
       record with no run events → violation naming the source. (kaya-ntv)
-- [ ] 1.6 Staleness fixtures: supersede under a cited authored block with and
+- [x] 1.6 Staleness fixtures: supersede under a cited authored block with and
       without `--fail-on-stale-authored`; bytes unchanged in both cases;
       `build` still exits 0. (kaya-ntv)
 - [x] 1.7 Exit fixtures: clean 0, violations 1, bad flag/missing path 2;
@@ -43,9 +43,9 @@ contract-test shape. One tdd-ro5u run per ticket.
 - [x] 2.3 Add `kaya check` with `--root`, `--out`, `--publish-out`,
       `--expect-digest`; emit the `check` envelope with structured findings and
       the exit contract. `--index` lands in kaya-a4e. (kaya-585)
-- [ ] 2.4 Add the facts block (kaya-8ot) and the opt-in assertions
+- [x] 2.4 Add the facts block (kaya-8ot) and the opt-in assertions
       (kaya-ntv); reuse the build summary's kind vocabulary.
-- [ ] 2.5 Wire `--fail-on-stale-authored` to the existing stale report; do not
+- [x] 2.5 Wire `--fail-on-stale-authored` to the existing stale report; do not
       change `build` behavior. (kaya-ntv)
 
 ## 3. Refactor — separate commit

@@ -4,9 +4,10 @@
 //! without writing a byte, so a repository can gate on drift before it ships.
 //! Responsibilities: read the ledger from an invocation root and refuse any
 //! history git cannot verify, replan every research and publication document
-//! through the same pure planners its writer uses, and compare the expected
-//! bytes with the worktree — or with the git index under `--index` — per
-//! managed block and per document.
+//! through the same pure planners its writer uses, compare the expected bytes
+//! with the worktree — or with the git index under `--index` — per managed
+//! block and per document, and report the requested assertions and the stale
+//! authored blocks the verified facts expose.
 //! Rationale: verification is the inverse of compilation, never a second
 //! implementation of it — sharing the planners means a `check` finding names
 //! exactly the bytes `build` or `publish` would rewrite, and a clean run is
@@ -15,7 +16,14 @@
 //! Drift paths are reported relative to the invocation root, `/`-separated.
 //! The publication tree is verified whether or not it exists: a record that was
 //! never published is drift, because every planned page is then missing.
+//!
+//! Findings and violations are distinct: drift, a missing document, and an
+//! extra managed document are always defects; a requested requirement is a
+//! defect because asking for it is the opt-in; and a stale authored block is
+//! reported unless [`CheckOptions::fail_on_stale_authored`] turns it into a
+//! defect too.
 
+pub mod assertions;
 pub mod facts;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -33,6 +41,7 @@ use crate::projection::{self, BlockKind, ProjectionError, index, report, reuse};
 use crate::promotion::{PromotionError, PromotionState};
 use crate::publication::{self, PublicationError};
 
+use self::assertions::{Required, Stale};
 use self::facts::Facts;
 
 /// The append-only research ledger, relative to the invocation root.
@@ -134,19 +143,46 @@ pub struct Entry {
     pub kind: &'static str,
 }
 
+/// What a check should verify beyond the always-on drift comparison.
+///
+/// The flags only widen what counts as a defect: drift, a missing document, or
+/// an extra managed document always fails, while a requirement and the stale
+/// report fail only when the caller asked for them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CheckOptions {
+    /// Read the ledger and every compared document from the git index.
+    pub index: bool,
+    /// Dotted `family.kind` names the record must emit.
+    pub require_kinds: Vec<String>,
+    /// Canonical capture sources the record must hold events for.
+    pub require_sources: Vec<String>,
+    /// Turn a non-empty stale report into exit 1.
+    pub fail_on_stale_authored: bool,
+}
+
 /// The result of one check: every finding, sorted by path.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Outcome {
     /// Drift findings, sorted by `(path, block, kind)`.
     pub drift: Vec<Entry>,
+    /// Requested kinds or sources the record does not satisfy.
+    pub required: Vec<Required>,
+    /// Authored blocks whose cited evidence changed, sorted by
+    /// `(path, block, evidence)`.
+    pub stale: Vec<Stale>,
     /// What the check observed in the verified record.
     pub facts: Facts,
+    /// Whether a non-empty stale report fails the check.
+    pub enforce_stale: bool,
 }
 
 impl Outcome {
-    /// The verdict the exit code carries: 0 clean, 1 drift.
+    /// The verdict the exit code carries: 0 clean, 1 drift or an unmet
+    /// assertion the caller enabled.
     pub fn exit_code(&self) -> u8 {
-        if self.drift.is_empty() { 0 } else { 1 }
+        let violated = !self.drift.is_empty() || !self.required.is_empty();
+        let stale = self.enforce_stale && !self.stale.is_empty();
+        if violated || stale { 1 } else { 0 }
     }
 }
 
@@ -427,16 +463,20 @@ impl Source {
 /// The ledger is read once, its committed history is verified (a worktree that
 /// does not extend `HEAD` is refused before any finding), and every projection
 /// is replanned from the verified events. `out` and `publish_out` are
-/// directories relative to `root`. With `index`, the ledger and every compared
-/// document come from the git index, so the verdict is the one a commit of the
-/// staged tree would earn.
+/// directories relative to `root`. With `options.index`, the ledger and every
+/// compared document come from the git index, so the verdict is the one a
+/// commit of the staged tree would earn. The requested assertions and the
+/// stale report are always evaluated; `options` only decides which of them the
+/// exit code treats as a defect.
 pub fn check(
     root: &Path,
     out: &Path,
     publish_out: &Path,
     expect_digest: Option<&str>,
-    index: bool,
+    options: &CheckOptions,
 ) -> Result<Outcome, VerificationError> {
+    assertions::validate_request(&options.require_kinds, &options.require_sources)?;
+
     let expect_digest = match expect_digest {
         Some(digest) if valid_digest(digest) => Some(digest),
         Some(digest) => {
@@ -450,7 +490,7 @@ pub fn check(
         None => None,
     };
 
-    let source = if index {
+    let source = if options.index {
         Source::index(root)
     } else {
         Source::worktree(root)
@@ -479,7 +519,15 @@ pub fn check(
     // the reported drift counts it once.
     drift.dedup();
     let facts = Facts::derive(&events, ledger_digest, &expected, &omitted)?;
-    Ok(Outcome { drift, facts })
+    let required = assertions::required(&facts, &options.require_kinds, &options.require_sources);
+    let stale = assertions::stale(&source, &expected, &events);
+    Ok(Outcome {
+        drift,
+        required,
+        stale,
+        facts,
+        enforce_stale: options.fail_on_stale_authored,
+    })
 }
 
 /// Whether `digest` is exactly 64 hexadecimal characters.

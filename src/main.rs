@@ -99,6 +99,15 @@ enum Command {
         /// Read the ledger and projections from the git index, not the worktree
         #[arg(long)]
         index: bool,
+        /// Require the record to emit this dotted `family.kind`, repeatable
+        #[arg(long = "require-kind", value_name = "FAMILY.KIND")]
+        require_kind: Vec<String>,
+        /// Require events from this canonical capture source, repeatable
+        #[arg(long = "require-source", value_name = "SOURCE")]
+        require_source: Vec<String>,
+        /// Fail the check when an authored block cites changed evidence
+        #[arg(long)]
+        fail_on_stale_authored: bool,
     },
     /// Approve a proposed assertion as a conclusion
     Promote {
@@ -191,8 +200,23 @@ fn main() -> ExitCode {
             publish_out,
             expect_digest,
             index,
+            require_kind,
+            require_source,
+            fail_on_stale_authored,
         } => {
-            return cmd_check(&root, &out, &publish_out, expect_digest.as_deref(), index);
+            let options = verification::CheckOptions {
+                index,
+                require_kinds: require_kind,
+                require_sources: require_source,
+                fail_on_stale_authored,
+            };
+            return cmd_check(
+                &root,
+                &out,
+                &publish_out,
+                expect_digest.as_deref(),
+                &options,
+            );
         }
         Command::Promote {
             assertion_id,
@@ -730,19 +754,22 @@ fn cmd_publish(out: &Path) -> Result<Envelope, Failure> {
 
 /// Verify the record without writing: the expected bytes come from the same
 /// planners `build` and `publish` use, compared against the worktree or, with
-/// `index`, against the staged blobs a commit would record.
+/// `options.index`, against the staged blobs a commit would record.
 ///
-/// `check` reports drift in its own success envelope and lets the exit code
-/// carry the verdict: 0 clean, 1 drift, 2 usage or I/O failure. It creates no
-/// directory, appends no event, and evaluates no threshold.
+/// `check` reports drift, unmet requirements, and staleness in its own success
+/// envelope and lets the exit code carry the verdict: 0 clean, 1 drift or an
+/// enabled violation, 2 usage or I/O failure. Only the flags decide which
+/// findings are violations, so the same envelope proves both a plain advisory
+/// run and an enforced gate. It creates no directory, appends no event, and
+/// evaluates no threshold.
 fn cmd_check(
     root: &Path,
     out: &Path,
     publish_out: &Path,
     expect_digest: Option<&str>,
-    index: bool,
+    options: &verification::CheckOptions,
 ) -> ExitCode {
-    match verification::check(root, out, publish_out, expect_digest, index) {
+    match verification::check(root, out, publish_out, expect_digest, options) {
         Ok(outcome) => {
             let code = outcome.exit_code();
             let facts = outcome.facts;
@@ -750,7 +777,8 @@ fn cmd_check(
                 "check",
                 json!({
                     "drift": outcome.drift,
-                    "stale": [],
+                    "required": outcome.required,
+                    "stale": outcome.stale,
                     "events": facts.events,
                     "ledger_digest": facts.ledger_digest,
                     "last_capture_commit": facts.last_capture_commit,

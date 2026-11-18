@@ -1,0 +1,9 @@
+id = "advisory-by-default"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "check_stale_advisory_by_default"}]

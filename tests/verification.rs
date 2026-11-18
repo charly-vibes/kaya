@@ -15,7 +15,19 @@
 //! compared document are read from `:<path>`, so staged drift is reported even
 //! when the worktree is clean, worktree noise is ignored, a staged ledger in a
 //! repository whose `HEAD` predates it is verifiable, and an unmerged index
-//! entry is an I/O failure rather than a worktree fallback.
+//! entry is an I/O failure rather than a worktree fallback. The stale report
+//! follows the same rule: a staged correction and its citing document produce
+//! one finding naming the root-relative path, while a citation that lives only
+//! in the worktree is invisible to `--index`.
+//!
+//! The opt-in flags are proven the same way: `--require-kind` and
+//! `--require-source` turn an omitted dotted kind or an absent canonical
+//! source into a named `data.required` violation (exit 1) and refuse
+//! vocabulary they do not know (exit 2), while `--fail-on-stale-authored`
+//! turns the projection's stale report into a violation naming the authored
+//! block and the evidence ids a correction changed. Without that flag a stale
+//! block is advisory: `check` reports it and exits 0, and `build` keeps
+//! reporting it without failing.
 //!
 //! The fixtures follow `tests/acceptance.rs` and `tests/cli.rs`: the built
 //! binary runs in a `tempfile::TempDir`, envelopes are parsed as JSON, and
@@ -47,6 +59,11 @@ const PUBLICATION_EXPORT: &str = "docs/public/publication.json";
 
 /// Authored prose the fixture seeds before `build` ever runs.
 const AUTHORED_PROSE: &str = "Human interpretation of the compiled record.";
+
+/// The human-owned region of the research index, as `build` and `publish`
+/// must leave it.
+const AUTHORED_BEGIN: &str = "<!-- kaya:authored -->";
+const AUTHORED_END: &str = "<!-- kaya:end authored -->";
 
 /// A foreign tool's managed block: bytes kaya never interprets, writes, or
 /// compares, so `check` must leave it out of every finding.
@@ -673,6 +690,151 @@ fn newest_timestamp(events: &[Value]) -> String {
         .max()
         .expect("the ledger records events")
         .to_owned()
+}
+
+/// Cite `id` from the seeded authored block, leaving every other byte alone.
+fn cite_in_authored_prose(root: &Path, id: &str) {
+    let path = root.join(INDEX);
+    let document = fs::read_to_string(&path).expect("the fixture index is readable");
+    let marker = format!("<!-- kaya:cites {id} -->");
+    assert!(
+        !document.contains(&marker),
+        "the authored block does not cite {id} yet: {document}"
+    );
+    let cited = format!("{AUTHORED_PROSE}\n{marker}");
+    let updated = document.replace(AUTHORED_PROSE, &cited);
+    assert_ne!(updated, document, "the authored prose carries the marker");
+    fs::write(&path, updated).expect("cite the event from authored prose");
+}
+
+/// The authored bytes of the research index, markers included.
+fn authored_bytes(root: &Path) -> Vec<u8> {
+    let document = fs::read_to_string(root.join(INDEX)).expect("the index is readable");
+    let start = document
+        .find(AUTHORED_BEGIN)
+        .unwrap_or_else(|| panic!("the index carries an authored block: {document}"));
+    let rest = &document[start..];
+    let end = rest
+        .find(AUTHORED_END)
+        .unwrap_or_else(|| panic!("the authored block is closed: {document}"))
+        + AUTHORED_END.len();
+    rest.as_bytes()[..end].to_vec()
+}
+
+/// Append one correction that changes the stored data of the `target` event.
+///
+/// The correction clones the cited event's envelope — schema, type, actor,
+/// subject, provenance, and artifacts — takes a fresh id, a later timestamp,
+/// and data naming the superseded id plus a changed attribute. The appended
+/// line extends the committed ledger on a line boundary, so the record's
+/// history stays verifiable.
+fn append_correction(root: &Path, target: &Value) {
+    const CORRECTION_ID: &str = "evt-0123456789abcdef0123456789";
+    const CORRECTION_AT: &str = "2026-11-20T00:00:00Z";
+
+    let events = ledger_events(root);
+    assert!(
+        !events
+            .iter()
+            .any(|event| event["id"] == json!(CORRECTION_ID)),
+        "the correction id is fresh: {CORRECTION_ID}"
+    );
+    assert!(
+        newest_timestamp(&events).as_str() < CORRECTION_AT,
+        "the correction is recorded after every seed event"
+    );
+    let target_id = target["id"]
+        .as_str()
+        .unwrap_or_else(|| panic!("the cited event carries an id: {target}"));
+
+    let mut correction = target.clone();
+    correction["id"] = json!(CORRECTION_ID);
+    correction["timestamp"] = json!(CORRECTION_AT);
+    correction["data"] = json!({
+        "supersedes": target_id,
+        "attributes": { "title": "corrected by test" },
+    });
+    let mut line = serde_json::to_string(&correction)
+        .expect("the correction event serializes to one JSON line");
+    line.push('\n');
+
+    let mut ledger = fs::OpenOptions::new()
+        .append(true)
+        .open(root.join(LEDGER))
+        .expect("the ledger is appended to, never rewritten");
+    ledger
+        .write_all(line.as_bytes())
+        .expect("append the correction line");
+}
+
+/// A committed record whose authored index block cites a seed event, then a
+/// correction appended to the ledger after the commit changes that event.
+///
+/// Returns the fixture and the changed evidence id. `build` must report the
+/// stale block and still exit 0 without rewriting authored bytes; `publish`
+/// then composes the publication tree from the corrected research bytes, so
+/// staleness is the only defect a `check` can report.
+fn record_with_a_stale_authored_block() -> (Fixture, String) {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+    let cited = ledger_events(root)[0].clone();
+    let target = cited["id"]
+        .as_str()
+        .expect("the first seed event carries an id")
+        .to_owned();
+
+    cite_in_authored_prose(root, &target);
+    run_ok(root, &["build"]);
+    run_ok(root, &["publish"]);
+    git(root, &["add", "--all"]);
+    git(
+        root,
+        &[
+            "commit",
+            "--quiet",
+            "--message",
+            "cite the seed event from authored prose",
+        ],
+    );
+
+    let authored = authored_bytes(root);
+    append_correction(root, &cited);
+    let built = run_ok(root, &["build"]);
+    assert_eq!(
+        built["data"]["stale"],
+        json!([{ "block": "authored-1", "evidence": [target.clone()] }]),
+        "build reports the stale authored block without failing: {built}"
+    );
+    assert_eq!(
+        authored_bytes(root),
+        authored,
+        "build reports staleness without rewriting authored bytes"
+    );
+    run_ok(root, &["publish"]);
+    assert_eq!(
+        authored_bytes(root),
+        authored,
+        "publish leaves the authored bytes alone"
+    );
+
+    (fixture, target)
+}
+
+/// The `data.required` entries: one per missing required kind or source.
+fn required_entries(envelope: &Value) -> Vec<Value> {
+    envelope["data"]["required"]
+        .as_array()
+        .unwrap_or_else(|| panic!("check reports data.required as an array: {envelope}"))
+        .clone()
+}
+
+/// The `data.stale` entries: each stale document path, its authored block, and
+/// the evidence ids the block cites.
+fn stale_entries(envelope: &Value) -> Vec<Value> {
+    envelope["data"]["stale"]
+        .as_array()
+        .unwrap_or_else(|| panic!("check reports data.stale as an array: {envelope}"))
+        .clone()
 }
 
 /// The seven record facts every executed `check` reports.
@@ -1755,5 +1917,477 @@ fn check_facts_property() {
         parse_envelope(&worktree)["data"],
         parse_envelope(&index)["data"],
         "worktree and index modes report identical facts for identical bytes"
+    );
+}
+
+#[test]
+fn check_required_kind_omitted() {
+    let fixture = Fixture::new();
+
+    let output = fixture.output(&["check", "--require-kind", "understanding.decision-record"]);
+
+    assert_eq!(
+        exit_code(&output),
+        1,
+        "a required kind the projection omits is a violation: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "the committed record itself matches its projections: {envelope}"
+    );
+    let omitted = dotted_kinds(record_facts(&envelope), "omitted_kinds");
+    assert!(
+        omitted.contains(&"understanding.decision-record".to_owned()),
+        "the seed holds no decision, so the required kind is omitted for no-records: {envelope}"
+    );
+    assert_eq!(
+        required_entries(&envelope),
+        vec![json!({
+            "area": "kind",
+            "name": "understanding.decision-record",
+            "reason": "no-records",
+        })],
+        "the report names the omitted kind and its reason: {envelope}"
+    );
+}
+
+#[test]
+fn check_required_absent_kind() {
+    let fixture = Fixture::new();
+
+    // `bogus.kind` is a well-formed dotted name no planner ever emits or
+    // omits, so it is neither satisfied nor a family with no records.
+    let output = fixture.output(&["check", "--require-kind", "bogus.kind"]);
+
+    assert_eq!(
+        exit_code(&output),
+        1,
+        "a required kind outside both vocabularies is a violation: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "the committed record itself matches its projections: {envelope}"
+    );
+    let facts = record_facts(&envelope);
+    assert!(
+        !dotted_kinds(facts, "emitted_kinds").contains(&"bogus.kind".to_owned())
+            && !dotted_kinds(facts, "omitted_kinds").contains(&"bogus.kind".to_owned()),
+        "the requested kind is in neither vocabulary, so no-records cannot apply: {envelope}"
+    );
+    assert_eq!(
+        required_entries(&envelope),
+        vec![json!({
+            "area": "kind",
+            "name": "bogus.kind",
+            "reason": "absent",
+        })],
+        "a kind no planner names is absent rather than omitted: {envelope}"
+    );
+}
+
+#[test]
+fn check_required_source_absent() {
+    let fixture = Fixture::new();
+
+    let output = fixture.output(&["check", "--require-source", "test-runner"]);
+
+    assert_eq!(
+        exit_code(&output),
+        1,
+        "a required source with no events is a violation: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "the committed record itself matches its projections: {envelope}"
+    );
+    assert_eq!(
+        required_entries(&envelope),
+        vec![json!({
+            "area": "source",
+            "name": "test-runner",
+            "reason": "no-events",
+        })],
+        "the report names the absent source and its reason: {envelope}"
+    );
+
+    // A requirement outside the canonical vocabulary is a usage failure, not
+    // a finding: the check never runs, so it reports nothing to enforce.
+    let unknown = fixture.output(&["check", "--require-source", "charly"]);
+    assert_eq!(
+        exit_code(&unknown),
+        2,
+        "an unknown source is refused before any comparison: {}",
+        stderr(&unknown)
+    );
+    let envelope = parse_envelope(&unknown);
+    assert_eq!(
+        envelope["ok"],
+        json!(false),
+        "a usage failure is an error envelope: {envelope}"
+    );
+    let label = envelope["error"]["label"]
+        .as_str()
+        .unwrap_or_else(|| panic!("a usage failure names its label: {envelope}"));
+    assert!(
+        label.starts_with("kaya.verification."),
+        "usage failures stay in the verification namespace: {envelope}"
+    );
+    assert!(
+        envelope["data"].is_null(),
+        "a usage failure reports no findings: {envelope}"
+    );
+
+    // A kind that is not a dotted `family.kind` name is refused the same way.
+    let malformed = fixture.output(&["check", "--require-kind", "decision-record"]);
+    assert_eq!(
+        exit_code(&malformed),
+        2,
+        "a malformed required kind is refused before any comparison: {}",
+        stderr(&malformed)
+    );
+    let envelope = parse_envelope(&malformed);
+    assert_eq!(
+        envelope["ok"],
+        json!(false),
+        "a usage failure is an error envelope: {envelope}"
+    );
+    let label = envelope["error"]["label"]
+        .as_str()
+        .unwrap_or_else(|| panic!("a usage failure names its label: {envelope}"));
+    assert!(
+        label.starts_with("kaya.verification."),
+        "usage failures stay in the verification namespace: {envelope}"
+    );
+    assert!(
+        envelope["data"].is_null(),
+        "a usage failure reports no findings: {envelope}"
+    );
+}
+
+#[test]
+fn check_stale_advisory_by_default() {
+    let (fixture, cited) = record_with_a_stale_authored_block();
+
+    let before = snapshot_tree(fixture.root());
+    let output = fixture.output(&["check"]);
+    let after = snapshot_tree(fixture.root());
+
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "without --fail-on-stale-authored a stale block is advisory: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_eq!(
+        envelope["ok"],
+        json!(true),
+        "the executed check reports ok:true; the exit code carries the verdict: {envelope}"
+    );
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "the committed record itself matches its projections: {envelope}"
+    );
+    assert_eq!(
+        stale_entries(&envelope),
+        vec![json!({
+            "path": INDEX,
+            "block": "authored-1",
+            "evidence": [cited.clone()],
+        })],
+        "the report names the stale document, block, and evidence: {envelope}"
+    );
+    assert_tree_unchanged(&before, &after);
+}
+
+#[test]
+fn check_stale_enforced() {
+    let (fixture, cited) = record_with_a_stale_authored_block();
+    let authored = authored_bytes(fixture.root());
+
+    let before = snapshot_tree(fixture.root());
+    let output = fixture.output(&["check", "--fail-on-stale-authored"]);
+    let after = snapshot_tree(fixture.root());
+
+    assert_eq!(
+        exit_code(&output),
+        1,
+        "--fail-on-stale-authored turns the stale report into a violation: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_eq!(
+        envelope["ok"],
+        json!(true),
+        "the executed check reports ok:true; the exit code carries the verdict: {envelope}"
+    );
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "the committed record itself matches its projections: {envelope}"
+    );
+    assert_eq!(
+        stale_entries(&envelope),
+        vec![json!({
+            "path": INDEX,
+            "block": "authored-1",
+            "evidence": [cited.clone()],
+        })],
+        "enforcement names the document, block, and changed evidence ids: {envelope}"
+    );
+    assert_eq!(
+        authored_bytes(fixture.root()),
+        authored,
+        "enforcement reports without rewriting the authored bytes"
+    );
+    assert_tree_unchanged(&before, &after);
+}
+
+#[test]
+fn check_required_items() {
+    let fixture = Fixture::new();
+
+    let output = fixture.output(&[
+        "check",
+        "--require-kind",
+        "understanding.decision-record",
+        "--require-source",
+        "test-runner",
+    ]);
+
+    assert_eq!(
+        exit_code(&output),
+        1,
+        "every absent requirement is a violation: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "the record is clean; only the requirements fail: {envelope}"
+    );
+    let required = required_entries(&envelope);
+    assert_eq!(
+        required.len(),
+        2,
+        "both flags are reported, one entry each: {envelope}"
+    );
+    assert!(
+        required.contains(&json!({
+            "area": "kind",
+            "name": "understanding.decision-record",
+            "reason": "no-records",
+        })),
+        "the absent required kind is named with its reason: {envelope}"
+    );
+    assert!(
+        required.contains(&json!({
+            "area": "source",
+            "name": "test-runner",
+            "reason": "no-events",
+        })),
+        "the absent required source is named with its reason: {envelope}"
+    );
+}
+
+#[test]
+fn check_required_satisfied_and_repeated() {
+    let fixture = Fixture::new();
+
+    // The seed emits `orientation.research-map` and holds model events, so
+    // asking twice for the same satisfied sources stays one clean verdict:
+    // a requirement names a defect, never a count.
+    let output = fixture.output(&[
+        "check",
+        "--require-kind",
+        "orientation.research-map",
+        "--require-source",
+        "model",
+        "--require-source",
+        "model",
+    ]);
+
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "satisfied requirements are no violation: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "the committed record itself matches its projections: {envelope}"
+    );
+    assert!(
+        dotted_kinds(record_facts(&envelope), "emitted_kinds")
+            .contains(&"orientation.research-map".to_owned()),
+        "the required kind is emitted by the research index: {envelope}"
+    );
+    assert_eq!(
+        required_entries(&envelope),
+        Vec::<Value>::new(),
+        "satisfied and repeated requirements report nothing: {envelope}"
+    );
+}
+
+#[test]
+fn check_stale_violation() {
+    let (fixture, cited) = record_with_a_stale_authored_block();
+    let authored = authored_bytes(fixture.root());
+
+    let before = snapshot_tree(fixture.root());
+    let output = fixture.output(&["check", "--fail-on-stale-authored"]);
+    let after = snapshot_tree(fixture.root());
+
+    assert_eq!(
+        exit_code(&output),
+        1,
+        "enforced staleness is a violation: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_eq!(
+        envelope["ok"],
+        json!(true),
+        "the executed check reports ok:true; the exit code carries the verdict: {envelope}"
+    );
+    let stale = stale_entries(&envelope);
+    assert_eq!(stale.len(), 1, "one stale authored block: {envelope}");
+    assert_eq!(
+        stale[0]["path"],
+        json!(INDEX),
+        "the violation names the document: {envelope}"
+    );
+    assert_eq!(
+        stale[0]["block"],
+        json!("authored-1"),
+        "the violation names the block: {envelope}"
+    );
+    assert_eq!(
+        stale[0]["evidence"],
+        json!([cited.clone()]),
+        "the violation names the changed evidence ids: {envelope}"
+    );
+    assert_eq!(
+        authored_bytes(fixture.root()),
+        authored,
+        "the violation is reported without rewriting the authored bytes"
+    );
+    assert_tree_unchanged(&before, &after);
+}
+
+#[test]
+fn check_index_stale_parity() {
+    let (fixture, cited) = record_with_a_stale_authored_block();
+    let root = fixture.root();
+
+    // The correction and the document that cites the corrected event are
+    // staged, then the worktree copies go back to `HEAD`: the index is the
+    // only place the stale citation lives, exactly as a partial `git add`
+    // leaves it.
+    git(root, &["add", "--all"]);
+    restore_worktree_from_head(root, LEDGER);
+    restore_worktree_from_head(root, INDEX);
+
+    assert_eq!(
+        worktree_bytes(root, INDEX),
+        head_bytes(root, INDEX),
+        "the worktree copy is HEAD's clean bytes"
+    );
+    assert_ne!(
+        index_bytes(root, LEDGER),
+        head_bytes(root, LEDGER),
+        "the index carries the correction the citation is judged against"
+    );
+
+    let output = fixture.output(&["check", "--index", "--fail-on-stale-authored"]);
+
+    assert_eq!(
+        exit_code(&output),
+        1,
+        "staleness staged into the index is a violation: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_eq!(
+        envelope["ok"],
+        json!(true),
+        "the executed check reports ok:true; the exit code carries the verdict: {envelope}"
+    );
+    assert_eq!(
+        envelope["envelope_kind"],
+        json!("check"),
+        "check emits its own envelope kind: {envelope}"
+    );
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "the staged tree matches its own projections, so only staleness fails: {envelope}"
+    );
+    assert_eq!(
+        stale_entries(&envelope),
+        vec![json!({
+            "path": INDEX,
+            "block": "authored-1",
+            "evidence": [cited.clone()],
+        })],
+        "index mode names the same document, block, and evidence as the worktree: {envelope}"
+    );
+
+    // A worktree-only citation with clean staged copies is invisible to an
+    // index check: the commit this tree would record does not hold it, so the
+    // stale block is the worktree's, not the index's.
+    let (noisy, noisy_cited) = record_with_a_stale_authored_block();
+    let root = noisy.root();
+
+    assert_eq!(
+        index_bytes(root, LEDGER),
+        head_bytes(root, LEDGER),
+        "the staged ledger is HEAD's clean bytes"
+    );
+    assert_eq!(
+        index_bytes(root, INDEX),
+        head_bytes(root, INDEX),
+        "the staged document is HEAD's clean bytes"
+    );
+
+    let worktree = noisy.output(&["check", "--fail-on-stale-authored"]);
+    assert_eq!(
+        exit_code(&worktree),
+        1,
+        "the worktree run reports the unstaged citation as stale: {}",
+        stderr(&worktree)
+    );
+    assert_eq!(
+        stale_entries(&parse_envelope(&worktree)),
+        vec![json!({
+            "path": INDEX,
+            "block": "authored-1",
+            "evidence": [noisy_cited],
+        })],
+        "the worktree run names the document, block, and evidence"
+    );
+
+    let output = noisy.output(&["check", "--index", "--fail-on-stale-authored"]);
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "unstaged staleness does not fail an index check: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        stale_entries(&envelope).is_empty(),
+        "index mode reports no staleness from worktree bytes: {envelope}"
     );
 }
