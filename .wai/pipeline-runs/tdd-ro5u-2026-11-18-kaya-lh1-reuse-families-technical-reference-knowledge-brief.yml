@@ -2,9 +2,9 @@ run_id: tdd-ro5u-2026-11-18-kaya-lh1-reuse-families-technical-reference-knowledg
 pipeline: tdd-ro5u
 topic: kaya-lh1 reuse families technical-reference knowledge-brief
 created_at: '2026-11-18T00:07:37.416023437+00:00'
-current_step: 8
+current_step: 9
 approvals:
-  ship-close: '2026-11-18T01:28:24.210925006+00:00'
+  ship-close: '2026-11-18T01:29:09.216892486+00:00'
 epic: null
 child_issues: []
 child_runs: []
