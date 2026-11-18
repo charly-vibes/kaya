@@ -170,6 +170,9 @@ enum ImportSource {
         /// Maximum number of recent commits to observe
         #[arg(long, default_value_t = 100, value_name = "N")]
         limit: usize,
+        /// Skip commits whose subject starts with this prefix (repeatable)
+        #[arg(long = "exclude-message-prefix", value_name = "PREFIX")]
+        exclude_message_prefix: Vec<String>,
     },
     /// Import one completed test run from a libtest JSONL report
     Test {
@@ -493,9 +496,11 @@ fn cmd_import(source: ImportSource) -> Result<Envelope, Failure> {
             root,
             project,
             limit,
+            exclude_message_prefix,
         } => (
             "git",
-            git::capture(&root, &project, limit).map_err(adapter_failure)?,
+            git::capture_excluding(&root, &project, limit, &exclude_message_prefix)
+                .map_err(adapter_failure)?,
         ),
         ImportSource::Test { report, project } => (
             "test-runner",

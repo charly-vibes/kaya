@@ -42,7 +42,7 @@ docs: specs-docs
 	python3 scripts/build-publications.py
 
 # Fail when the built book contains a relative link the artifact cannot resolve
-links:
+links: docs
 	python3 scripts/check-links.py
 
 # Fail when status/README release claims contradict Cargo.toml
@@ -56,7 +56,7 @@ record-check mode="warn": record-verify release-claims links
 # Capture a scheduled snapshot: observe wai and git, then rebuild products
 record-capture:
 	cargo run --quiet -- import wai
-	cargo run --quiet -- import git
+	cargo run --quiet -- import git --exclude-message-prefix "chore(record):"
 	cargo run --quiet -- build
 	cargo run --quiet -- publish
 

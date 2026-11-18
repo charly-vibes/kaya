@@ -40,7 +40,7 @@ def resolve(page: Path, target: str, root: Path) -> Path | None:
         return candidate
     if candidate.is_dir() and (candidate / "index.html").is_file():
         return candidate / "index.html"
-    return candidate if candidate.exists() else None
+    return candidate if candidate.is_file() else None
 
 
 def main() -> int:

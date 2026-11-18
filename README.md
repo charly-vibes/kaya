@@ -48,7 +48,18 @@ kaya challenge <conclusion> --events <id>... --actor <name>
   `docs/research/overview.md` and `docs/research/understanding.md`, and the
   reuse-handoff reference documents; it rewrites only its own generated
   blocks, preserves authored bytes verbatim, and leaves a document absent
-  when its kinds have no records.
+  when its kinds have no records. The research map's trailing count reports
+  record events; `verification.*` bookkeeping is excluded so replaying an
+  acknowledgment changes no bytes.
+- `kaya check` recomputes both the research and publication trees without
+  writing and exits 0 clean, 1 violations, 2 usage or I/O. `--index` reads the
+  staged tree instead of the worktree; `--root`, `--out`, and `--publish-out`
+  set the invocation and projection roots. The envelope reports `events`,
+  `ledger_digest`, `last_capture_commit`, `newest_event_at`,
+  `events_by_source`, `emitted_kinds`, and `omitted_kinds`; kaya evaluates no
+  thresholds. `--require-kind <family.kind>`, `--require-source
+  <wai|git|test-runner|model>`, and `--fail-on-stale-authored` turn those
+  findings into exit 1.
 - Authored prose may cite ledger evidence with a
   `<!-- kaya:cites <event-id> -->` marker inside a `kaya:authored` block.
   Every cited id must exist in the ledger. When a correction supersedes a
@@ -60,6 +71,21 @@ kaya challenge <conclusion> --events <id>... --actor <name>
   instead of as prompts. Events are not conclusions.
 - Every executed command prints exactly one JSON envelope to stdout; the
   envelope contract is described in [Status](docs/src/status.md).
+
+### Record gates
+
+- `just record-verify` runs the read-only worktree check.
+- `just record-check [warn|fail]` composes the verifier, release claims, built
+  book links, and the lag gate; pull requests warn, main and releases fail.
+- `just record-lag [warn|fail] [bound]` reports commits since
+  `last_capture_commit` touching `src`, `docs`, `openspec`, and `.wai`
+  (default bound 25).
+- `just links` builds the book and fails on unresolved relative links;
+  `just release-claims` checks that `docs/src/status.md` agrees with
+  `Cargo.toml`.
+- `just record-capture` observes the wai tree and recent commits, then rebuilds
+  the products; the nightly Record workflow commits the snapshot on main and
+  skips its own `chore(record):` commits.
 
 The behavioral specification remains the openspec change
 [`add-core-research-record`](openspec/changes/add-core-research-record/proposal.md)

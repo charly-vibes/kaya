@@ -35,6 +35,20 @@ const LOG_FORMAT: &str = "--format=%H%x1f%aI%x1f%s";
 /// observe and yields an empty vector rather than a failure. Nothing is
 /// written under `root`.
 pub fn capture(root: &Path, project: &str, limit: usize) -> Result<Vec<Event>, AdapterError> {
+    capture_excluding(root, project, limit, &[])
+}
+
+/// Capture up to `limit` commits, skipping subjects that start with any prefix.
+///
+/// A prefix is repository-owned policy: the scheduled capture job skips its own
+/// snapshot commits so the record reaches a fixed point instead of observing
+/// yesterday's snapshot forever. An empty prefix list captures everything.
+pub fn capture_excluding(
+    root: &Path,
+    project: &str,
+    limit: usize,
+    excluded_prefixes: &[String],
+) -> Result<Vec<Event>, AdapterError> {
     // Verify the directory is a repository before treating a HEAD probe miss
     // as merely an unborn branch; a non-repository still fails atomically.
     checked_git(root, &["rev-parse", "--git-dir"], "git rev-parse --git-dir")?;
@@ -66,6 +80,12 @@ pub fn capture(root: &Path, project: &str, limit: usize) -> Result<Vec<Event>, A
                 "git: commit record {number} in {} carries malformed sha \"{sha}\"",
                 root.display()
             )));
+        }
+        if excluded_prefixes
+            .iter()
+            .any(|prefix| !prefix.is_empty() && message.starts_with(prefix))
+        {
+            continue;
         }
         let Some(timestamp) = timestamp_of(author_date) else {
             return Err(failure(&format!(

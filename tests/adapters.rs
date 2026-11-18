@@ -186,6 +186,24 @@ fn git_capture_emits_one_deterministic_event_per_commit() {
 }
 
 #[test]
+fn git_capture_skips_excluded_subjects() {
+    let dir = init_repo();
+    seed_commits(dir.path());
+
+    let events = git::capture_excluding(dir.path(), PROJECT, 10, &["add ledger".to_owned()])
+        .expect("capture succeeds");
+
+    assert_eq!(events.len(), COMMITS.len() - 1, "one commit is skipped");
+    assert!(
+        events.iter().all(|event| !event.data["message"]
+            .as_str()
+            .unwrap_or("")
+            .starts_with("add ledger")),
+        "no excluded subject is recorded"
+    );
+}
+
+#[test]
 fn git_capture_honours_the_limit() {
     let dir = init_repo();
     let shas = seed_commits(dir.path());
