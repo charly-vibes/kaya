@@ -62,5 +62,6 @@ JSONL parser.
   and list the new command (tracked in tasks and kaya-gh2).
 - Code: new CLI surface; the projection builders gain a non-writing entry
   point; the ledger reader gains an index source; no ledger writes.
-- Tickets: kaya-585 (implementation). Repository wiring is kaya-3kg;
-  staleness semantics are kaya-7hm.
+- Tickets: kaya-585 (worktree drift and exit), kaya-a4e (--index), kaya-8ot
+  (facts and vocabulary), kaya-ntv (assertions and staleness). Repository
+  wiring is kaya-3kg/kaya-tm8; staleness semantics are kaya-7hm.

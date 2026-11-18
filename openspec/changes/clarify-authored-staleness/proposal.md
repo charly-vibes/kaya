@@ -53,8 +53,9 @@ purpose of recording that the author has seen the change.
   changed, but its unimplemented acknowledgment clause gains a concrete shape.
 - Code: marker validation, acknowledgment event parsing, and a new CLI
   command; no change to generated blocks.
-- Tickets: kaya-7hm. Verification enforcement is `add-record-verification`
-  (kaya-585), which reads the stale report defined here.
+- Tickets: kaya-7hm (sequenced after kaya-585 — both touch `src/main.rs`).
+  Verification enforcement is `add-record-verification` (kaya-585), which reads
+  the stale report defined here.
 - Archive order matters: `kaya.projection` is still an undeployed delta of
   `add-core-research-record`. The deployment must merge this change's layer
   properties with the capability's existing six; the archive checklist requires
