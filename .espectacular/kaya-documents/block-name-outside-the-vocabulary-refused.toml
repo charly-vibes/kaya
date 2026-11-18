@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "block-name-outside-the-vocabulary-refused"
+description = "Block name outside the vocabulary refused."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "legacy_block_name_is_refused_before_writing" },
+]

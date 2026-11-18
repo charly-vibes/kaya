@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "omission-visible-in-the-package"
+description = "Omission visible in the package."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "build_writes_overview_and_publish_uses_it" },
+]

@@ -56,9 +56,13 @@ code changes here. bd ticket mapping noted per phase.
 
 ## Archive checklist
 
-- [ ] All `kaya.documents` and `kaya.publications` scenarios have executing
-      contract tests (`ah check --changes add-document-taxonomy --run-tests`).
-- [ ] `spk lint openspec/specs` clean after the two layers deploy.
-- [ ] bd tickets closed with scenario references.
-- [ ] Archive companion deploys the layers; book "Design specs" section
-      updated. (kaya-cc9)
+- [x] All `kaya.documents` and `kaya.publications` scenarios have executing
+      contract tests: `ah check --run-tests` reports 35 passed / 0 findings on
+      the deployed specs (kaya-cc9).
+- [x] `spk lint openspec/specs` clean on both deployed layers (2 files, 0
+      issues) (kaya-cc9).
+- [x] bd tickets closed with scenario references (kaya-lh1 closed; the earlier
+      slices closed with their evidence commits).
+- [x] Archive companion deployed the layers into `openspec/specs` and the book
+      "Design specs" section now renders kaya.documents and kaya.publications
+      via `just specs-docs`. (kaya-cc9)

@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "shared-fact-rendered-once"
+description = "Shared fact rendered once."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "shared_fact_is_rendered_once_with_a_cross_reference" },
+]

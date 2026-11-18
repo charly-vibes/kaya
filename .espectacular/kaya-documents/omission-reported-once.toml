@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "omission-reported-once"
+description = "Omission reported once."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "omitted_kinds_reported_once_in_build_envelope" },
+]

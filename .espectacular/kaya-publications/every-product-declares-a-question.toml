@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "every-product-declares-a-question"
+description = "Every product declares a question."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "admission_table_is_pinned_for_every_product" },
+]

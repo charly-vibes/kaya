@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "reproduction-package-points-at-a-revision"
+description = "Reproduction package points at a revision."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "inputs_selects_references_from_the_graph" },
+]

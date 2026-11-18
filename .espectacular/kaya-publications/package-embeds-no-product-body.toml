@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "package-embeds-no-product-body"
+description = "Package embeds no product body."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "project_site_over_overview_and_reference" },
+]

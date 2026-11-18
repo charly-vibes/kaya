@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "isolated-entity-still-listed"
+description = "Isolated entity still listed."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "isolated_entity_is_listed_once_and_no_edge_is_invented" },
+]

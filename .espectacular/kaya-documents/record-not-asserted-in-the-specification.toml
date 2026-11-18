@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "record-not-asserted-in-the-specification"
+description = "Record not asserted in the specification."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "specification_without_runs_renders_and_record_is_omitted" },
+]

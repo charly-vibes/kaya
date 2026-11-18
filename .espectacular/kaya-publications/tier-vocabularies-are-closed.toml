@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "tier-vocabularies-are-closed"
+description = "Tier vocabularies are closed."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{ flags = "tier_resolved_for_every_name_and_unknown_refused" }]

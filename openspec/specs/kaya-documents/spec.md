@@ -1,4 +1,16 @@
-## ADDED Requirements
+# kaya-documents Specification
+
+## Purpose
+The record-facing half of kaya: the eleven document kinds that answer "what do
+we know, and what did we intend?" so the client-facing publication layer has a
+stable interface to compose from. Every projected document is classified into
+one family and one kind from the closed vocabulary; declared intent and
+observed execution never share a block; generated blocks are named
+`<family>.<kind>`; kinds with no records disappear without placeholders; reuse
+kinds carry references instead of copying payloads; and the research map
+renders typed edges rather than type-grouped lists.
+
+## Requirements
 
 ### Requirement: Family vocabulary
 
@@ -10,7 +22,7 @@ A document projection SHALL classify every projected document by exactly one fam
 - **THEN** the document builds and its build entry names both the family and
   the kind
 
-#### Scenario: Unknown kind refused
+#### Scenario: Kind outside the closed vocabulary refused
 
 - **WHEN** a projection declares kind `experiment-report`
 - **THEN** the build refuses with a labeled error naming `experiment-report`

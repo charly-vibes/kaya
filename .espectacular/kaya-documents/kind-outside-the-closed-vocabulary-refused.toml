@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "kind-outside-the-closed-vocabulary-refused"
+description = "Kind outside the closed vocabulary refused."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{ flags = "unknown_kind_is_refused_with_a_label_and_vocabulary" }]

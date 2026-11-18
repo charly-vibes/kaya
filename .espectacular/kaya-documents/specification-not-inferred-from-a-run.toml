@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "specification-not-inferred-from-a-run"
+description = "Specification not inferred from a run."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "specification_kind_is_omitted_for_a_record_only_experiment" },
+]

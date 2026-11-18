@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "package-cannot-list-a-family"
+description = "Package cannot list a family."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "package_cannot_list_a_family" },
+]

@@ -32,8 +32,12 @@ lint: fmt-check
 
 # === Docs ===
 
+# Copy the deployed capability specs and their layers into the book
+specs-docs:
+	python3 scripts/sync-specs.py
+
 # Build the mdBook
-docs:
+docs: specs-docs
 	mdbook build
 
 # === Spec gates ===

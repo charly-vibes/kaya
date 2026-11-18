@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "markdown-and-export-agree"
+description = "Markdown and export agree."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "markdown_and_export_share_one_source_and_rebuild_identically" },
+]

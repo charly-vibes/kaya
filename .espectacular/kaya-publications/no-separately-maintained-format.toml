@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "no-separately-maintained-format"
+description = "No separately maintained format."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "repeat_publish_is_byte_identical" },
+]

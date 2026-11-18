@@ -1,0 +1,13 @@
+tool_version = "0.12.3"
+
+id = "no-stub-page"
+description = "No stub page."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [
+  { flags = "product_without_backing_document_is_omitted_without_a_page" },
+]
