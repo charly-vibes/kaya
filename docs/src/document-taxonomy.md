@@ -145,6 +145,14 @@ Common labels that look like types but are not: an FAQ is a question-oriented
 presentation, troubleshooting is a how-to, a changelog is a release-history
 document, a glossary is a reference collection.
 
+## Publication deployment
+
+The publication tree is deployed inside the book artifact, not as a second
+Pages site. GitHub Pages serves one site per repository, so a second upload
+would replace the book it is meant to accompany. `just docs` builds the book
+and copies `docs/public` into `book/public`; the Docs workflow uploads
+`book/`. Book-root pages link to the tree as `public/<page>.md`.
+
 ## Rules that keep the taxonomy honest
 
 1. **Omission over placeholders.** A kind with no records is omitted and
