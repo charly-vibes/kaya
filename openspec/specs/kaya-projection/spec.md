@@ -104,7 +104,10 @@ are unchanged SHALL keep their previous bytes without recomputation.
 
 ### Requirement: Stale-authored flagging
 
-When an authored block's cited evidence changes after its last acknowledgment, the compiler SHALL report the block as stale in the build summary — naming the changed evidence ids — and SHALL NOT alter the block's bytes. Acknowledgment is a human act recorded as an event.
+The compiler SHALL report an authored block as stale in the build summary —
+naming the changed evidence ids — when the block's cited evidence changes
+after its last acknowledgment, and SHALL NOT alter the block's bytes.
+Acknowledgment is a human act recorded as an event.
 
 #### Scenario: Evidence change flags the block
 
@@ -115,9 +118,8 @@ When an authored block's cited evidence changes after its last acknowledgment, t
 
 ### Requirement: Citation markers
 
-An authored block MAY declare its evidence with one or more
-`<!-- kaya:cites <id> [<id>…] -->` markers. Every cited id SHALL resolve to an
-event present in the ledger. A marker naming an unknown id SHALL be refused by
+An authored block MAY cite evidence with `<!-- kaya:cites <id> [<id>…] -->` markers; every cited id SHALL resolve to
+an event present in the ledger. A marker naming an unknown id SHALL be refused by
 `build` and `check` with a labeled error naming the document, the marker, and
 the id. Markers appearing outside an authored block SHALL be treated as
 ordinary prose. Marker bytes SHALL never be rewritten.
@@ -184,12 +186,12 @@ SHALL NOT alter authored bytes.
 
 ### Requirement: Acknowledgment command
 
-`kaya acknowledge <document> --block <name> --events <id>... --actor <name>`
-SHALL append exactly one acknowledgment event and SHALL refuse a tool actor
-with a labeled error, appending nothing. It SHALL refuse an acknowledgment whose
-document does not exist or whose block name is not an authored block in that
-document. Ids that are no longer cited SHALL be accepted and SHALL have no
-effect.
+`kaya acknowledge` SHALL append exactly one acknowledgment event when invoked
+as `kaya acknowledge <document> --block <name> --events <id>... --actor <name>`,
+and SHALL refuse a tool actor with a labeled error, appending nothing. It SHALL
+refuse an acknowledgment whose document does not exist or whose block name is
+not an authored block in that document. Ids that are no longer cited SHALL be
+accepted and SHALL have no effect.
 
 #### Scenario: Tool actor refused
 

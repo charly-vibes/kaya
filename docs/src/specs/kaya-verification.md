@@ -112,9 +112,9 @@ treated as having empty committed history for this mode.
 
 ### Requirement: Index read failures
 
-When a compared path cannot be read from the index — an unmerged entry or a
-git failure — `kaya check` SHALL fail with `kaya.verification.check_io` naming
-the path and SHALL NOT fall back to the worktree.
+`kaya check` SHALL fail with `kaya.verification.check_io` naming the path when
+a compared path cannot be read from the index — an unmerged entry or a git
+failure — and SHALL NOT fall back to the worktree.
 
 #### Scenario: Unreadable index path fails loudly
 

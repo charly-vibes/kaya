@@ -73,9 +73,11 @@ jobs:
           tar -xzf "$tmp/bd.tgz" -C "$tmp" bd
           sudo mv "$tmp/bd" /usr/local/bin/bd
 
-      # Installed tools must run, not just install.
+      # Installed tools must run, not just install. The openspec smoke
+      # validates one deployed capability spec strictly (specs survive; the
+      # changes that created them are archived and their names expire).
       - name: Smoke pinned tools
-        run: bd --version && ah --version && spk --version && openspec validate add-core-research-record --strict
+        run: bd --version && ah --version && spk --version && openspec validate kaya-verification --type spec --strict
 
       # Run the record gates: warn on pull requests, fail on main.
       # This is the same `just record-check` developers run locally.
