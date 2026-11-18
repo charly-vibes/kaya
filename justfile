@@ -53,6 +53,13 @@ release-claims:
 record-check mode="warn": record-verify release-claims links
 	python3 scripts/record-lag.py --mode {{mode}} --bound 25
 
+# Capture a scheduled snapshot: observe wai and git, then rebuild products
+record-capture:
+	cargo run --quiet -- import wai
+	cargo run --quiet -- import git
+	cargo run --quiet -- build
+	cargo run --quiet -- publish
+
 # === Spec gates ===
 
 # Verify the committed record against its projections without writing

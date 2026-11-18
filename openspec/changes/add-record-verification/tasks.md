@@ -69,7 +69,7 @@ behavior. They may land after the command does.
       `.whisper/` ignore is added. (kaya-tm8)
 - [x] 4.3 Lag gate reading `kaya check` facts: warn on PRs, fail on
       `main`/release above the configured bound. (kaya-8dg)
-- [ ] 4.4 Scheduled capture on `main` (`import wai`, `import git`, `build`,
+- [x] 4.4 Scheduled capture on `main` (`import wai`, `import git`, `build`,
       `publish`) that commits the snapshot deliberately. (kaya-9go)
 - [x] 4.5 Link check over the built book (kaya-nwv) and the release-claim check for
       `docs/src/status.md` (kaya-gh2).
@@ -78,12 +78,12 @@ behavior. They may land after the command does.
 
 ## 5. Archive checklist
 
-- [ ] Every `kaya.verification` scenario has a TOML contract and an executing
+- [x] Every `kaya.verification` scenario has a TOML contract and an executing
       test (`ah check --changes add-record-verification --run-tests` reports no
       `no-toml` or `no-tests-declared`).
 - [ ] `spk lint` clean on the new layer; property rows match the mirror
       scenarios one-to-one.
-- [ ] No duplicated renderer: a fixture builds and checks the same record and
+- [x] No duplicated renderer: a fixture builds and checks the same record and
       asserts equality of expected bytes.
-- [ ] kaya-585, kaya-a4e, kaya-8ot, kaya-ntv closed; repository tickets
+- [x] kaya-585, kaya-a4e, kaya-8ot, kaya-ntv closed; repository tickets
       remain open or closed on their own evidence.

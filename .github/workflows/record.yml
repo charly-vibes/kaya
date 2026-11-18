@@ -1,0 +1,60 @@
+# Record workflow — capture a scheduled snapshot on main
+#
+# Runs nightly (and on demand) on main only: observe the wai artifact tree and
+# recent commits, rebuild the research and publication products, and commit the
+# snapshot deliberately. Capture never runs in a pre-commit hook or on a pull
+# request; kaya evaluates no thresholds here.
+
+name: Record
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: record
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    if: github.ref == 'refs/heads/main'
+    name: Capture record snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Install just
+        uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6 # v2.0.0
+
+      - name: Configure git
+        run: |
+          git config user.name "kaya record"
+          git config user.email "record@kaya.invalid"
+
+      - name: Capture and compile
+        run: just record-capture
+
+      - name: Commit the snapshot
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "record is current; nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore(record): capture scheduled snapshot"
+          git push
