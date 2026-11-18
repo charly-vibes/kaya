@@ -35,7 +35,12 @@ def resolve(page: Path, target: str, root: Path) -> Path | None:
     relative = unquote(parts.path)
     if not relative:
         return None
-    candidate = (page.parent / relative).resolve()
+    if relative.startswith("/"):
+        candidate = (root / relative.lstrip("/")).resolve()
+    else:
+        candidate = (page.parent / relative).resolve()
+    if not candidate.is_relative_to(root):
+        return None
     if candidate.is_file():
         return candidate
     if candidate.is_dir() and (candidate / "index.html").is_file():
