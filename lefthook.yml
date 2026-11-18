@@ -13,6 +13,8 @@ pre-commit:
     ddl-spk-lint:
       run: spk lint openspec/specs || test $? -eq 2
     # ddl:managed:end (pre-commit)
+    record-verify-staged:
+      run: cargo run --quiet -- check --index --fail-on-stale-authored
 
 pre-push:
   commands:
@@ -22,3 +24,5 @@ pre-push:
     ddl-ah-check:
       run: ah check
     # ddl:managed:end (pre-push)
+    record-verify:
+      run: just record-verify

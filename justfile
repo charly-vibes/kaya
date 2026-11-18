@@ -42,6 +42,10 @@ docs: specs-docs
 
 # === Spec gates ===
 
+# Verify the committed record against its projections without writing
+record-verify:
+	cargo run --quiet -- check
+
 # Validate spec ↔ test correspondence (espectacular, bin: ah)
 validate:
 	ah check
