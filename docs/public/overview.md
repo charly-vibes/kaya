@@ -15,7 +15,7 @@ any of them: it assumes they already own their own authoritative records, so the
 same fact is entered once and cited everywhere else.
 
 Status: experimental · MVP-1 CLI implemented · long-form rationale in the
-[motivation & design](../src/index.md) page.
+[motivation & design](../index.html) page.
 <!-- kaya:end authored -->
 
 <!-- kaya:begin generated:publication.product.overview -->

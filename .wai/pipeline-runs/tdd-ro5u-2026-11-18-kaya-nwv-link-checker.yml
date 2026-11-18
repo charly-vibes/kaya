@@ -1,0 +1,11 @@
+run_id: tdd-ro5u-2026-11-18-kaya-nwv-link-checker
+pipeline: tdd-ro5u
+topic: kaya-nwv link checker
+created_at: '2026-11-18T19:28:47.514467251+00:00'
+current_step: 8
+approvals: {}
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

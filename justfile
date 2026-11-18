@@ -41,6 +41,10 @@ docs: specs-docs
 	mdbook build
 	python3 scripts/build-publications.py
 
+# Fail when the built book contains a relative link the artifact cannot resolve
+links:
+	python3 scripts/check-links.py
+
 # === Spec gates ===
 
 # Verify the committed record against its projections without writing

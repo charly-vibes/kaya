@@ -121,11 +121,11 @@ comes last, if ever).
 ## Milestones
 
 1. **MVP 1 — static research compilation.** Core entities and event format
-   *(implemented — [add-core-research-record](../../openspec/changes/add-core-research-record/proposal.md))*,
+   *(implemented — [add-core-research-record](https://github.com/charly-vibes/kaya/blob/main/openspec/changes/add-core-research-record/proposal.md))*,
    wai import, git history + test results import, research index, experiment
    report with authored sections preserved. *Validation: a useful dossier from
    existing project information, without rewriting anything — proven by the
-   dogfooded [research dossier](../research/index.md).*
+   dogfooded [research dossier](research/index.md).*
 2. **MVP 2 — continuous capture.** CLI capture, agent traces, deduplication,
    relationship linking, missing-evidence detection, incremental
    regeneration.

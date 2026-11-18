@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Render the publication tree into the book artifact.
+"""Render the publication and research trees into the book artifact.
 
-Purpose: publish docs/public as HTML inside the mdBook output so the deployed
-site contains the client-facing publication pages as well as the book.
-Responsibilities: build a throwaway mdBook source from docs/public, render it
-into book/public, and copy the structured export beside the pages.
+Purpose: publish docs/public and docs/research as HTML inside the mdBook
+output so the deployed site carries the book, the client-facing publication
+pages, and the compiled dossier.
+Responsibilities: build throwaway mdBook sources from the Markdown trees,
+render them into book/public and book/research, and copy the structured
+publication export beside its pages.
 Rationale: GitHub Pages serves one site per repository; a second upload would
 replace the book. Rendering through mdBook keeps the Markdown sources and the
 deployed pages identical instead of maintaining a second HTML copy.
@@ -20,7 +22,9 @@ import tempfile
 from pathlib import Path
 
 PUBLIC = Path("docs/public")
-BOOK_OUT = Path("book/public")
+PUBLIC_OUT = Path("book/public")
+RESEARCH = Path("docs/research")
+RESEARCH_OUT = Path("book/research")
 EXPORT = "publication.json"
 
 
@@ -32,43 +36,56 @@ def title_of(path: Path) -> str:
     return path.stem
 
 
+def render_tree(source: Path, out: Path, title: str) -> int:
+    """Render every Markdown file under `source` into HTML under `out`."""
+    pages = sorted(path for path in source.rglob("*.md") if path.name != "SUMMARY.md")
+    if not pages:
+        print(f"build-publications: {source} has no Markdown pages", file=sys.stderr)
+        return 1
+
+    with tempfile.TemporaryDirectory(prefix="kaya-book-") as tmp:
+        root = Path(tmp)
+        src = root / "src"
+        summary = ["# Summary", ""]
+        for page in pages:
+            relative = page.relative_to(source)
+            target = src / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(page, target)
+            summary.append(f"- [{title_of(page)}]({relative.as_posix()})")
+        (src / "SUMMARY.md").write_text("\n".join(summary) + "\n", encoding="utf-8")
+        (root / "book.toml").write_text(
+            f'[book]\ntitle = "{title}"\nsrc = "src"\n',
+            encoding="utf-8",
+        )
+
+        shutil.rmtree(out, ignore_errors=True)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        process = subprocess.run(
+            ["mdbook", "build", str(root), "-d", str(out.resolve())],
+            check=False,
+        )
+        if process.returncode != 0:
+            print(f"build-publications: mdbook failed for {source}", file=sys.stderr)
+            return process.returncode
+    print(f"build-publications: rendered {len(pages)} page(s) into {out}")
+    return 0
+
+
 def main() -> int:
     if not PUBLIC.is_dir():
         print(f"build-publications: {PUBLIC} is missing", file=sys.stderr)
         return 1
-    pages = sorted(path for path in PUBLIC.glob("*.md") if path.name != "SUMMARY.md")
-    if not pages:
-        print(f"build-publications: {PUBLIC} has no Markdown pages", file=sys.stderr)
-        return 1
-
-    with tempfile.TemporaryDirectory(prefix="kaya-publications-") as tmp:
-        root = Path(tmp)
-        src = root / "src"
-        src.mkdir()
-        for page in pages:
-            shutil.copy2(page, src / page.name)
-        summary = ["# Summary", ""]
-        summary.extend(f"- [{title_of(page)}]({page.name})" for page in pages)
-        (src / "SUMMARY.md").write_text("\n".join(summary) + "\n", encoding="utf-8")
-        (root / "book.toml").write_text(
-            '[book]\ntitle = "kaya publications"\nsrc = "src"\n',
-            encoding="utf-8",
-        )
-
-        shutil.rmtree(BOOK_OUT, ignore_errors=True)
-        BOOK_OUT.parent.mkdir(parents=True, exist_ok=True)
-        process = subprocess.run(
-            ["mdbook", "build", str(root), "-d", str(BOOK_OUT.resolve())],
-            check=False,
-        )
-        if process.returncode != 0:
-            print("build-publications: mdbook failed", file=sys.stderr)
-            return process.returncode
-
+    status = render_tree(PUBLIC, PUBLIC_OUT, "kaya publications")
+    if status != 0:
+        return status
+    if RESEARCH.is_dir():
+        status = render_tree(RESEARCH, RESEARCH_OUT, "kaya research")
+        if status != 0:
+            return status
     export = PUBLIC / EXPORT
     if export.is_file():
-        shutil.copy2(export, BOOK_OUT / EXPORT)
-    print(f"build-publications: rendered {len(pages)} page(s) into {BOOK_OUT}")
+        shutil.copy2(export, PUBLIC_OUT / EXPORT)
     return 0
 
 
