@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-18-kaya-n50-overview-cutover
+pipeline: tdd-ro5u
+topic: kaya-n50 overview cutover
+created_at: '2026-11-18T01:43:36.430378385+00:00'
+current_step: 8
+approvals:
+  ship-close: '2026-11-18T11:24:16.205388542+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []
