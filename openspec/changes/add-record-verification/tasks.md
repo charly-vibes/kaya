@@ -21,7 +21,7 @@ contract-test shape. One tdd-ro5u run per ticket.
       in the worktree only → passes; ledger staged with no `HEAD` copy →
       verifies instead of refusing; unmerged or unreadable index path → exit 2
       with `kaya.verification.check_io`, never a worktree fallback. (kaya-a4e)
-- [ ] 1.4 Facts fixture: wai, git, and model events, known newest commit →
+- [x] 1.4 Facts fixture: wai, git, and model events, known newest commit →
       `events_by_source` uses the `wai`/`git`/`test-runner`/`model` keys (the
       seed's human actor never appears), and emitted/omitted kinds are dotted
       `family.kind` names with no duplicate spelling. (kaya-8ot)

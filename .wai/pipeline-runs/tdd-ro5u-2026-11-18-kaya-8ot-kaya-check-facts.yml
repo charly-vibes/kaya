@@ -1,0 +1,11 @@
+run_id: tdd-ro5u-2026-11-18-kaya-8ot-kaya-check-facts
+pipeline: tdd-ro5u
+topic: kaya-8ot kaya check facts
+created_at: '2026-11-18T16:20:34.042481303+00:00'
+current_step: 8
+approvals: {}
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

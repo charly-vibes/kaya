@@ -274,6 +274,30 @@ fn git_stdout(workspace: &Path, args: &[&str]) -> Vec<u8> {
     output.stdout
 }
 
+/// The commit `HEAD` names.
+fn head_sha(workspace: &Path) -> String {
+    String::from_utf8(git_stdout(workspace, &["rev-parse", "HEAD"]))
+        .expect("the commit sha is UTF-8")
+        .trim()
+        .to_owned()
+}
+
+/// Commit the staged tree stamped with explicit author and committer dates, so
+/// a fixture can put a later author date on an earlier log entry.
+fn commit_dated(workspace: &Path, message: &str, author: &str, committer: &str) {
+    let output = git_command(workspace)
+        .args(["commit", "--quiet", "--message", message])
+        .env("GIT_AUTHOR_DATE", author)
+        .env("GIT_COMMITTER_DATE", committer)
+        .output()
+        .expect("git runs");
+    assert!(
+        output.status.success(),
+        "git commit {message:?} failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 fn parse_envelope(output: &Output) -> Value {
     serde_json::from_slice(&output.stdout).unwrap_or_else(|err| {
         panic!(
@@ -558,6 +582,177 @@ fn assert_tree_unchanged(before: &TreeSnapshot, after: &TreeSnapshot) {
         .map(|(path, _)| path)
         .collect::<Vec<_>>();
     assert!(changed.is_empty(), "check rewrote files: {changed:?}");
+}
+
+/// A dated wai research artifact; the adapter records one observation per
+/// markdown file under `.wai/projects/<project>/<kind>/`.
+const WAI_NOTE: &str = ".wai/projects/kaya/research/2026-11-18-note.md";
+
+/// The canonical `events_by_source` keys: capture family and provenance, never
+/// the actor name.
+const SOURCES: [&str; 4] = ["wai", "git", "test-runner", "model"];
+
+/// Write one human-authored research note into the wai tree.
+fn add_wai_artifact(root: &Path) {
+    let path = root.join(WAI_NOTE);
+    fs::create_dir_all(path.parent().expect("the wai artifact has a parent"))
+        .expect("create the wai research directory");
+    fs::write(
+        &path,
+        "# facts fixture note\n\nA human note the wai adapter only observes.\n",
+    )
+    .expect("write the wai artifact");
+}
+
+/// A valid libtest JSONL report: suite and bare-string records are ignored, so
+/// the terminal test events are what the adapter tallies.
+const LIBTEST_REPORT: &str = concat!(
+    "{\"type\":\"suite\",\"event\":\"started\",\"test_count\":4}\n",
+    "{\"type\":\"test\",\"event\":\"started\",\"name\":\"passes_one\"}\n",
+    "{\"type\":\"test\",\"event\":\"ok\",\"name\":\"passes_one\"}\n",
+    "{\"type\":\"test\",\"event\":\"started\",\"name\":\"passes_two\"}\n",
+    "{\"type\":\"test\",\"event\":\"ok\",\"name\":\"passes_two\"}\n",
+    "{\"type\":\"test\",\"event\":\"started\",\"name\":\"fails\"}\n",
+    "{\"type\":\"test\",\"event\":\"failed\",\"name\":\"fails\"}\n",
+    "{\"type\":\"test\",\"event\":\"ignored\",\"name\":\"skipped\"}\n",
+    "\"a bare JSON string is not a test event\"\n",
+    "{\"type\":\"suite\",\"event\":\"ok\"}\n",
+);
+
+/// Where a fixture writes the run report it imports.
+const LIBTEST_REPORT_PATH: &str = "cargo-test-results.jsonl";
+
+/// Write the libtest report under `root` and return its path.
+fn write_libtest_report(root: &Path) -> PathBuf {
+    let path = root.join(LIBTEST_REPORT_PATH);
+    fs::write(&path, LIBTEST_REPORT).expect("write the libtest report");
+    path
+}
+
+/// A record with two capture sources: import the wai tree and `limit` recent
+/// commits, then rebuild, publish, and commit the grown ledger, so `check`
+/// reads a record whose committed history it can verify.
+fn record_with_two_sources(root: &Path, limit: &str) {
+    add_wai_artifact(root);
+    run_ok(root, &["import", "wai"]);
+    run_ok(root, &["import", "git", "--limit", limit]);
+    run_ok(root, &["build"]);
+    run_ok(root, &["publish"]);
+    git(root, &["add", "--all"]);
+    git(
+        root,
+        &[
+            "commit",
+            "--quiet",
+            "--message",
+            "record imported observations",
+        ],
+    );
+}
+
+/// Every event the worktree ledger records, in file order.
+fn ledger_events(root: &Path) -> Vec<Value> {
+    let text = fs::read_to_string(root.join(LEDGER)).expect("the ledger is readable");
+    text.lines()
+        .map(|line| {
+            serde_json::from_str(line)
+                .unwrap_or_else(|error| panic!("a ledger line is one JSON event ({error}): {line}"))
+        })
+        .collect()
+}
+
+/// The greatest event timestamp the ledger records.
+fn newest_timestamp(events: &[Value]) -> String {
+    events
+        .iter()
+        .map(|event| {
+            event["timestamp"]
+                .as_str()
+                .unwrap_or_else(|| panic!("every event carries a timestamp: {event}"))
+        })
+        .max()
+        .expect("the ledger records events")
+        .to_owned()
+}
+
+/// The seven record facts every executed `check` reports.
+fn record_facts(envelope: &Value) -> &Value {
+    const FIELDS: [&str; 7] = [
+        "events",
+        "ledger_digest",
+        "last_capture_commit",
+        "newest_event_at",
+        "events_by_source",
+        "emitted_kinds",
+        "omitted_kinds",
+    ];
+    let data = envelope["data"]
+        .as_object()
+        .unwrap_or_else(|| panic!("check reports data as an object: {envelope}"));
+    for field in FIELDS {
+        assert!(
+            data.contains_key(field),
+            "check reports data.{field}: {envelope}"
+        );
+    }
+    &envelope["data"]
+}
+
+/// The canonical source counts, requiring exactly the four source keys.
+fn source_counts(facts: &Value) -> BTreeMap<String, u64> {
+    let counts = facts["events_by_source"]
+        .as_object()
+        .unwrap_or_else(|| panic!("check reports data.events_by_source as an object: {facts}"));
+    let keys = counts.keys().cloned().collect::<BTreeSet<_>>();
+    let expected = SOURCES
+        .iter()
+        .map(|source| (*source).to_owned())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        keys, expected,
+        "events_by_source holds exactly the canonical sources {SOURCES:?}: {facts}"
+    );
+    counts
+        .iter()
+        .map(|(source, count)| {
+            let count = count
+                .as_u64()
+                .unwrap_or_else(|| panic!("the {source} source count is an integer: {facts}"));
+            (source.clone(), count)
+        })
+        .collect()
+}
+
+/// A dotted `family.kind` list: strings, strictly sorted (hence unique), with a
+/// non-empty family and kind on either side of a dot.
+fn dotted_kinds(facts: &Value, field: &str) -> Vec<String> {
+    let list = facts[field]
+        .as_array()
+        .unwrap_or_else(|| panic!("check reports data.{field} as an array: {facts}"));
+    let names = list
+        .iter()
+        .map(|name| {
+            name.as_str()
+                .unwrap_or_else(|| panic!("data.{field} holds strings: {facts}"))
+                .to_owned()
+        })
+        .collect::<Vec<_>>();
+    for pair in names.windows(2) {
+        assert!(
+            pair[0] < pair[1],
+            "data.{field} is sorted and deduplicated: {names:?}"
+        );
+    }
+    for name in &names {
+        let (family, kind) = name.split_once('.').unwrap_or_else(|| {
+            panic!("data.{field} names dotted family.kind values, got \"{name}\": {facts}")
+        });
+        assert!(
+            !family.is_empty() && !kind.is_empty() && !name.split('.').any(str::is_empty),
+            "data.{field} names dotted family.kind values, got \"{name}\": {facts}"
+        );
+    }
+    names
 }
 
 #[test]
@@ -1161,4 +1356,404 @@ fn check_index_reports_stray_managed_document() {
          {envelope}"
     );
     assert_document_finding(&drift[0], STRAY, "extra");
+}
+
+#[test]
+fn check_facts_reported() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+
+    let output = fixture.output(&["check"]);
+
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "a clean record exits 0: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    let facts = record_facts(&envelope);
+
+    // The report is a second reader of the record, not a second parser: its
+    // count and digest describe exactly the verified ledger bytes.
+    let events = ledger_events(root);
+    assert_eq!(
+        facts["events"].as_u64(),
+        Some(events.len() as u64),
+        "the event count matches the ledger: {envelope}"
+    );
+    assert_eq!(
+        facts["ledger_digest"],
+        json!(sha256_hex(&worktree_bytes(root, LEDGER))),
+        "the digest is sha256 over the verified ledger bytes: {envelope}"
+    );
+    assert_eq!(
+        facts["newest_event_at"],
+        json!(newest_timestamp(&events)),
+        "the newest event timestamp is the greatest recorded: {envelope}"
+    );
+
+    // The seed records no capture observation, so there is no frontier yet,
+    // and every event is a model event.
+    assert_eq!(
+        facts["last_capture_commit"],
+        Value::Null,
+        "a record without capture events reports a null frontier: {envelope}"
+    );
+    let counts = source_counts(facts);
+    assert_eq!(
+        counts["model"],
+        events.len() as u64,
+        "every seed event is a model event: {envelope}"
+    );
+    assert_eq!(
+        counts["wai"], 0,
+        "the seed imports no wai artifact observations: {envelope}"
+    );
+    assert_eq!(
+        counts["git"], 0,
+        "the seed imports no commit observations: {envelope}"
+    );
+    assert_eq!(
+        counts["test-runner"], 0,
+        "the seed imports no run observations: {envelope}"
+    );
+    assert_eq!(
+        counts.values().sum::<u64>(),
+        events.len() as u64,
+        "the per-source counts partition every event: {envelope}"
+    );
+    assert!(
+        !counts.contains_key("charly"),
+        "the seed's human actor is never a source key: {envelope}"
+    );
+
+    // Both kind lists are one vocabulary: dotted `family.kind` names.
+    let emitted = dotted_kinds(facts, "emitted_kinds");
+    assert!(
+        !emitted.is_empty(),
+        "the projection emits at least the research map: {envelope}"
+    );
+    let omitted = dotted_kinds(facts, "omitted_kinds");
+    assert!(
+        omitted.contains(&"understanding.decision-record".to_owned()),
+        "the seed holds no decision, so that kind is omitted for no-records: {envelope}"
+    );
+}
+
+#[test]
+fn check_capture_frontier_survives_rewrite() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+    let captured = head_sha(root);
+
+    // Record the frontier, then rewrite that very commit: the observation is
+    // a fact about the record, not a promise that git still reaches the sha.
+    run_ok(root, &["import", "git", "--limit", "1"]);
+    run_ok(root, &["build"]);
+    run_ok(root, &["publish"]);
+    git(root, &["add", "--all"]);
+    git(root, &["commit", "--amend", "--no-edit"]);
+
+    let rewritten = head_sha(root);
+    assert_ne!(
+        rewritten, captured,
+        "the amend rewrites the captured commit into a new sha"
+    );
+    let reachable = String::from_utf8(git_stdout(root, &["rev-list", "--all"]))
+        .expect("the reachable shas are UTF-8");
+    assert!(
+        !reachable.split_whitespace().any(|sha| sha == captured),
+        "the recorded sha is no longer reachable from any ref: {reachable}"
+    );
+
+    let output = fixture.output(&["check"]);
+
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "the rewritten record still verifies against its projections: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    let facts = record_facts(&envelope);
+    assert_eq!(
+        facts["last_capture_commit"],
+        json!(captured),
+        "the frontier is reported as recorded even though the commit is unreachable: {envelope}"
+    );
+}
+
+#[test]
+fn check_facts_test_runner_source() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+    let captured = head_sha(root);
+
+    // A record holding three capture sources: a wai artifact, the one recent
+    // commit, and a completed libtest run.
+    add_wai_artifact(root);
+    run_ok(root, &["import", "wai"]);
+    run_ok(root, &["import", "git", "--limit", "1"]);
+    let report = write_libtest_report(root);
+    let report = report.to_str().expect("the report path is UTF-8");
+    run_ok(root, &["import", "test", "--report", report]);
+    run_ok(root, &["build"]);
+    run_ok(root, &["publish"]);
+    git(root, &["add", "--all"]);
+    git(
+        root,
+        &[
+            "commit",
+            "--quiet",
+            "--message",
+            "record imported observations",
+        ],
+    );
+
+    let output = fixture.output(&["check"]);
+
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "the extended record still verifies against its projections: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    let facts = record_facts(&envelope);
+
+    // The report describes the verified ledger without parsing it again.
+    let events = ledger_events(root);
+    assert_eq!(
+        facts["events"].as_u64(),
+        Some(events.len() as u64),
+        "the event count matches the ledger: {envelope}"
+    );
+    assert_eq!(
+        facts["ledger_digest"],
+        json!(sha256_hex(&worktree_bytes(root, LEDGER))),
+        "the digest is sha256 over the verified ledger bytes: {envelope}"
+    );
+    assert_eq!(
+        facts["newest_event_at"],
+        json!(newest_timestamp(&events)),
+        "the newest event timestamp is the greatest recorded: {envelope}"
+    );
+
+    // A record with more than one source still carries a capture frontier.
+    assert_eq!(
+        facts["last_capture_commit"],
+        json!(captured),
+        "the frontier names the one imported commit: {envelope}"
+    );
+    let counts = source_counts(facts);
+    assert!(
+        counts["test-runner"] >= 1,
+        "the imported run counts under test-runner: {envelope}"
+    );
+    assert!(
+        counts["wai"] >= 1,
+        "the imported research note counts under wai: {envelope}"
+    );
+    assert!(
+        counts["git"] >= 1,
+        "the imported commit counts under git: {envelope}"
+    );
+    assert!(
+        counts["model"] >= 1,
+        "the seed's model events count under model: {envelope}"
+    );
+    assert_eq!(
+        counts.values().sum::<u64>(),
+        events.len() as u64,
+        "the canonical counts partition every event: {envelope}"
+    );
+    assert!(
+        !counts.contains_key("charly"),
+        "the seed's human actor name never becomes a source key: {envelope}"
+    );
+
+    let emitted = dotted_kinds(facts, "emitted_kinds");
+    let omitted = dotted_kinds(facts, "omitted_kinds");
+    assert!(
+        !emitted.is_empty(),
+        "the projection emits at least the research map: {envelope}"
+    );
+    assert!(
+        omitted.contains(&"understanding.decision-record".to_owned()),
+        "the seed holds no decision, so that kind is omitted for no-records: {envelope}"
+    );
+}
+
+#[test]
+fn check_sources_and_kinds_canonical() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+
+    record_with_two_sources(root, "3");
+
+    let output = fixture.output(&["check"]);
+
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "the extended record still verifies against its projections: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    let facts = record_facts(&envelope);
+
+    let counts = source_counts(facts);
+    assert_eq!(
+        counts["model"], 13,
+        "the committed seed's model events count under model: {envelope}"
+    );
+    assert!(
+        counts["wai"] >= 1,
+        "the imported research note counts under wai: {envelope}"
+    );
+    assert!(
+        counts["git"] >= 1,
+        "the imported commits count under git: {envelope}"
+    );
+    assert_eq!(
+        counts["test-runner"], 0,
+        "no run report was imported, so test-runner is zero: {envelope}"
+    );
+    assert!(
+        !counts.contains_key("charly"),
+        "the seed's human actor name never becomes a source key: {envelope}"
+    );
+    assert_eq!(
+        counts.values().sum::<u64>(),
+        facts["events"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("check reports an integer event count: {envelope}")),
+        "the canonical counts partition every event: {envelope}"
+    );
+
+    let emitted = dotted_kinds(facts, "emitted_kinds");
+    assert!(
+        !emitted.is_empty(),
+        "the projection emits at least the research map: {envelope}"
+    );
+    let omitted = dotted_kinds(facts, "omitted_kinds");
+    assert!(
+        omitted.contains(&"understanding.decision-record".to_owned()),
+        "the seed holds no decision, so that kind is omitted for no-records: {envelope}"
+    );
+}
+
+#[test]
+fn check_facts_property() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+
+    let notes = root.join("notes");
+    fs::create_dir_all(&notes).expect("create the notes directory");
+
+    // Two commits whose log order and author dates disagree: the tip carries
+    // the earlier author date, so only a frontier ordered by record time names
+    // the commit the record observed later.
+    fs::write(notes.join("observed-later.md"), "# observed later\n")
+        .expect("write the later-dated note");
+    git(root, &["add", "--all"]);
+    commit_dated(
+        root,
+        "observe the later-dated commit",
+        "2026-11-19T00:00:00+00:00",
+        "2026-11-19T00:00:00+00:00",
+    );
+    let later_dated = head_sha(root);
+
+    fs::write(notes.join("observed-earlier.md"), "# observed earlier\n")
+        .expect("write the earlier-dated note");
+    git(root, &["add", "--all"]);
+    commit_dated(
+        root,
+        "observe the earlier-dated commit",
+        "2026-11-17T00:00:00+00:00",
+        "2026-11-21T00:00:00+00:00",
+    );
+    let later_logged = head_sha(root);
+    assert_ne!(
+        later_dated, later_logged,
+        "the two dated commits are distinct"
+    );
+
+    record_with_two_sources(root, "2");
+    let events = ledger_events(root);
+    let imported = events
+        .iter()
+        .filter(|event| event["type"] == json!("capture.commit.observed"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        imported.len(),
+        2,
+        "the limit imports both dated commits: {imported:?}"
+    );
+    let expected_timestamp = newest_timestamp(&events);
+    // The later author date wins, not the later log entry the import read last.
+    let expected_frontier = later_dated;
+    let expected_digest = sha256_hex(&worktree_bytes(root, LEDGER));
+
+    // The same committed bytes read through the worktree and through the
+    // index must yield one fact set: the facts describe the verified record,
+    // not the read path.
+    let worktree = fixture.output(&["check"]);
+    let index = fixture.output(&["check", "--index"]);
+    for output in [&worktree, &index] {
+        assert_eq!(
+            exit_code(output),
+            0,
+            "the same clean record exits 0 in both modes: {}",
+            stderr(output)
+        );
+        let envelope = parse_envelope(output);
+        assert_check_envelope(&envelope);
+        let facts = record_facts(&envelope);
+
+        // Frontier, canonical counts, and dotted kinds are present together.
+        assert_eq!(
+            facts["last_capture_commit"],
+            json!(expected_frontier),
+            "the frontier names the newest recorded capture sha: {envelope}"
+        );
+        assert_eq!(
+            facts["newest_event_at"],
+            json!(expected_timestamp),
+            "the newest event timestamp is the greatest recorded: {envelope}"
+        );
+        assert_eq!(
+            facts["ledger_digest"],
+            json!(expected_digest),
+            "the digest covers the verified ledger bytes: {envelope}"
+        );
+        let counts = source_counts(facts);
+        assert_eq!(
+            counts.values().sum::<u64>(),
+            events.len() as u64,
+            "the per-source counts partition every event: {envelope}"
+        );
+        assert!(
+            counts["wai"] >= 1 && counts["git"] >= 1,
+            "both capture sources are counted: {envelope}"
+        );
+        let emitted = dotted_kinds(facts, "emitted_kinds");
+        let omitted = dotted_kinds(facts, "omitted_kinds");
+        assert!(
+            !emitted.is_empty() && !omitted.is_empty(),
+            "both kind lists are reported: {envelope}"
+        );
+    }
+
+    assert_eq!(
+        parse_envelope(&worktree)["data"],
+        parse_envelope(&index)["data"],
+        "worktree and index modes report identical facts for identical bytes"
+    );
 }

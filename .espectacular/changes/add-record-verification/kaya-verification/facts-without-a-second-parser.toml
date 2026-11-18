@@ -1,0 +1,9 @@
+id = "facts-without-a-second-parser"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "check_facts_test_runner_source"}]

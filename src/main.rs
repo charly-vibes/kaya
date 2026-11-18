@@ -745,11 +745,19 @@ fn cmd_check(
     match verification::check(root, out, publish_out, expect_digest, index) {
         Ok(outcome) => {
             let code = outcome.exit_code();
+            let facts = outcome.facts;
             let envelope = Envelope::ok(
                 "check",
                 json!({
                     "drift": outcome.drift,
                     "stale": [],
+                    "events": facts.events,
+                    "ledger_digest": facts.ledger_digest,
+                    "last_capture_commit": facts.last_capture_commit,
+                    "newest_event_at": facts.newest_event_at,
+                    "events_by_source": facts.events_by_source,
+                    "emitted_kinds": facts.emitted_kinds,
+                    "omitted_kinds": facts.omitted_kinds,
                 }),
             );
             emit_code(envelope, code)

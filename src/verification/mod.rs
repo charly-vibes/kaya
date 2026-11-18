@@ -16,6 +16,8 @@
 //! The publication tree is verified whether or not it exists: a record that was
 //! never published is drift, because every planned page is then missing.
 
+pub mod facts;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
@@ -30,6 +32,8 @@ use crate::model::{self, EntityType, Graph};
 use crate::projection::{self, BlockKind, ProjectionError, index, report, reuse};
 use crate::promotion::{PromotionError, PromotionState};
 use crate::publication::{self, PublicationError};
+
+use self::facts::Facts;
 
 /// The append-only research ledger, relative to the invocation root.
 const LEDGER: &str = ".kaya/ledger.jsonl";
@@ -135,6 +139,8 @@ pub struct Entry {
 pub struct Outcome {
     /// Drift findings, sorted by `(path, block, kind)`.
     pub drift: Vec<Entry>,
+    /// What the check observed in the verified record.
+    pub facts: Facts,
 }
 
 impl Outcome {
@@ -452,11 +458,11 @@ pub fn check(
     let out = root.join(out);
     let publish_out = root.join(publish_out);
 
-    let events = read_ledger(&source, expect_digest)?;
+    let (events, ledger_digest) = read_ledger(&source, expect_digest)?;
     let graph = model::build(&events)?;
     let promotion = PromotionState::from_events(&events)?;
 
-    let expected = plan_research(&source, &out, &events, &graph, &promotion)?;
+    let (expected, omitted) = plan_research(&source, &out, &events, &graph, &promotion)?;
 
     let mut drift = Vec::new();
     compare_research(&source, &out, &expected, &mut drift)?;
@@ -472,7 +478,8 @@ pub fn check(
     // layer lumps with an omission, for example — and a finding is a fact, so
     // the reported drift counts it once.
     drift.dedup();
-    Ok(Outcome { drift })
+    let facts = Facts::derive(&events, ledger_digest, &expected, &omitted)?;
+    Ok(Outcome { drift, facts })
 }
 
 /// Whether `digest` is exactly 64 hexadecimal characters.
@@ -480,7 +487,8 @@ fn valid_digest(digest: &str) -> bool {
     digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-/// Read and verify the ledger, returning the events it records.
+/// Read and verify the ledger, returning the events it records and the sha256
+/// of the exact verified bytes.
 ///
 /// Committed history is mandatory: no flag relaxes it. In worktree mode a
 /// tracked ledger must extend its committed `HEAD` bytes on a line boundary,
@@ -494,7 +502,7 @@ fn valid_digest(digest: &str) -> bool {
 fn read_ledger(
     source: &Source,
     expect_digest: Option<&str>,
-) -> Result<Vec<Event>, VerificationError> {
+) -> Result<(Vec<Event>, String), VerificationError> {
     let root = source.root();
     let path = root.join(LEDGER);
     let missing = || {
@@ -529,21 +537,22 @@ fn read_ledger(
     };
     verify_history(&committed, &bytes, &path)?;
 
-    if let Some(expected) = expect_digest {
-        let digest = sha256_hex(&bytes);
-        if digest != expected {
-            return Err(VerificationError::new(
-                LABEL_DIGEST,
-                format!(
-                    "ledger {} does not match the expected digest {expected}: the verified \
-                     bytes digest {digest}",
-                    path.display()
-                ),
-            ));
-        }
+    let digest = sha256_hex(&bytes);
+    if let Some(expected) = expect_digest
+        && digest != expected
+    {
+        return Err(VerificationError::new(
+            LABEL_DIGEST,
+            format!(
+                "ledger {} does not match the expected digest {expected}: the verified \
+                 bytes digest {digest}",
+                path.display()
+            ),
+        ));
     }
 
-    parse_events(&bytes, &path)
+    let events = parse_events(&bytes, &path)?;
+    Ok((events, digest))
 }
 
 /// The committed `HEAD` bytes of the ledger under `root`.
@@ -744,22 +753,25 @@ fn parse_events(bytes: &[u8], path: &Path) -> Result<Vec<Event>, VerificationErr
     Ok(events)
 }
 
-/// The research documents the projections emit, keyed by absolute path.
+/// The research documents the projections emit, keyed by absolute path, and
+/// the dotted `family.kind` names a planner omitted for having no records.
 ///
 /// Every planner receives the document already at its path — worktree or
 /// staged bytes, whichever mode reads — so the map is the fixed point a clean
 /// `build` would leave: generated bodies are replanned while authored prose,
 /// foreign blocks, and marker placement survive untouched. Planning from
 /// absent bytes would instead reduce each document to its generated blocks and
-/// report the human's bytes as drift.
+/// report the human's bytes as drift. An omission is collected even when its
+/// plan leaves no document: the empty kind is why the bytes are absent.
 fn plan_research(
     source: &Source,
     out: &Path,
     events: &[Event],
     graph: &Graph,
     promotion: &PromotionState,
-) -> Result<BTreeMap<PathBuf, String>, VerificationError> {
+) -> Result<(BTreeMap<PathBuf, String>, Vec<String>), VerificationError> {
     let mut expected = BTreeMap::new();
+    let mut omitted = Vec::new();
 
     let index_path = out.join("index.md");
     let existing = source.read_text(&index_path)?;
@@ -774,6 +786,9 @@ fn plan_research(
         let path = experiments.join(format!("{}.md", node.id.replace('/', "-")));
         let existing = source.read_text(&path)?;
         let planned = report::plan(graph, &node.id, existing.as_deref(), promotion)?;
+        // An omitted kind is a fact even when the plan leaves no document:
+        // the omission is why the bytes are absent.
+        omitted.extend(planned.omitted.iter().map(omitted_kind));
         if !planned.document.trim().is_empty() {
             expected.insert(path, planned.document);
         }
@@ -782,6 +797,7 @@ fn plan_research(
     let understanding_path = out.join("understanding.md");
     let existing = source.read_text(&understanding_path)?;
     let planned = report::plan_understanding(graph, existing.as_deref())?;
+    omitted.extend(planned.omitted.iter().map(omitted_kind));
     if !planned.document.trim().is_empty() {
         expected.insert(understanding_path, planned.document);
     }
@@ -789,6 +805,7 @@ fn plan_research(
     let overview_path = out.join("overview.md");
     let existing = source.read_text(&overview_path)?;
     let planned = report::plan_overview(graph, existing.as_deref())?;
+    omitted.extend(planned.omitted.iter().map(omitted_kind));
     if !planned.document.trim().is_empty() {
         expected.insert(overview_path, planned.document);
     }
@@ -800,12 +817,20 @@ fn plan_research(
         existing.insert(path, document);
     }
     for planned in reuse::plan(&inputs, out, &existing)? {
+        omitted.extend(planned.omitted.iter().map(omitted_kind));
         if let Some(document) = planned.document {
             expected.insert(planned.path, document);
         }
     }
 
-    Ok(expected)
+    omitted.sort();
+    omitted.dedup();
+    Ok((expected, omitted))
+}
+
+/// One planner omission as a dotted `family.kind` name.
+fn omitted_kind(omitted: &report::Omitted) -> String {
+    format!("{}.{}", omitted.family, omitted.kind)
 }
 
 /// Compare every expected research document with the source's bytes.
