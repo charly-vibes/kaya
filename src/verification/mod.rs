@@ -5,7 +5,8 @@
 //! Responsibilities: read the ledger from an invocation root and refuse any
 //! history git cannot verify, replan every research and publication document
 //! through the same pure planners its writer uses, and compare the expected
-//! bytes with the worktree per managed block and per document.
+//! bytes with the worktree — or with the git index under `--index` — per
+//! managed block and per document.
 //! Rationale: verification is the inverse of compilation, never a second
 //! implementation of it — sharing the planners means a `check` finding names
 //! exactly the bytes `build` or `publish` would rewrite, and a clean run is
@@ -143,72 +144,255 @@ impl Outcome {
     }
 }
 
-/// The worktree a check reads: document text and Markdown directory listings.
+/// The tree a check reads: document text and Markdown directory listings.
+///
+/// Worktree mode reads the files a developer sees. Index mode reads the blobs
+/// a commit would record (`:<path>`), so a partially staged tree verifies
+/// exactly as the commit would leave it. Index mode never falls back to the
+/// worktree: an entry the index cannot serve is an I/O failure.
 #[derive(Debug, Clone)]
-pub struct Source {
-    root: PathBuf,
+pub enum Source {
+    /// Read the worktree under the root.
+    Worktree(PathBuf),
+    /// Read staged blobs from the git index under the root.
+    Index(PathBuf),
 }
 
 impl Source {
     /// Read the worktree under `root`.
-    pub fn new(root: &Path) -> Self {
-        Self {
-            root: root.to_path_buf(),
+    pub fn worktree(root: &Path) -> Self {
+        Self::Worktree(root.to_path_buf())
+    }
+
+    /// Read the git index under `root`.
+    pub fn index(root: &Path) -> Self {
+        Self::Index(root.to_path_buf())
+    }
+
+    /// The root both modes resolve paths against.
+    fn root(&self) -> &Path {
+        match self {
+            Self::Worktree(root) | Self::Index(root) => root,
         }
     }
 
     /// Read a document, treating absence as absence rather than failure.
     pub fn read_text(&self, path: &Path) -> Result<Option<String>, VerificationError> {
-        match fs::read_to_string(path) {
-            Ok(text) => Ok(Some(text)),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(read_failure(path, error)),
+        match self {
+            Self::Worktree(_) => match fs::read_to_string(path) {
+                Ok(text) => Ok(Some(text)),
+                Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+                Err(error) => Err(read_failure(path, error)),
+            },
+            Self::Index(_) => {
+                let relative = self.index_path(path)?;
+                match self.read_index(&relative)? {
+                    Some(bytes) => String::from_utf8(bytes).map(Some).map_err(|_| {
+                        index_failure(&relative, "the staged bytes are not valid UTF-8")
+                    }),
+                    None => Ok(None),
+                }
+            }
         }
     }
 
     /// Read a target byte-for-byte, treating absence as absence rather than
     /// failure.
     pub fn read_bytes(&self, path: &Path) -> Result<Option<Vec<u8>>, VerificationError> {
-        match fs::read(path) {
-            Ok(bytes) => Ok(Some(bytes)),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(read_failure(path, error)),
+        match self {
+            Self::Worktree(_) => match fs::read(path) {
+                Ok(bytes) => Ok(Some(bytes)),
+                Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+                Err(error) => Err(read_failure(path, error)),
+            },
+            Self::Index(_) => {
+                let relative = self.index_path(path)?;
+                self.read_index(&relative)
+            }
         }
     }
 
     /// The Markdown files directly under `dir`, sorted; an absent directory
     /// lists nothing.
     pub fn list_markdown(&self, dir: &Path) -> Result<Vec<PathBuf>, VerificationError> {
-        let entries = match fs::read_dir(dir) {
-            Ok(entries) => entries,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
-            Err(error) => {
-                return Err(VerificationError::new(
-                    LABEL_IO,
-                    format!("failed to list \"{}\": {error}", dir.display()),
-                ));
+        match self {
+            Self::Worktree(_) => {
+                let entries = match fs::read_dir(dir) {
+                    Ok(entries) => entries,
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+                    Err(error) => {
+                        return Err(VerificationError::new(
+                            LABEL_IO,
+                            format!("failed to list \"{}\": {error}", dir.display()),
+                        ));
+                    }
+                };
+                let mut paths = Vec::new();
+                for entry in entries {
+                    let entry = entry.map_err(|error| {
+                        VerificationError::new(
+                            LABEL_IO,
+                            format!("failed to list \"{}\": {error}", dir.display()),
+                        )
+                    })?;
+                    let path = entry.path();
+                    if path.extension().is_some_and(|extension| extension == "md") {
+                        paths.push(path);
+                    }
+                }
+                paths.sort();
+                Ok(paths)
             }
+            Self::Index(_) => self.list_index_markdown(dir),
+        }
+    }
+
+    /// The staged Markdown files directly under `dir`, sorted, as index paths.
+    ///
+    /// `git ls-files` lists the index recursively, so paths below a nested
+    /// directory are dropped: the worktree listing this mirrors is shallow. An
+    /// absent directory lists nothing because no staged path carries its
+    /// prefix, and the worktree is never consulted.
+    fn list_index_markdown(&self, dir: &Path) -> Result<Vec<PathBuf>, VerificationError> {
+        let relative = self.index_path(dir)?;
+        let pathspec = if relative.is_empty() {
+            ".".to_owned()
+        } else {
+            format!(":(literal){relative}")
+        };
+        let output =
+            git(self.root(), &["ls-files", "-z", "--", pathspec.as_str()]).map_err(|error| {
+                index_failure(&relative, &format!("`git ls-files` could not run: {error}"))
+            })?;
+        if !output.status.success() {
+            return Err(index_failure(&relative, "`git ls-files` failed"));
+        }
+        let prefix = if relative.is_empty() {
+            String::new()
+        } else {
+            format!("{relative}/")
         };
         let mut paths = Vec::new();
-        for entry in entries {
-            let entry = entry.map_err(|error| {
-                VerificationError::new(
-                    LABEL_IO,
-                    format!("failed to list \"{}\": {error}", dir.display()),
-                )
-            })?;
-            let path = entry.path();
+        for entry in output.stdout.split(|byte| *byte == 0) {
+            if entry.is_empty() {
+                continue;
+            }
+            let Ok(text) = std::str::from_utf8(entry) else {
+                return Err(index_failure(
+                    &relative,
+                    "a path listed by git is not valid UTF-8",
+                ));
+            };
+            let Some(name) = text.strip_prefix(prefix.as_str()) else {
+                continue;
+            };
+            // Direct children only: a nested path would not be a file the
+            // shallow worktree listing returns either.
+            if name.contains('/') {
+                continue;
+            }
+            let path = Path::new(name);
             if path.extension().is_some_and(|extension| extension == "md") {
-                paths.push(path);
+                paths.push(dir.join(path));
             }
         }
         paths.sort();
         Ok(paths)
     }
 
+    /// A compared path as a `/`-separated path relative to the root.
+    fn index_path(&self, path: &Path) -> Result<String, VerificationError> {
+        let root = self.root();
+        let outside = || {
+            VerificationError::new(
+                LABEL_IO,
+                format!(
+                    "failed to read \"{}\" from the git index: the path is outside the root \
+                     \"{}\"",
+                    path.display(),
+                    root.display()
+                ),
+            )
+        };
+        let Ok(relative) = path.strip_prefix(root) else {
+            return Err(outside());
+        };
+        let mut parts: Vec<String> = Vec::new();
+        for component in relative.components() {
+            match component {
+                Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
+                Component::CurDir => {}
+                Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                    return Err(outside());
+                }
+            }
+        }
+        Ok(parts.join("/"))
+    }
+
+    /// The staged bytes at a root-relative path: `None` when the index does
+    /// not record it, an I/O refusal when it cannot be served.
+    fn read_index(&self, relative: &str) -> Result<Option<Vec<u8>>, VerificationError> {
+        // `:(literal)` keeps a document name holding `*` or `?` a plain path
+        // while still resolving against the reader's root.
+        let pathspec = format!(":(literal){relative}");
+        // `--stage -z` answers presence and merge state in one call: every
+        // entry is a NUL-terminated `<mode> <object> <stage>\t<path>`, and a
+        // conflict is the same path recorded at stages 1..3 instead of 0.
+        let staged = git(
+            self.root(),
+            &["ls-files", "--stage", "-z", "--", pathspec.as_str()],
+        )
+        .map_err(|error| {
+            index_failure(
+                relative,
+                &format!("`git ls-files --stage` could not run: {error}"),
+            )
+        })?;
+        if !staged.status.success() {
+            return Err(index_failure(relative, "`git ls-files --stage` failed"));
+        }
+        let mut present = false;
+        for entry in staged.stdout.split(|byte| *byte == 0) {
+            if entry.is_empty() {
+                continue;
+            }
+            present = true;
+            let stage = index_entry_stage(entry).ok_or_else(|| {
+                index_failure(relative, "git printed an index entry kaya cannot parse")
+            })?;
+            if stage != 0 {
+                return Err(index_failure(
+                    relative,
+                    "the index entry is unmerged; resolve the conflict before checking",
+                ));
+            }
+        }
+        if !present {
+            return Ok(None);
+        }
+
+        // `:./<path>` resolves against the reader's root, which `git -C` makes
+        // the working directory of every command here.
+        let spec = format!(":./{relative}");
+        let shown = git(self.root(), &["show", &spec]).map_err(|error| {
+            index_failure(
+                relative,
+                &format!("`git show {spec}` could not run: {error}"),
+            )
+        })?;
+        if !shown.status.success() {
+            return Err(index_failure(
+                relative,
+                &format!("`git show {spec}` failed"),
+            ));
+        }
+        Ok(Some(shown.stdout))
+    }
+
     /// A path as reported: relative to the root, `/`-separated.
     pub fn relative(&self, path: &Path) -> String {
-        let Ok(relative) = path.strip_prefix(&self.root) else {
+        let Ok(relative) = path.strip_prefix(self.root()) else {
             return path.to_string_lossy().replace('\\', "/");
         };
         let mut parts: Vec<String> = Vec::new();
@@ -237,12 +421,15 @@ impl Source {
 /// The ledger is read once, its committed history is verified (a worktree that
 /// does not extend `HEAD` is refused before any finding), and every projection
 /// is replanned from the verified events. `out` and `publish_out` are
-/// directories relative to `root`.
+/// directories relative to `root`. With `index`, the ledger and every compared
+/// document come from the git index, so the verdict is the one a commit of the
+/// staged tree would earn.
 pub fn check(
     root: &Path,
     out: &Path,
     publish_out: &Path,
     expect_digest: Option<&str>,
+    index: bool,
 ) -> Result<Outcome, VerificationError> {
     let expect_digest = match expect_digest {
         Some(digest) if valid_digest(digest) => Some(digest),
@@ -257,11 +444,15 @@ pub fn check(
         None => None,
     };
 
-    let source = Source::new(root);
+    let source = if index {
+        Source::index(root)
+    } else {
+        Source::worktree(root)
+    };
     let out = root.join(out);
     let publish_out = root.join(publish_out);
 
-    let events = read_ledger(root, expect_digest)?;
+    let events = read_ledger(&source, expect_digest)?;
     let graph = model::build(&events)?;
     let promotion = PromotionState::from_events(&events)?;
 
@@ -291,25 +482,51 @@ fn valid_digest(digest: &str) -> bool {
 
 /// Read and verify the ledger, returning the events it records.
 ///
-/// Committed history is mandatory: no flag relaxes it. A tracked ledger must
-/// extend its committed `HEAD` bytes on a line boundary, and an untracked one
-/// has no history to verify at all, so both are refused with the label `build`
-/// uses. A pinned digest narrows the accepted bytes further; it never widens
-/// them.
-fn read_ledger(root: &Path, expect_digest: Option<&str>) -> Result<Vec<Event>, VerificationError> {
+/// Committed history is mandatory: no flag relaxes it. In worktree mode a
+/// tracked ledger must extend its committed `HEAD` bytes on a line boundary,
+/// and an untracked one has no history to verify at all, so both are refused
+/// with the label `build` uses. In index mode the staged ledger is verified
+/// against `HEAD` as well, except that a `HEAD` carrying no ledger copy leaves
+/// the baseline empty: a staged first record is verifiable, not refused. A
+/// `HEAD` that does carry the ledger but cannot serve its bytes is an I/O
+/// refusal, never an empty baseline. A pinned digest narrows the accepted
+/// bytes further; it never widens them.
+fn read_ledger(
+    source: &Source,
+    expect_digest: Option<&str>,
+) -> Result<Vec<Event>, VerificationError> {
+    let root = source.root();
     let path = root.join(LEDGER);
-    let bytes = fs::read(&path).map_err(|error| match error.kind() {
-        io::ErrorKind::NotFound => VerificationError::new(
+    let missing = || {
+        VerificationError::new(
             "missing-ledger",
-            format!(
-                "missing ledger {}: run `kaya init` to create it",
-                path.display()
-            ),
-        ),
-        _ => read_failure(&path, error),
-    })?;
+            match source {
+                Source::Worktree(_) => {
+                    format!(
+                        "missing ledger {}: run `kaya init` to create it",
+                        path.display()
+                    )
+                }
+                Source::Index(_) => format!(
+                    "missing ledger {}: stage the ledger before checking with --index",
+                    path.display()
+                ),
+            },
+        )
+    };
 
-    let committed = committed_history(root)?;
+    let bytes = match source {
+        Source::Worktree(_) => fs::read(&path).map_err(|error| match error.kind() {
+            io::ErrorKind::NotFound => missing(),
+            _ => read_failure(&path, error),
+        })?,
+        Source::Index(_) => source.read_bytes(&path)?.ok_or_else(missing)?,
+    };
+
+    let committed = match source {
+        Source::Worktree(_) => committed_history(root)?,
+        Source::Index(_) => staged_history(root)?,
+    };
     verify_history(&committed, &bytes, &path)?;
 
     if let Some(expected) = expect_digest {
@@ -366,6 +583,90 @@ fn committed_history(root: &Path) -> Result<Vec<u8>, VerificationError> {
         ));
     }
     Ok(committed.stdout)
+}
+
+/// The `HEAD` bytes of the ledger, used as the baseline for an index check.
+///
+/// `HEAD` is asked for the ledger by name first, so its two kinds of absence
+/// stay distinct from a failure to read it: a `HEAD` that does not list the
+/// ledger carries no copy — the first commit of a record — and an unborn
+/// `HEAD` names no commit at all, so both leave the baseline empty and the
+/// staged ledger is the whole history. A `HEAD` that lists the ledger but
+/// cannot serve its bytes is an I/O refusal: verification never silently
+/// substitutes an empty baseline for bytes git failed to read.
+fn staged_history(root: &Path) -> Result<Vec<u8>, VerificationError> {
+    let tree = git(
+        root,
+        &["ls-tree", "--name-only", "-z", "HEAD", "--", LEDGER],
+    )
+    .map_err(|error| {
+        VerificationError::new(
+            LABEL_IO,
+            format!("failed to read {LEDGER} from HEAD: `git ls-tree HEAD` could not run: {error}"),
+        )
+    })?;
+    if !tree.status.success() {
+        if head_is_unborn(root) {
+            return Ok(Vec::new());
+        }
+        return Err(VerificationError::new(
+            LABEL_IO,
+            format!(
+                "failed to read {LEDGER} from HEAD: `git ls-tree HEAD` failed, so HEAD cannot \
+                 be read: {}",
+                String::from_utf8_lossy(&tree.stderr).trim()
+            ),
+        ));
+    }
+    let listed = tree
+        .stdout
+        .split(|byte| *byte == 0)
+        .any(|entry| entry == LEDGER.as_bytes());
+    if !listed {
+        return Ok(Vec::new());
+    }
+
+    // `HEAD:./<path>` resolves from `git -C root`, so a nested root reads its
+    // own ledger rather than the repository root's.
+    let spec = format!("HEAD:./{LEDGER}");
+    let committed = git(root, &["show", &spec]).map_err(|error| {
+        VerificationError::new(
+            LABEL_IO,
+            format!("failed to read {LEDGER} from HEAD: `git show {spec}` could not run: {error}"),
+        )
+    })?;
+    if !committed.status.success() {
+        return Err(VerificationError::new(
+            LABEL_IO,
+            format!(
+                "failed to read {LEDGER} from HEAD: HEAD lists the ledger but `git show {spec}` \
+                 failed, so its committed history is unknown: {}",
+                String::from_utf8_lossy(&committed.stderr).trim()
+            ),
+        ));
+    }
+    Ok(committed.stdout)
+}
+
+/// Whether `HEAD` names no commit yet: the state of a repository before its
+/// first commit, where the record it stages is its whole history.
+///
+/// `HEAD` must be a symbolic ref to a branch that does not exist yet. A
+/// detached `HEAD`, or a branch whose ref is present but unreadable, is a
+/// broken repository rather than a new one, so the caller reports the read
+/// failure instead of trusting an empty baseline.
+fn head_is_unborn(root: &Path) -> bool {
+    let head = match git(root, &["symbolic-ref", "--quiet", "HEAD"]) {
+        Ok(output) if output.status.success() => output,
+        Ok(_) | Err(_) => return false,
+    };
+    let Ok(branch) = std::str::from_utf8(&head.stdout) else {
+        return false;
+    };
+    match git(root, &["show-ref", "--verify", "--quiet", branch.trim()]) {
+        Ok(output) => !output.status.success(),
+        Err(_) => false,
+    }
 }
 
 /// Run one git command inside `root`.
@@ -445,11 +746,12 @@ fn parse_events(bytes: &[u8], path: &Path) -> Result<Vec<Event>, VerificationErr
 
 /// The research documents the projections emit, keyed by absolute path.
 ///
-/// Every planner receives the document already in the worktree, so the map is
-/// the fixed point a clean `build` would leave: generated bodies are replanned
-/// while authored prose, foreign blocks, and marker placement survive
-/// untouched. Planning from absent bytes would instead reduce each document to
-/// its generated blocks and report the human's bytes as drift.
+/// Every planner receives the document already at its path — worktree or
+/// staged bytes, whichever mode reads — so the map is the fixed point a clean
+/// `build` would leave: generated bodies are replanned while authored prose,
+/// foreign blocks, and marker placement survive untouched. Planning from
+/// absent bytes would instead reduce each document to its generated blocks and
+/// report the human's bytes as drift.
 fn plan_research(
     source: &Source,
     out: &Path,
@@ -506,7 +808,7 @@ fn plan_research(
     Ok(expected)
 }
 
-/// Compare every expected research document with the worktree.
+/// Compare every expected research document with the source's bytes.
 fn compare_research(
     source: &Source,
     out: &Path,
@@ -550,10 +852,10 @@ fn existing_documents(source: &Source, out: &Path) -> Result<Vec<PathBuf>, Verif
     Ok(paths)
 }
 
-/// Compare the publication tree the declarations compose with the worktree.
+/// Compare the publication tree the declarations compose with the source.
 ///
 /// The plan carries the bytes `kaya publish` would leave, computed over the
-/// worktree's own files, so a page or export the plan would rewrite is
+/// source's own files, so a page or export the plan would rewrite is
 /// `changed`, one it would create is `missing`, and one it would unlink is
 /// `extra`. An absent publication directory is drift rather than a silent
 /// pass: every planned page is then missing.
@@ -711,6 +1013,27 @@ fn read_failure(path: &Path, error: io::Error) -> VerificationError {
         LABEL_IO,
         format!("failed to read \"{}\": {error}", path.display()),
     )
+}
+
+/// An index read failure as the verification I/O class, naming the path.
+///
+/// The path is the root-relative form git reports, which is also the form the
+/// drift report and its fixes use; the failing read is named here so a
+/// partially staged tree never falls back to worktree bytes.
+fn index_failure(relative: &str, detail: &str) -> VerificationError {
+    VerificationError::new(
+        LABEL_IO,
+        format!("failed to read \"{relative}\" from the git index: {detail}"),
+    )
+}
+
+/// The stage number from one `git ls-files --stage -z` entry
+/// (`<mode> <object> <stage>\t<path>`), or `None` when git's line is not in
+/// that shape.
+fn index_entry_stage(entry: &[u8]) -> Option<u32> {
+    let tab = entry.iter().position(|byte| *byte == b'\t')?;
+    let metadata = std::str::from_utf8(&entry[..tab]).ok()?;
+    metadata.split(' ').nth(2)?.parse().ok()
 }
 
 /// The same labeled refusal in the publication layer's error type, which is

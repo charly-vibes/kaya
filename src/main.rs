@@ -96,6 +96,9 @@ enum Command {
         /// Refuse to check unless the ledger's digest is exactly this hex value
         #[arg(long, value_name = "HEX")]
         expect_digest: Option<String>,
+        /// Read the ledger and projections from the git index, not the worktree
+        #[arg(long)]
+        index: bool,
     },
     /// Approve a proposed assertion as a conclusion
     Promote {
@@ -187,8 +190,9 @@ fn main() -> ExitCode {
             out,
             publish_out,
             expect_digest,
+            index,
         } => {
-            return cmd_check(&root, &out, &publish_out, expect_digest.as_deref());
+            return cmd_check(&root, &out, &publish_out, expect_digest.as_deref(), index);
         }
         Command::Promote {
             assertion_id,
@@ -725,13 +729,20 @@ fn cmd_publish(out: &Path) -> Result<Envelope, Failure> {
 }
 
 /// Verify the record without writing: the expected bytes come from the same
-/// planners `build` and `publish` use, compared against the worktree.
+/// planners `build` and `publish` use, compared against the worktree or, with
+/// `index`, against the staged blobs a commit would record.
 ///
 /// `check` reports drift in its own success envelope and lets the exit code
 /// carry the verdict: 0 clean, 1 drift, 2 usage or I/O failure. It creates no
 /// directory, appends no event, and evaluates no threshold.
-fn cmd_check(root: &Path, out: &Path, publish_out: &Path, expect_digest: Option<&str>) -> ExitCode {
-    match verification::check(root, out, publish_out, expect_digest) {
+fn cmd_check(
+    root: &Path,
+    out: &Path,
+    publish_out: &Path,
+    expect_digest: Option<&str>,
+    index: bool,
+) -> ExitCode {
+    match verification::check(root, out, publish_out, expect_digest, index) {
         Ok(outcome) => {
             let code = outcome.exit_code();
             let envelope = Envelope::ok(

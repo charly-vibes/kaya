@@ -17,7 +17,7 @@ contract-test shape. One tdd-ro5u run per ticket.
 - [x] 1.2 No-side-effects fixture: hash the tree and the ledger before and
       after a check over a drifted record; assert identical and assert the
       drift was still reported. (kaya-585)
-- [ ] 1.3 Index fixtures: document drifted in the index only → fails; drifted
+- [x] 1.3 Index fixtures: document drifted in the index only → fails; drifted
       in the worktree only → passes; ledger staged with no `HEAD` copy →
       verifies instead of refusing; unmerged or unreadable index path → exit 2
       with `kaya.verification.check_io`, never a worktree fallback. (kaya-a4e)
@@ -38,7 +38,7 @@ contract-test shape. One tdd-ro5u run per ticket.
 
 - [x] 2.1 Extract the expected-bytes stage from `build`/`publish` so `check`
       renders the same bytes without writing; no second renderer. (kaya-585)
-- [ ] 2.2 Add the index reader (`git show :<path>`) for the ledger and every
+- [x] 2.2 Add the index reader (`git show :<path>`) for the ledger and every
       projection document; treat an unstaged absent path as absent. (kaya-a4e)
 - [x] 2.3 Add `kaya check` with `--root`, `--out`, `--publish-out`,
       `--expect-digest`; emit the `check` envelope with structured findings and
@@ -50,7 +50,7 @@ contract-test shape. One tdd-ro5u run per ticket.
 
 ## 3. Refactor — separate commit
 
-- [ ] 3.1 One comparison core shared by worktree and index modes; no mode
+- [x] 3.1 One comparison core shared by worktree and index modes; no mode
       branch inside the renderer. (kaya-585)
 - [ ] 3.2 Documentation: command table in README; `docs/src/status.md`
       implemented list and its capability count (six → seven); the hook example

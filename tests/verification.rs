@@ -11,14 +11,21 @@
 //! longer extends `HEAD` is refused before any finding, and the exit code
 //! carries the verdict (0 clean, 1 drift, 2 usage or I/O).
 //!
+//! The `--index` fixtures do the same over the git index: the ledger and every
+//! compared document are read from `:<path>`, so staged drift is reported even
+//! when the worktree is clean, worktree noise is ignored, a staged ledger in a
+//! repository whose `HEAD` predates it is verifiable, and an unmerged index
+//! entry is an I/O failure rather than a worktree fallback.
+//!
 //! The fixtures follow `tests/acceptance.rs` and `tests/cli.rs`: the built
 //! binary runs in a `tempfile::TempDir`, envelopes are parsed as JSON, and
 //! commits use a fixed identity and dates.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 use assert_cmd::Command as AssertCommand;
 use serde_json::{Value, json};
@@ -66,17 +73,8 @@ impl Fixture {
         let dir = tempfile::tempdir().expect("temp workspace");
         let root = dir.path();
 
-        git(root, &["init", "--quiet"]);
-        git(root, &["config", "user.name", "kaya verification"]);
-        git(
-            root,
-            &["config", "user.email", "verification@example.invalid"],
-        );
-
-        run_ok(root, &["init"]);
-        let seed = manifest_dir().join(SEED);
-        let seed = seed.to_str().expect("the seed path is UTF-8");
-        run_ok(root, &["import", "model", "--file", seed]);
+        init_repository(root);
+        create_record(root);
 
         git(root, &["add", "--all"]);
         git(
@@ -84,10 +82,7 @@ impl Fixture {
             &["commit", "--quiet", "--message", "record the model seed"],
         );
 
-        seed_authored_index(root);
-        run_ok(root, &["build"]);
-        run_ok(root, &["publish"]);
-
+        compile_projection(root, false);
         git(root, &["add", "--all"]);
         git(
             root,
@@ -98,17 +93,35 @@ impl Fixture {
                 "commit the compiled record",
             ],
         );
+        Self { dir }
+    }
 
-        let index = fs::read_to_string(root.join(INDEX)).expect("build writes the research index");
-        assert!(
-            index.contains(INDEX_BEGIN),
-            "the fixture index carries the managed research map block: {index}"
-        );
-        assert!(
-            index.contains(FOREIGN_BLOCK) && index.contains(AUTHORED_PROSE),
-            "the projection preserves the seeded authored and foreign bytes: {index}"
+    /// A first-commit record: the only commit predates the record, and the
+    /// ledger with its projections is staged but never committed, so `HEAD`
+    /// carries no ledger copy for `check --index` to verify against.
+    ///
+    /// `build --allow-uncommitted` compiles the projections while the ledger
+    /// has no committed history; staging the whole tree afterwards is the
+    /// first record a commit would create.
+    fn staged_first_commit() -> Self {
+        let dir = tempfile::tempdir().expect("temp workspace");
+        let root = dir.path();
+
+        init_repository(root);
+        fs::write(
+            root.join("README.md"),
+            "# a repository before its research record\n",
+        )
+        .expect("write the pre-record commit's file");
+        git(root, &["add", "--", "README.md"]);
+        git(
+            root,
+            &["commit", "--quiet", "--message", "open the repository"],
         );
 
+        create_record(root);
+        compile_projection(root, true);
+        git(root, &["add", "--all"]);
         Self { dir }
     }
 
@@ -125,6 +138,49 @@ impl Fixture {
         command.current_dir(cwd).args(args);
         command.output().expect("kaya runs")
     }
+}
+
+/// A git repository with a fixed identity and no user configuration.
+fn init_repository(root: &Path) {
+    git(root, &["init", "--quiet"]);
+    git(root, &["config", "user.name", "kaya verification"]);
+    git(
+        root,
+        &["config", "user.email", "verification@example.invalid"],
+    );
+}
+
+/// Create the ledger and import the committed model seed, leaving every byte
+/// uncommitted for the caller to stage.
+fn create_record(root: &Path) {
+    run_ok(root, &["init"]);
+    let seed = manifest_dir().join(SEED);
+    let seed = seed.to_str().expect("the seed path is UTF-8");
+    run_ok(root, &["import", "model", "--file", seed]);
+}
+
+/// Seed the authored index, then compile and publish the projections.
+///
+/// `allow_uncommitted` compiles a ledger git cannot verify against `HEAD`,
+/// which is exactly the first-commit fixture's state.
+fn compile_projection(root: &Path, allow_uncommitted: bool) {
+    seed_authored_index(root);
+    let mut build = vec!["build"];
+    if allow_uncommitted {
+        build.push("--allow-uncommitted");
+    }
+    run_ok(root, &build);
+    run_ok(root, &["publish"]);
+
+    let index = fs::read_to_string(root.join(INDEX)).expect("build writes the research index");
+    assert!(
+        index.contains(INDEX_BEGIN),
+        "the fixture index carries the managed research map block: {index}"
+    );
+    assert!(
+        index.contains(FOREIGN_BLOCK) && index.contains(AUTHORED_PROSE),
+        "the projection preserves the seeded authored and foreign bytes: {index}"
+    );
 }
 
 fn manifest_dir() -> PathBuf {
@@ -151,9 +207,10 @@ fn run_ok(workspace: &Path, args: &[&str]) -> Value {
     envelope
 }
 
-/// One deterministic commit: fixed identity, fixed dates, no user config.
-fn git(workspace: &Path, args: &[&str]) {
-    let output = Command::new("git")
+/// A git command with a deterministic identity, dates, and no user config.
+fn git_command(workspace: &Path) -> Command {
+    let mut command = Command::new("git");
+    command
         .arg("-C")
         .arg(workspace)
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
@@ -166,15 +223,55 @@ fn git(workspace: &Path, args: &[&str]) {
         .env("GIT_COMMITTER_NAME", "kaya verification")
         .env("GIT_COMMITTER_EMAIL", "verification@example.invalid")
         .env("GIT_AUTHOR_DATE", "2026-11-18T00:00:00+00:00")
-        .env("GIT_COMMITTER_DATE", "2026-11-18T00:00:00+00:00")
+        .env("GIT_COMMITTER_DATE", "2026-11-18T00:00:00+00:00");
+    command
+}
+
+/// Run one git command and capture its output without requiring success.
+fn git_output(workspace: &Path, args: &[&str]) -> Output {
+    git_command(workspace)
         .args(args)
         .output()
+        .expect("git runs")
+}
+
+/// Run one git command with `input` on stdin, capturing its output.
+fn git_with_stdin(workspace: &Path, args: &[&str], input: &[u8]) -> Output {
+    let mut child = git_command(workspace)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .expect("git runs");
+    child
+        .stdin
+        .take()
+        .expect("git stdin is piped")
+        .write_all(input)
+        .expect("write git stdin");
+    child.wait_with_output().expect("git finishes")
+}
+
+/// One deterministic commit: fixed identity, fixed dates, no user config.
+fn git(workspace: &Path, args: &[&str]) {
+    let output = git_output(workspace, args);
     assert!(
         output.status.success(),
         "git {args:?} failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+/// The bytes one git command writes to stdout, requiring exit 0.
+fn git_stdout(workspace: &Path, args: &[&str]) -> Vec<u8> {
+    let output = git_output(workspace, args);
+    assert!(
+        output.status.success(),
+        "git {args:?} failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    output.stdout
 }
 
 fn parse_envelope(output: &Output) -> Value {
@@ -323,6 +420,63 @@ fn corrupt_ledger_history(root: &Path) {
         "the seed's first ledger line names its actor: {first}"
     );
     fs::write(&path, format!("{tampered}\n{rest}")).expect("rewrite the ledger worktree bytes");
+}
+
+/// Stage `relative` exactly as the worktree holds it now.
+fn stage(root: &Path, relative: &str) {
+    git(root, &["add", "--", relative]);
+}
+
+/// Restore the worktree copy of `relative` to the bytes `HEAD` records.
+fn restore_worktree_from_head(root: &Path, relative: &str) {
+    let spec = format!("HEAD:{relative}");
+    let bytes = git_stdout(root, &["show", &spec]);
+    fs::write(root.join(relative), bytes).expect("restore the worktree document from HEAD");
+}
+
+/// The worktree bytes of `relative`.
+fn worktree_bytes(root: &Path, relative: &str) -> Vec<u8> {
+    fs::read(root.join(relative)).unwrap_or_else(|error| {
+        panic!("the worktree copy of {relative} is readable: {error}");
+    })
+}
+
+/// The staged (index) bytes of `relative`, as `git show :<path>` reports them.
+fn index_bytes(root: &Path, relative: &str) -> Vec<u8> {
+    let spec = format!(":{relative}");
+    git_stdout(root, &["show", &spec])
+}
+
+/// The committed `HEAD` bytes of `relative`.
+fn head_bytes(root: &Path, relative: &str) -> Vec<u8> {
+    let spec = format!("HEAD:{relative}");
+    git_stdout(root, &["show", &spec])
+}
+
+/// Put `relative` in the index as two unmerged stages, leaving the worktree
+/// copy exactly as it was.
+fn make_index_unmerged(root: &Path, relative: &str) {
+    let spec = format!(":{relative}");
+    let sha = String::from_utf8(git_stdout(root, &["rev-parse", &spec]))
+        .expect("the blob id is UTF-8")
+        .trim()
+        .to_owned();
+
+    git(root, &["update-index", "--force-remove", "--", relative]);
+    let info = format!("100644 {sha} 1\t{relative}\n100644 {sha} 2\t{relative}\n");
+    let output = git_with_stdin(root, &["update-index", "--index-info"], info.as_bytes());
+    assert!(
+        output.status.success(),
+        "the index records two unmerged stages for {relative}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let unmerged = git_output(root, &["show", &spec]);
+    assert!(
+        !unmerged.status.success(),
+        "an unmerged {relative} cannot be read from the index: {}",
+        String::from_utf8_lossy(&unmerged.stdout)
+    );
 }
 
 /// Every directory path and every regular file's digest under `root`.
@@ -676,4 +830,335 @@ fn check_reports_missing_publication_export() {
         entry["block"].is_null(),
         "a document-level finding carries a null block: {entry}"
     );
+}
+
+#[test]
+fn check_index_only_drift_fails() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+
+    // Stage the drifted bytes, then put the worktree back to `HEAD`: the
+    // index is the only place the drift lives, exactly as a partial `git add`
+    // leaves it.
+    corrupt_index_block(root);
+    stage(root, INDEX);
+    restore_worktree_from_head(root, INDEX);
+
+    assert_eq!(
+        worktree_bytes(root, INDEX),
+        head_bytes(root, INDEX),
+        "the worktree copy is HEAD's clean bytes"
+    );
+    assert_ne!(
+        index_bytes(root, INDEX),
+        head_bytes(root, INDEX),
+        "the index carries the drifted bytes"
+    );
+
+    // The default mode reads the worktree, which a `git commit` would not use
+    // for this path, so it sees nothing.
+    let worktree = fixture.output(&["check"]);
+    assert_eq!(
+        exit_code(&worktree),
+        0,
+        "the clean worktree copy is no drift: {}",
+        stderr(&worktree)
+    );
+    assert!(
+        drift_entries(&parse_envelope(&worktree)).is_empty(),
+        "the worktree check reports no drift"
+    );
+
+    let output = fixture.output(&["check", "--index"]);
+
+    assert_eq!(
+        exit_code(&output),
+        1,
+        "drift staged into the index exits 1: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    let drift = drift_entries(&envelope);
+    assert_eq!(drift.len(), 1, "one drifted block: {envelope}");
+    assert_changed(&drift[0], INDEX, INDEX_BLOCK);
+}
+
+#[test]
+fn check_worktree_noise_ignored() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+
+    // Drift the worktree without staging it: the index still holds HEAD's
+    // bytes, so a commit of this tree would be clean.
+    corrupt_index_block(root);
+    assert_ne!(
+        worktree_bytes(root, INDEX),
+        head_bytes(root, INDEX),
+        "the worktree copy is drifted"
+    );
+    assert_eq!(
+        index_bytes(root, INDEX),
+        head_bytes(root, INDEX),
+        "the staged copy is HEAD's clean bytes"
+    );
+
+    let worktree = fixture.output(&["check"]);
+    assert_eq!(
+        exit_code(&worktree),
+        1,
+        "the default mode reports worktree drift: {}",
+        stderr(&worktree)
+    );
+    let drift = drift_entries(&parse_envelope(&worktree));
+    assert_eq!(drift.len(), 1, "one drifted block in the worktree");
+    assert_changed(&drift[0], INDEX, INDEX_BLOCK);
+
+    let output = fixture.output(&["check", "--index"]);
+
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "unstaged worktree noise does not fail an index check: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "index mode reports no drift from worktree bytes: {envelope}"
+    );
+}
+
+#[test]
+fn check_first_commit_verifiable() {
+    let fixture = Fixture::staged_first_commit();
+    let root = fixture.root();
+
+    // `HEAD` predates the record; the ledger exists only in the index.
+    let committed_spec = format!("HEAD:{LEDGER}");
+    let committed = git_output(root, &["cat-file", "-e", &committed_spec]);
+    assert!(
+        !committed.status.success(),
+        "the first-commit fixture's HEAD carries no ledger copy"
+    );
+    assert_eq!(
+        index_bytes(root, LEDGER),
+        worktree_bytes(root, LEDGER),
+        "the staged ledger is the record the worktree holds"
+    );
+    assert!(
+        !index_bytes(root, LEDGER).is_empty(),
+        "the staged ledger records events"
+    );
+
+    // Without `--index` there is no committed history to verify, so the
+    // record is refused rather than silently trusted.
+    let worktree = fixture.output(&["check"]);
+    assert_eq!(
+        exit_code(&worktree),
+        2,
+        "a ledger HEAD never recorded is refused by the default mode: {}",
+        stderr(&worktree)
+    );
+    assert_eq!(
+        parse_envelope(&worktree)["error"]["label"],
+        json!("kaya.ledger.uncommitted_history"),
+        "the default mode keeps its committed-history refusal"
+    );
+
+    let output = fixture.output(&["check", "--index"]);
+
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "the staged first record verifies against empty committed history: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "the staged first record matches its projections: {envelope}"
+    );
+}
+
+#[test]
+fn check_unreadable_index_path_fails() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+
+    // Two stages and no stage 0: `git show :docs/research/index.md` fails the
+    // way an unresolved merge leaves the index, while the worktree file stays
+    // a clean copy of HEAD's bytes.
+    make_index_unmerged(root, INDEX);
+    assert_eq!(
+        worktree_bytes(root, INDEX),
+        head_bytes(root, INDEX),
+        "the worktree copy stays clean"
+    );
+
+    let output = fixture.output(&["check", "--index"]);
+
+    assert_eq!(
+        exit_code(&output),
+        2,
+        "an unreadable index entry is an I/O failure: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_eq!(
+        envelope["ok"],
+        json!(false),
+        "an unreadable index entry is an error envelope: {envelope}"
+    );
+    assert_eq!(
+        envelope["error"]["label"],
+        json!("kaya.verification.check_io"),
+        "index read failures use the check_io label: {envelope}"
+    );
+    let message = envelope["error"]["message"]
+        .as_str()
+        .unwrap_or_else(|| panic!("the I/O failure carries a message: {envelope}"));
+    assert!(
+        message.contains(INDEX),
+        "the failure names the unreadable path: {message}"
+    );
+    assert!(
+        envelope["data"]["drift"].is_null() || envelope["data"]["drift"] == json!([]),
+        "no drift finding is reported for an unreadable path: {envelope}"
+    );
+
+    // A worktree fallback would have found the clean copy and reported no
+    // failure, so the exit code already proves the worktree was not read; the
+    // bytes prove the run left it alone.
+    assert_eq!(
+        worktree_bytes(root, INDEX),
+        head_bytes(root, INDEX),
+        "the failed check leaves the worktree copy untouched"
+    );
+}
+
+#[test]
+fn check_index_reads() {
+    // Index bytes win when they are the drifted side: the clean worktree must
+    // not mask staged drift.
+    let staged = Fixture::new();
+    corrupt_index_block(staged.root());
+    stage(staged.root(), INDEX);
+    restore_worktree_from_head(staged.root(), INDEX);
+
+    let output = staged.output(&["check", "--index"]);
+    assert_eq!(
+        exit_code(&output),
+        1,
+        "staged drift is found even though the worktree is clean: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    let drift = drift_entries(&envelope);
+    assert_eq!(drift.len(), 1, "one drifted block: {envelope}");
+    assert_changed(&drift[0], INDEX, INDEX_BLOCK);
+
+    // Index bytes win when the worktree is the drifted side: unstaged bytes
+    // must not manufacture drift.
+    let noisy = Fixture::new();
+    corrupt_index_block(noisy.root());
+
+    let output = noisy.output(&["check", "--index"]);
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "worktree drift the index does not hold is ignored: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "index mode reports no finding from worktree bytes: {envelope}"
+    );
+}
+
+#[test]
+fn check_index_reads_the_ledger_from_the_index() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+
+    // Tamper with the worktree ledger only: a commit would record the index's
+    // committed bytes, which still equal `HEAD`.
+    corrupt_ledger_history(root);
+    assert_eq!(
+        index_bytes(root, LEDGER),
+        head_bytes(root, LEDGER),
+        "the staged ledger is HEAD's clean bytes"
+    );
+    assert_ne!(
+        worktree_bytes(root, LEDGER),
+        head_bytes(root, LEDGER),
+        "the worktree ledger no longer extends HEAD"
+    );
+
+    // The default mode reads the tampered worktree ledger and refuses it
+    // before reporting any drift.
+    let worktree = fixture.output(&["check"]);
+    assert_eq!(
+        exit_code(&worktree),
+        2,
+        "the tampered worktree ledger is refused: {}",
+        stderr(&worktree)
+    );
+    assert_eq!(
+        parse_envelope(&worktree)["error"]["label"],
+        json!("kaya.ledger.uncommitted_history"),
+        "the default mode keeps its committed-history refusal"
+    );
+
+    // Index mode verifies the staged ledger against HEAD, so the worktree's
+    // unverified bytes are irrelevant and the record is clean.
+    let output = fixture.output(&["check", "--index"]);
+
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "the staged ledger verifies even though the worktree ledger is tampered: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "index mode reports no drift from the tampered worktree ledger: {envelope}"
+    );
+}
+
+#[test]
+fn check_index_reports_stray_managed_document() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+
+    // The stray managed document exists only in the index and the worktree:
+    // both sides a commit and the worktree check would see agree.
+    add_stray_managed_document(root);
+    stage(root, STRAY);
+
+    let output = fixture.output(&["check", "--index"]);
+
+    assert_eq!(
+        exit_code(&output),
+        1,
+        "an extra managed document exits 1 in index mode: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    let drift = drift_entries(&envelope);
+    assert_eq!(
+        drift.len(),
+        1,
+        "the staged managed document that the projection does not emit is the only finding: \
+         {envelope}"
+    );
+    assert_document_finding(&drift[0], STRAY, "extra");
 }

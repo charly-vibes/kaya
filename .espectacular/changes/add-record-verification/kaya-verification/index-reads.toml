@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "index-reads"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "check_index_reads"}]
