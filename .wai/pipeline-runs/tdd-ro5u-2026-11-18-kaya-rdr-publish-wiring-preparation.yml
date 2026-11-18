@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-18-kaya-rdr-publish-wiring-preparation
+pipeline: tdd-ro5u
+topic: kaya-rdr publish wiring preparation
+created_at: '2026-11-18T11:25:08.158197518+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-18T11:38:14.325431065+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []
