@@ -5,7 +5,7 @@ contract-test shape. One tdd-ro5u run per ticket.
 
 ## 1. Red — failing tests first
 
-- [ ] 1.0 Declare one contract per scenario:
+- [x] 1.0 Declare one contract per scenario:
       `.espectacular/changes/add-record-verification/kaya-verification/<scenario>.toml`
       bound to its future test name, so `ah check --changes` reports
       `no-tests-declared` instead of `no-toml`. One TOML per scenario;
@@ -73,7 +73,7 @@ behavior. They may land after the command does.
       `publish`) that commits the snapshot deliberately. (kaya-9go)
 - [x] 4.5 Link check over the built book (kaya-nwv) and the release-claim check for
       `docs/src/status.md` (kaya-gh2).
-- [ ] 4.6 Publication tree reachable from the deployed docs (copy into the
+- [x] 4.6 Publication tree reachable from the deployed docs (copy into the
       book or a second Pages job). (kaya-2b0)
 
 ## 5. Archive checklist
@@ -81,7 +81,7 @@ behavior. They may land after the command does.
 - [x] Every `kaya.verification` scenario has a TOML contract and an executing
       test (`ah check --changes add-record-verification --run-tests` reports no
       `no-toml` or `no-tests-declared`).
-- [ ] `spk lint` clean on the new layer; property rows match the mirror
+- [x] `spk lint` clean on the new layer; property rows match the mirror
       scenarios one-to-one.
 - [x] No duplicated renderer: a fixture builds and checks the same record and
       asserts equality of expected bytes.
