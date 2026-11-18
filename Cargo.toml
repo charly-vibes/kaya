@@ -8,7 +8,7 @@ repository = "https://github.com/charly-vibes/kaya"
 readme = "README.md"
 description = "A living record of exploration: compile the artifacts a project already produces into continuously generated, human-owned documentation"
 keywords = ["documentation", "research", "provenance", "knowledge", "cli"]
-categories = ["development-tools", "documentation"]
+categories = ["development-tools", "command-line-utilities"]
 # The crate is the compiler; the research workspace, agent configuration, spec
 # corpus and release tooling belong to the repository, not to consumers.
 exclude = [
