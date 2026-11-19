@@ -114,6 +114,7 @@ tests and in real use.
 - kaya/Artifact/c2afedf — c2afedfe113c0a83ccfc954e1943117f5052f064
 - kaya/Artifact/c4a4f03 — c4a4f038bd7bbf30e0e41e8baa68334226bd08ee
 - kaya/Artifact/c5d2745 — c5d274521b3fa374859ef7bd02dc8556a57776ec
+- kaya/Artifact/cb8be97 — cb8be97696b59f99909ba7f39a10daa2819294bc
 - kaya/Artifact/ccf3881 — ccf38819c1f4272a38fa32d26d143de883b7f6a1
 - kaya/Artifact/cf2773b — cf2773b9a180e1ed8d63355345b74d23c2fa6022
 - kaya/Artifact/cfa552b — cfa552bfacab1d007c573f7c0ca1f954d4271fbd
@@ -206,6 +207,8 @@ tests and in real use.
 - kaya/Artifact/designs-2026-11-18-refactor-kaya-rdr-tidy-pass-review-no-code-chan — .wai/projects/kaya/designs/2026-11-18-refactor-kaya-rdr-tidy-pass-review-no-code-chan.md
 - kaya/Artifact/designs-2026-11-18-refactor-kaya-rdr-tidy-pass-review-no-code-chan-2 — .wai/projects/kaya/designs/2026-11-18-refactor-kaya-rdr-tidy-pass-review-no-code-chan-2.md
 - kaya/Artifact/designs-2026-11-18-refactor-kaya-tm8-one-composite-recipe-ci-invoke — .wai/projects/kaya/designs/2026-11-18-refactor-kaya-tm8-one-composite-recipe-ci-invoke.md
+- kaya/Artifact/designs-2026-11-19-green-kaya-syx-all-gates-green-cargo-test-full-s — .wai/projects/kaya/designs/2026-11-19-green-kaya-syx-all-gates-green-cargo-test-full-s.md
+- kaya/Artifact/designs-2026-11-19-refactor-kaya-syx-deliberate-no-op-tidy-reviewed — .wai/projects/kaya/designs/2026-11-19-refactor-kaya-syx-deliberate-no-op-tidy-reviewed.md
 - kaya/Artifact/df81656 — df81656005a9c0e10b392db0af2b8b91a8436dc1
 - kaya/Artifact/e178048 — e178048e81017f9667b091311aa7ce912483cd0e
 - kaya/Artifact/e29ec21 — e29ec21e052c992978e9efb125cf50b412801e30
@@ -232,6 +235,7 @@ tests and in real use.
 - kaya/Artifact/ff8a2f6 — ff8a2f6b8f1fb0b9d99c61ad8682eb06cc72e10a
 - kaya/Artifact/handoffs-2026-11-17-session-end — .wai/projects/kaya/handoffs/2026-11-17-session-end.md
 - kaya/Artifact/handoffs-2026-11-18-session-end — .wai/projects/kaya/handoffs/2026-11-18-session-end.md
+- kaya/Artifact/handoffs-2026-11-19-session-end — .wai/projects/kaya/handoffs/2026-11-19-session-end.md
 - kaya/Artifact/plans-2026-11-16-plan-kaya-10k-event-serde-parse-line-to-line-wi — .wai/projects/kaya/plans/2026-11-16-plan-kaya-10k-event-serde-parse-line-to-line-wi.md
 - kaya/Artifact/plans-2026-11-16-plan-kaya-5cg-render-question-hypothesis-runs-obs — .wai/projects/kaya/plans/2026-11-16-plan-kaya-5cg-render-question-hypothesis-runs-obs.md
 - kaya/Artifact/plans-2026-11-16-plan-kaya-5ea-one-requirement-proposal-budget-is — .wai/projects/kaya/plans/2026-11-16-plan-kaya-5ea-one-requirement-proposal-budget-is.md
@@ -269,6 +273,7 @@ tests and in real use.
 - kaya/Artifact/plans-2026-11-18-plan-kaya-nwv-scripts-check-links-py-walks-book — .wai/projects/kaya/plans/2026-11-18-plan-kaya-nwv-scripts-check-links-py-walks-book.md
 - kaya/Artifact/plans-2026-11-18-plan-kaya-rdr-publish-preparation-steps-tdd-or — .wai/projects/kaya/plans/2026-11-18-plan-kaya-rdr-publish-preparation-steps-tdd-or.md
 - kaya/Artifact/plans-2026-11-18-plan-kaya-tm8-justfile-record-check-mode-warn — .wai/projects/kaya/plans/2026-11-18-plan-kaya-tm8-justfile-record-check-mode-warn.md
+- kaya/Artifact/plans-2026-11-19-plan-kaya-syx-turu-adapter-files-new-src-adapter — .wai/projects/kaya/plans/2026-11-19-plan-kaya-syx-turu-adapter-files-new-src-adapter.md
 - kaya/Artifact/research-2026-11-16-orient-kaya-10k-closed-nine-field-kaya-event-v0-s — .wai/projects/kaya/research/2026-11-16-orient-kaya-10k-closed-nine-field-kaya-event-v0-s.md
 - kaya/Artifact/research-2026-11-16-orient-kaya-5cg-experiment-report-projection-with — .wai/projects/kaya/research/2026-11-16-orient-kaya-5cg-experiment-report-projection-with.md
 - kaya/Artifact/research-2026-11-16-orient-kaya-5ea-promotion-rate-cap-requirement-fr — .wai/projects/kaya/research/2026-11-16-orient-kaya-5ea-promotion-rate-cap-requirement-fr.md
@@ -474,6 +479,12 @@ tests and in real use.
 - kaya/Artifact/research-2026-11-18-ship-kaya-nwv-commit-above-chore-docs-check-ev — .wai/projects/kaya/research/2026-11-18-ship-kaya-nwv-commit-above-chore-docs-check-ev.md
 - kaya/Artifact/research-2026-11-18-ship-kaya-rdr-commits-eb4f2c9-preparation-85 — .wai/projects/kaya/research/2026-11-18-ship-kaya-rdr-commits-eb4f2c9-preparation-85.md
 - kaya/Artifact/research-2026-11-18-ship-kaya-tm8-commit-above-kaya-tm8-closed-bd-e — .wai/projects/kaya/research/2026-11-18-ship-kaya-tm8-commit-above-kaya-tm8-closed-bd-e.md
+- kaya/Artifact/research-2026-11-19-ledger-kaya-syx-ship-evidence-cargo-test-full-sui — .wai/projects/kaya/research/2026-11-19-ledger-kaya-syx-ship-evidence-cargo-test-full-sui.md
+- kaya/Artifact/research-2026-11-19-orient-kaya-syx-turu-adapter-ticket-confirmed-p3 — .wai/projects/kaya/research/2026-11-19-orient-kaya-syx-turu-adapter-ticket-confirmed-p3.md
+- kaya/Artifact/research-2026-11-19-red-kaya-syx-command-cargo-test-test-turu-expe — .wai/projects/kaya/research/2026-11-19-red-kaya-syx-command-cargo-test-test-turu-expe.md
+- kaya/Artifact/research-2026-11-19-ro5u-fixes-kaya-syx-f1-restored-by-restructure-ra — .wai/projects/kaya/research/2026-11-19-ro5u-fixes-kaya-syx-f1-restored-by-restructure-ra.md
+- kaya/Artifact/research-2026-11-19-ro5u-review-kaya-syx-verdict-critical-0-all-fixe — .wai/projects/kaya/research/2026-11-19-ro5u-review-kaya-syx-verdict-critical-0-all-fixe.md
+- kaya/Artifact/research-2026-11-19-ship-kaya-syx-turu-adapter-approved-by-user-2026-1 — .wai/projects/kaya/research/2026-11-19-ship-kaya-syx-turu-adapter-approved-by-user-2026-1.md
 
 ### Sources
 - kaya/Source/docs-src-index.md@43b606f — docs/src/index.md@43b606f
@@ -483,5 +494,5 @@ tests and in real use.
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_439 nodes from 538 events._
+_450 nodes from 549 events._
 <!-- kaya:end generated:orientation.research-map -->
