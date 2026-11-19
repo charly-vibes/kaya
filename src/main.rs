@@ -18,13 +18,12 @@ use std::process::{Command as ProcessCommand, ExitCode};
 
 use clap::error::ErrorKind as ClapErrorKind;
 use clap::{Parser, Subcommand};
+use kaya::ledger::{AppendOutcome, Ledger, LedgerError, changed_event_ids, sha256_hex};
 use serde_json::json;
-use sha2::{Digest, Sha256};
 
 use kaya::adapters::{AdapterError, git, testrunner, turu, wai};
 use kaya::envelope::Envelope;
 use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, new_id, parse_line};
-use kaya::ledger::{AppendOutcome, Ledger, LedgerError, changed_event_ids, sha256_hex};
 use kaya::model::{self, EntityType, ModelError};
 use kaya::projection::{ProjectionError, StaleBlock, Summary, index, report, reuse};
 use kaya::promotion::{self, PromotionError, PromotionState};
@@ -426,9 +425,9 @@ fn cmd_status() -> Result<Envelope, Failure> {
         _ => failure("ledger-io", format!("failed to read {LEDGER_PATH}: {err}")),
     })?;
 
-    // One streaming pass: digest, size, and tail byte together.
+    // One streaming pass: size, and tail byte together; the digest is the
+    // shared one-shot sha256_hex over the same bytes build and check use.
     let mut buffer = [0u8; STATUS_BUFFER_BYTES];
-    let mut hasher = Sha256::new();
     let mut bytes: u64 = 0;
     let mut last_byte: Option<u8> = None;
     let mut content = Vec::new();
@@ -441,10 +440,10 @@ fn cmd_status() -> Result<Envelope, Failure> {
         }
         let chunk = &buffer[..read];
         content.extend_from_slice(chunk);
-        hasher.update(chunk);
         bytes += read as u64;
         last_byte = Some(chunk[read - 1]);
     }
+    let digest = sha256_hex(&content);
 
     let (events, blank_lines) = line_counts(&content);
 
@@ -459,7 +458,7 @@ fn cmd_status() -> Result<Envelope, Failure> {
             "events": events,
             "blank_lines": blank_lines,
             "bytes": bytes,
-            "digest": format!("{:x}", hasher.finalize()),
+            "digest": digest,
             "replay_integrity": replay_integrity,
             "pending_proposals": pending_proposals()?,
         }),
