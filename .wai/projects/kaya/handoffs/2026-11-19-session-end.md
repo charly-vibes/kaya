@@ -41,9 +41,10 @@ phase: research
 ○ kaya-8f4 P3 Publication pages use blocks outside the document vocabulary
 ○ kaya-aaz P3 Design thread: DocIR, doctests, documentation commit gate
 ○ kaya-q6s P3 Understanding decision evidence has no Decision-to-Source link
+○ kaya-xjp P3 kaya-verification facts census: add turu source row
 
 --------------------------------------------------------------------------------
-Total: 6 issues (6 open, 0 in progress)
+Total: 7 issues (7 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
