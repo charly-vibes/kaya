@@ -638,3 +638,182 @@ fn committed_ledger_diff_shows_only_additions() {
         "the appended line appears in the diff: {diff}"
     );
 }
+
+const FOURTH: &str = "01JAV3Z0Y6W4Z5X8B7C6D5E4F4";
+
+/// Assert the ledger refuses `event` with the supersedes label and no byte change.
+fn assert_supersedes_refused(ledger: &mut Ledger, path: &std::path::Path, event: &Event) {
+    let before = fs::read(path).unwrap_or_default();
+    let err = ledger.append(event).unwrap_err();
+    assert_eq!(err.label, "kaya.ledger.supersedes_invalid");
+    assert!(err.message.contains(&event.id), "{}", err.message);
+    assert_eq!(fs::read(path).unwrap_or_default(), before);
+}
+
+#[test]
+fn dangling_supersedes_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    assert_eq!(ledger.append(&first).unwrap(), AppendOutcome::Appended);
+
+    let dangling = experiment_event(
+        SECOND,
+        "experiment.run.corrected",
+        json!({"passed": 4, "supersedes": THIRD}),
+    );
+    assert_supersedes_refused(&mut ledger, &path, &dangling);
+}
+
+#[test]
+fn self_referencing_supersedes_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    assert_eq!(ledger.append(&first).unwrap(), AppendOutcome::Appended);
+
+    let self_referencing = experiment_event(
+        SECOND,
+        "experiment.run.corrected",
+        json!({"passed": 4, "supersedes": SECOND}),
+    );
+    assert_supersedes_refused(&mut ledger, &path, &self_referencing);
+}
+
+#[test]
+fn mutual_supersedes_cycle_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    // A forward-referencing stored line stands in for a pre-validation
+    // ledger: appending B{supersedes: A} closes A -> B -> A, which the
+    // chain walk must refuse (byte-identical mutual cycles cannot be
+    // appended, since A naming B would be id reuse).
+    let a = experiment_event(
+        FIRST,
+        "experiment.run.completed",
+        json!({"passed": 3, "supersedes": SECOND}),
+    );
+    fs::write(&path, to_line(&a)).unwrap();
+    let mut ledger = Ledger::new(&path);
+    let b = experiment_event(
+        SECOND,
+        "experiment.run.corrected",
+        json!({"passed": 4, "supersedes": FIRST}),
+    );
+    assert_supersedes_refused(&mut ledger, &path, &b);
+}
+
+#[test]
+fn three_event_supersedes_cycle_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    // A forward-referencing stored line (as a pre-validation ledger could
+    // hold) lets a fresh append close a genuine 3-cycle: C -> B -> A -> C.
+    let a = experiment_event(
+        FIRST,
+        "experiment.run.completed",
+        json!({"passed": 3, "supersedes": THIRD}),
+    );
+    fs::write(&path, to_line(&a)).unwrap();
+    let mut ledger = Ledger::new(&path);
+    let b = experiment_event(
+        SECOND,
+        "experiment.run.corrected",
+        json!({"passed": 4, "supersedes": FIRST}),
+    );
+    assert_eq!(ledger.append(&b).unwrap(), AppendOutcome::Appended);
+    let cycle = experiment_event(
+        THIRD,
+        "experiment.run.corrected",
+        json!({"passed": 8, "supersedes": SECOND}),
+    );
+    assert_supersedes_refused(&mut ledger, &path, &cycle);
+}
+
+#[test]
+fn supersedes_object_shape_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    assert_eq!(ledger.append(&first).unwrap(), AppendOutcome::Appended);
+
+    let malformed = experiment_event(
+        SECOND,
+        "experiment.run.corrected",
+        json!({"passed": 4, "supersedes": {"id": FIRST}}),
+    );
+    assert_supersedes_refused(&mut ledger, &path, &malformed);
+}
+
+#[test]
+fn supersedes_empty_array_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    assert_eq!(ledger.append(&first).unwrap(), AppendOutcome::Appended);
+
+    let empty_array = experiment_event(
+        SECOND,
+        "experiment.run.corrected",
+        json!({"passed": 4, "supersedes": []}),
+    );
+    assert_supersedes_refused(&mut ledger, &path, &empty_array);
+}
+
+#[test]
+fn supersedes_array_with_non_string_entry_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    assert_eq!(ledger.append(&first).unwrap(), AppendOutcome::Appended);
+
+    let mixed = experiment_event(
+        SECOND,
+        "experiment.run.corrected",
+        json!({"passed": 4, "supersedes": [FIRST, 7]}),
+    );
+    assert_supersedes_refused(&mut ledger, &path, &mixed);
+
+    let empty_string_entry = experiment_event(
+        THIRD,
+        "experiment.run.corrected",
+        json!({"passed": 5, "supersedes": [FIRST, ""]}),
+    );
+    assert_supersedes_refused(&mut ledger, &path, &empty_string_entry);
+}
+
+#[test]
+fn valid_supersedes_chains_and_diamonds_still_append_and_resolve() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let original = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    let chain = experiment_event(
+        SECOND,
+        "experiment.run.corrected",
+        json!({"passed": 4, "supersedes": FIRST}),
+    );
+    let diamond = experiment_event(
+        THIRD,
+        "experiment.run.corrected",
+        json!({"passed": 5, "supersedes": [SECOND, FOURTH]}),
+    );
+    let other = experiment_event(FOURTH, "experiment.run.completed", json!({"count": 9}));
+
+    assert_eq!(ledger.append(&original).unwrap(), AppendOutcome::Appended);
+    assert_eq!(ledger.append(&other).unwrap(), AppendOutcome::Appended);
+    assert_eq!(ledger.append(&chain).unwrap(), AppendOutcome::Appended);
+    assert_eq!(ledger.append(&diamond).unwrap(), AppendOutcome::Appended);
+
+    let (events, _) = ledger.read_recovered().unwrap();
+    assert_eq!(events.len(), 4);
+    let effective = resolve_effective(&events);
+    assert_eq!(effective.len(), 2);
+    let first_effective = effective.iter().find(|e| e.id == FIRST).unwrap();
+    assert_eq!(first_effective.data["passed"], 5);
+}

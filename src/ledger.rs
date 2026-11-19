@@ -25,6 +25,7 @@ const LABEL_IO: &str = "kaya.ledger.io";
 const LABEL_RECORD_INVALID: &str = "kaya.ledger.record_invalid";
 const LABEL_ID_REUSE: &str = "kaya.ledger.id_reuse";
 const LABEL_DIGEST: &str = "kaya.ledger.digest_mismatch";
+const LABEL_SUPERSEDES_INVALID: &str = "kaya.ledger.supersedes_invalid";
 
 /// A labeled refusal raised while reading from or appending to the ledger.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -194,6 +195,8 @@ impl Ledger {
                 ),
             ));
         }
+
+        validate_supersedes(event, &loaded.events)?;
 
         let mut file = OpenOptions::new()
             .create(true)
@@ -489,6 +492,94 @@ fn apply_effective_data(
         }
     }
     visiting.remove(target);
+}
+
+/// Refuse an event whose `data.supersedes` is malformed, dangling,
+/// self-referential, or closes a cycle through the stored ledger.
+///
+/// `supersedes` must be a non-empty string or a non-empty array of non-empty
+/// strings naming ids already stored; every target's own stored chain must
+/// not lead back to the new event's id, or the correction history would
+/// become circular and unresolvable.
+fn validate_supersedes(event: &Event, stored: &[Event]) -> Result<(), LedgerError> {
+    let Some(value) = event.data.get("supersedes") else {
+        return Ok(());
+    };
+    let invalid = |detail: String| {
+        LedgerError::new(
+            LABEL_SUPERSEDES_INVALID,
+            format!("event \"{}\" {}: {}", event.id, detail, value),
+        )
+    };
+    let targets: Vec<&str> = match value {
+        serde_json::Value::String(target) if !target.is_empty() => vec![target.as_str()],
+        serde_json::Value::Array(items) if !items.is_empty() => {
+            let mut targets = Vec::with_capacity(items.len());
+            for item in items {
+                match item {
+                    serde_json::Value::String(target) if !target.is_empty() => {
+                        targets.push(target.as_str());
+                    }
+                    _ => {
+                        return Err(invalid(
+                            "has a data.supersedes that must be a non-empty string or a \
+                             non-empty array of non-empty strings, but an entry is not"
+                                .to_owned(),
+                        ));
+                    }
+                }
+            }
+            targets
+        }
+        _ => {
+            return Err(invalid(
+                "has a data.supersedes that must be a non-empty string or a non-empty \
+                 array of non-empty strings"
+                    .to_owned(),
+            ));
+        }
+    };
+    let stored_ids: HashSet<&str> = stored.iter().map(|stored| stored.id.as_str()).collect();
+    let mut corrections: HashMap<&str, Vec<&str>> = HashMap::new();
+    for stored in stored {
+        let targets = supersede_targets(&stored.data);
+        if !targets.is_empty() {
+            corrections.insert(stored.id.as_str(), targets);
+        }
+    }
+    for target in &targets {
+        if *target == event.id {
+            return Err(invalid(format!(
+                "supersedes itself; a correction may not name its own id \"{}\"",
+                event.id
+            )));
+        }
+        if !stored_ids.contains(target) {
+            return Err(invalid(format!(
+                "supersedes \"{}\", which is not present in the ledger",
+                target
+            )));
+        }
+        // Walk the target's stored chain; reaching the new event's id closes
+        // a cycle the resolver could never untangle.
+        let mut frontier = vec![*target];
+        let mut visited: HashSet<&str> = HashSet::new();
+        while let Some(id) = frontier.pop() {
+            if !visited.insert(id) {
+                continue;
+            }
+            if id == event.id {
+                return Err(invalid(format!(
+                    "closes a supersedes cycle: \"{}\" chain leads back to \"{}\"",
+                    target, event.id
+                )));
+            }
+            if let Some(nested) = corrections.get(id) {
+                frontier.extend(nested.iter().copied());
+            }
+        }
+    }
+    Ok(())
 }
 
 fn supersede_targets(data: &serde_json::Value) -> Vec<&str> {

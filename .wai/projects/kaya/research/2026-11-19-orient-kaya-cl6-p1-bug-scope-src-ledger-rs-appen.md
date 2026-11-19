@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-19-kaya-cl6-supersedes-validation, pipeline-step:orient]
+---
+
+ORIENT kaya-cl6: P1 bug. Scope src/ledger.rs append (164-213) + resolver family. Fix: any event carrying data.supersedes must validate at append — targets exist in ledger (dangling refused), shape is nonempty string or array of nonempty strings (objects/[]/non-string entries refused), self-reference refused, cycle through existing chain refused. New labeled refusal kaya.ledger.supersedes_invalid naming event id + offending target. Order semantics resolved by construction (targets must exist first). Silent-drop path in resolve_effective remains only for hand-edited files; documented. Red tests: tests/ledger.rs deterministic refusals (dangling, self, mutual cycle via two appends, chain cycle, object shape, empty array, non-string array entries); correction-totality Hegel suite must stay green (well-formed domain). Acceptance: cargo test green, append refuses all malformed shapes with the new label, valid chains still resolve (existing tests + Hegel suite unchanged).

@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-19-kaya-cl6-supersedes-validation
+pipeline: tdd-ro5u
+topic: kaya-cl6 supersedes validation
+created_at: '2026-11-19T18:55:22.953032218+00:00'
+current_step: 8
+approvals:
+  quality-ledger: '2026-11-19T19:09:45.561165963+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []
