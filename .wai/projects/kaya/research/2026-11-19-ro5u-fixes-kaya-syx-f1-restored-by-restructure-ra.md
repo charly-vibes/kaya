@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-19-kaya-syx-turu-adapter, pipeline-step:fix-review]
+---
+
+RO5U-FIXES kaya-syx: F1 restored by restructure rather than pure deletion: spec.md lost its Requirements header and layer.md likewise in the fix pass (restored), and the mute-failure-terminal lint requires the failed state to emit a file-owned effect, so run_failed returned as an honest effect row (expr kaya.adapters.run_failed(detail), surfaces as the implemented kaya.adapters.failure_atomic label) with property run_failed_labeled (generator missing_bundle_file_is_a_labeled_failure) plus mirror scenario run_failed_labeled plus contract run-failed-labeled.toml bound to the existing test. End state both files: 6 constraints, 6 property rows, 6 mirror scenarios, 12 tomls, anchors per-namespace. F2 status.md Integrations now lists whisper (turu) implemented and CLI row covers turu; README example includes kaya import turu. F3 SUMMARY has the kaya-adapters entry, layer sentence amended, 9 spec pages regenerated. Gates after fixes: spk lint 0 issues, openspec validate --strict --specs 9/9, ah check --run-tests --all-tests 149 passed 0 findings, just ci green.

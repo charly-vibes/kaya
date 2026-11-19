@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "run-failed-labeled"
+description = "Property-mirror scenario: an adapter run that cannot read its source ends in the labeled atomic refusal and the ledger gains no events."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "missing_bundle_file_is_a_labeled_failure"}]

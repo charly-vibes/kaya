@@ -26,6 +26,8 @@ pub const ARTIFACT_OBSERVED_EVENT: &str = "capture.artifact.observed";
 pub const COMMIT_OBSERVED_EVENT: &str = "capture.commit.observed";
 /// Adapter capture event that records a completed experiment run.
 pub const RUN_COMPLETED_EVENT: &str = "experiment.run.completed";
+/// Adapter capture event that records an observed source entry.
+pub const ENTRY_OBSERVED_EVENT: &str = "capture.entry.observed";
 
 const ENTITY_TYPE_SET: &str = "{Project, Question, Idea, Hypothesis, Model, Experiment, Run, Artifact, Observation, Claim, Finding, Decision, Source}";
 const RELATIONSHIP_SET: &str = "{investigates, predicts, executes, observes, supports, challenges, influences, realizes, derives}";
@@ -406,9 +408,10 @@ impl GraphBuilder {
 /// sees one effective event per record and a corrected event contributes its
 /// corrected payload. `model.entity.created` events create nodes and
 /// `model.relationship.asserted` events add edges. Adapter capture events
-/// (`capture.artifact.observed`, `capture.commit.observed`, and
-/// `experiment.run.completed`) create the Artifact and Run nodes they
-/// observed; no relationships are inferred from them. Other event types are
+/// (`capture.artifact.observed`, `capture.commit.observed`,
+/// `capture.entry.observed`, and `experiment.run.completed`) create the
+/// Artifact, Source, and Run nodes they observed; no relationships are
+/// inferred from them. Other event types are
 /// ignored — the model interprets only the events that describe its own
 /// structure.
 pub fn build(events: &[Event]) -> Result<Graph, ModelError> {
@@ -427,6 +430,9 @@ pub fn build(events: &[Event]) -> Result<Graph, ModelError> {
                 &["sha", "message"],
                 &mut builder,
             )?,
+            ENTRY_OBSERVED_EVENT => {
+                capture_from_event(event, EntityType::Source, &["entry"], &mut builder)?
+            }
             RUN_COMPLETED_EVENT => capture_from_event(
                 event,
                 EntityType::Run,

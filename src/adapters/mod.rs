@@ -10,6 +10,7 @@
 
 pub mod git;
 pub mod testrunner;
+pub mod turu;
 pub mod wai;
 
 pub use crate::ledger::sha256_hex;
@@ -39,6 +40,10 @@ pub const REGISTRY: &[AdapterRegistration] = &[
     AdapterRegistration {
         name: "test-runner",
         source_contract: "machine-readable run output (libtest JSONL)",
+    },
+    AdapterRegistration {
+        name: "turu",
+        source_contract: "bundle per whisper's shared-store contract (turu bundle pack, keyed by repo key)",
     },
 ];
 

@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "atomic-failure"
+description = "Property-mirror scenario: the ledger gains no events from a run whose source record fails validation mid-walk."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "unparsable_record_aborts_atomically"}]

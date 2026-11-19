@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-19-kaya-syx-turu-adapter
+pipeline: tdd-ro5u
+topic: kaya-syx turu adapter
+created_at: '2026-11-19T16:26:06.292002285+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-19T17:28:48.503983936+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

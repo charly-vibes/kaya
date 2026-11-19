@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   detection (`src/projection/`).
 - Promotion: proposal/approval/challenge replay with pending counts; CLI
   promotion commands require a named human `--actor` (`src/promotion.rs`).
+- turu adapter: `import turu --bundle <PATH> [--project NAME]` reads one turu
+  whisper bundle per whisper's shared-store contract and records each bundle
+  entry as a `capture.entry.observed` Source node (entry attribute feeds the
+  knowledge-brief projection); entry text stays in turu, and a malformed
+  bundle appends nothing (`src/adapters/turu.rs`).
 - Adapters for the `.wai/` artifact tree, git history, and libtest JSONL run
   reports (`src/adapters/`).
 - `tdd-ro5u` wai pipeline config (`orient` → `plan` → `red` → `green` →

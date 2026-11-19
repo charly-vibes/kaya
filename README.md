@@ -30,7 +30,8 @@ kaya init                          # create .kaya/ledger.jsonl if absent
 kaya status                        # event count, byte size, digest, pending proposals
 kaya import wai                    # observe the .wai/ artifact tree
 kaya import git                    # observe recent commits
-kaya import test --report <path>   # observe one libtest JSONL run
+kaya import test --report <path>    # observe one libtest JSONL run
+kaya import turu --bundle <bundle> --project <name>   # observe whisper entries from a turu bundle
 kaya import model --file <seed>    # record research-structure events from JSONL
 kaya build                         # compile docs/research (index + experiment reports)
 kaya build --expect-digest <hex>   # refuse to build unless the ledger matches
@@ -94,9 +95,12 @@ capability specs under [`openspec/specs/`](openspec/specs) — the document
 taxonomy as
 [`kaya-documents`](openspec/specs/kaya-documents/spec.md) and
 [`kaya-publications`](openspec/specs/kaya-publications/spec.md) — see
-[Documentation taxonomy](docs/src/document-taxonomy.md). `kaya-adapters`
-deploys once the deferred turu adapter (kaya-syx) binds its last scenario.
-Remaining milestones are tracked in
+[Documentation taxonomy](docs/src/document-taxonomy.md). `kaya-adapters` is
+deployed as a capability spec
+([`openspec/specs/kaya-adapters/spec.md`](openspec/specs/kaya-adapters/spec.md))
+with its contracts under
+[`.espectacular/kaya-adapters/`](.espectacular/kaya-adapters), bound by the
+turu adapter. Remaining milestones are tracked in
 beads (`bd ready` in a clone). This repository already dogfoods the compiler:
 [docs/research/](docs/research/index.md) is kaya's own compiled dossier.
 

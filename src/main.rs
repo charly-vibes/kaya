@@ -21,7 +21,7 @@ use clap::{Parser, Subcommand};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 
-use kaya::adapters::{AdapterError, git, testrunner, wai};
+use kaya::adapters::{AdapterError, git, testrunner, turu, wai};
 use kaya::envelope::Envelope;
 use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, new_id, parse_line};
 use kaya::ledger::{AppendOutcome, Ledger, LedgerError, changed_event_ids, sha256_hex};
@@ -173,6 +173,15 @@ enum ImportSource {
         /// Skip commits whose subject starts with this prefix (repeatable)
         #[arg(long = "exclude-message-prefix", value_name = "PREFIX")]
         exclude_message_prefix: Vec<String>,
+    },
+    /// Import observed whisper entries from a turu bundle file
+    Turu {
+        /// Path to the turu bundle file
+        #[arg(long, value_name = "PATH")]
+        bundle: PathBuf,
+        /// Project namespace recorded in the event identity
+        #[arg(long, default_value = "kaya", value_name = "NAME")]
+        project: String,
     },
     /// Import one completed test run from a libtest JSONL report
     Test {
@@ -505,6 +514,10 @@ fn cmd_import(source: ImportSource) -> Result<Envelope, Failure> {
         ImportSource::Test { report, project } => (
             "test-runner",
             vec![testrunner::capture(&report, &project).map_err(adapter_failure)?],
+        ),
+        ImportSource::Turu { bundle, project } => (
+            "turu",
+            turu::capture(&bundle, &project).map_err(adapter_failure)?,
         ),
         ImportSource::Model { file } => ("model", read_model_events(&file)?),
     };

@@ -8,8 +8,9 @@
 
 # Design specs
 
-Deployed capability specs live in `openspec/specs/`. The two document-taxonomy
-capabilities keep a specodelic layer beside each as `layer.md`; the research
+Deployed capability specs live in `openspec/specs/`. Three capabilities keep a
+specodelic layer beside each as `layer.md` — the two document-taxonomy
+capabilities and kaya-adapters; the research
 record capabilities carry their layer inline (frontmatter plus
 Constraints/Model/Properties tables inside `spec.md`). `just specs-docs`
 copies each capability into this book, and `just docs` runs it before
@@ -23,9 +24,9 @@ copies each capability into this book, and `just docs` runs it before
 - [kaya.projection](specs/kaya-projection.md)
 - [kaya.promotion](specs/kaya-promotion.md)
 - [kaya.verification](specs/kaya-verification.md)
+- [kaya.adapters](specs/kaya-adapters.md)
 
-`kaya-adapters` is not deployed yet: its capability spec stays in the
-`2026-11-18-add-core-research-record` archive (readable at
+`kaya-adapters` is deployed: its capability spec lives at
+`openspec/specs/kaya-adapters/spec.md` (formalized from
 `openspec/changes/archive/2026-11-18-add-core-research-record/specs/kaya-adapters/`)
-until the deferred turu adapter (kaya-syx) binds its last unbound scenario;
-then it deploys with its contracts.
+with its contracts under `.espectacular/kaya-adapters/`.
