@@ -181,7 +181,7 @@ fn status_flags_a_truncated_tail() {
     assert_eq!(
         envelope["data"]["events"],
         json!(1),
-        "only the newline-terminated event counts"
+        "only the complete event line counts"
     );
     assert_eq!(envelope["data"]["bytes"], json!(body.len() as u64));
     assert_eq!(

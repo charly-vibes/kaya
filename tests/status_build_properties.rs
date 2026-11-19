@@ -453,3 +453,82 @@ fn listing(root: &Path) -> BTreeSet<PathBuf> {
 fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
+
+// ---- kaya-g11: status event counting --------------------------------------
+
+/// Run `kaya status` in a workspace and return its `data` object, asserting
+/// the run succeeded.
+fn status_data(ws: &TempDir) -> Value {
+    let envelope = envelope(
+        &kaya(ws)
+            .args(["status"])
+            .output()
+            .expect("kaya status runs"),
+        "status",
+    );
+    assert_eq!(envelope["ok"], json!(true), "status must succeed");
+    envelope["data"].clone()
+}
+
+/// A line that is well-formed JSON but not a `kaya.event/v0` record.
+const NOT_AN_EVENT: &str = r#"{"note":"not a kaya event"}"#;
+
+#[test]
+fn status_counts_parsed_events_not_newlines() {
+    let ws = tempfile::tempdir().expect("workspace tempdir");
+    let ledger_path = ws.path().join(LEDGER);
+    seed_workspace(&ws, Profile::Untracked);
+
+    // One blank line after the terminated seed: three newline scans would
+    // call this 4 events; only 3 lines parse as records.
+    let mut bytes = seed_bytes();
+    bytes.push(b'\n');
+    fs::write(&ledger_path, &bytes).expect("blank line appends");
+
+    let data = status_data(&ws);
+    assert_eq!(
+        data["events"],
+        json!(3),
+        "blank line must not count as an event"
+    );
+    assert_eq!(data["blank_lines"], json!(1), "blank line must be counted");
+}
+
+#[test]
+fn status_counts_complete_unterminated_final_line() {
+    let ws = tempfile::tempdir().expect("workspace tempdir");
+    let ledger_path = ws.path().join(LEDGER);
+    seed_workspace(&ws, Profile::Untracked);
+
+    // Complete event line with no trailing newline: the newline count sees
+    // 3; the event record exists and must count.
+    let mut bytes = seed_bytes();
+    bytes.extend_from_slice(APPENDED_LINE.as_bytes());
+    fs::write(&ledger_path, &bytes).expect("unterminated tail writes");
+
+    let data = status_data(&ws);
+    assert_eq!(data["events"], json!(4), "complete final line must count");
+    assert_eq!(
+        data["replay_integrity"],
+        json!("recovered-truncated-tail"),
+        "unterminated tail must still be flagged"
+    );
+}
+
+#[test]
+fn status_excludes_unparseable_nonempty_lines() {
+    let ws = tempfile::tempdir().expect("workspace tempdir");
+    let ledger_path = ws.path().join(LEDGER);
+    seed_workspace(&ws, Profile::Untracked);
+
+    // Non-empty, valid JSON, but not a kaya.event/v0 record: excluded from
+    // the event count, and status stays a non-failing lenient read.
+    let mut bytes = seed_bytes();
+    bytes.extend_from_slice(NOT_AN_EVENT.as_bytes());
+    bytes.push(b'\n');
+    fs::write(&ledger_path, &bytes).expect("unparseable line appends");
+
+    let data = status_data(&ws);
+    assert_eq!(data["events"], json!(3), "unparseable line must not count");
+    assert_eq!(data["blank_lines"], json!(0), "non-empty line is not blank");
+}
