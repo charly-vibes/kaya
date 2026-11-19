@@ -374,30 +374,6 @@ impl Anchor {
     }
 }
 
-/// Drop events superseded by a later event's `data.supersedes`.
-///
-/// Corrections are appended, never edited, so readers resolve the record to
-/// its correction while the superseded line remains in the ledger as
-/// evidence.
-pub fn resolve(events: &[Event]) -> Vec<&Event> {
-    let mut superseded: HashSet<String> = HashSet::new();
-    let mut dropped = vec![false; events.len()];
-    for (index, event) in events.iter().enumerate().rev() {
-        if superseded.contains(&event.id) {
-            dropped[index] = true;
-        }
-        for target in supersede_targets(&event.data) {
-            superseded.insert(target.to_owned());
-        }
-    }
-    events
-        .iter()
-        .enumerate()
-        .filter(|(index, _)| !dropped[*index])
-        .map(|(_, event)| event)
-        .collect()
-}
-
 /// Ids whose stored data is superseded by a correction that changes it.
 ///
 /// A correction whose effective payload is byte-for-byte equal to the stored

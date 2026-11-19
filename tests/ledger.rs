@@ -4,9 +4,7 @@ use std::fs;
 use std::io::Write as _;
 
 use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, to_line};
-use kaya::ledger::{
-    Anchor, AppendOutcome, Ledger, Recovery, resolve, resolve_effective, sha256_hex,
-};
+use kaya::ledger::{Anchor, AppendOutcome, Ledger, Recovery, resolve_effective, sha256_hex};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
@@ -133,12 +131,12 @@ fn corrections_supersede_without_rewriting_the_original_line() {
             appended_newline: false,
         }
     );
-    assert_eq!(events, vec![original, correction.clone()]);
+    assert_eq!(events, vec![original.clone(), correction.clone()]);
 
-    let resolved = resolve(&events);
-    assert_eq!(resolved.len(), 1);
-    assert_eq!(resolved[0].id, correction.id);
-    assert_eq!(resolved[0].r#type, "experiment.run.corrected");
+    let effective = resolve_effective(&events);
+    assert_eq!(effective.len(), 1);
+    assert_eq!(effective[0].id, original.id);
+    assert_eq!(effective[0].data, json!({"passed": 3}));
 }
 
 #[test]
@@ -290,7 +288,7 @@ fn first_append_creates_the_ledger() {
 }
 
 #[test]
-fn resolve_drops_only_events_superseded_later() {
+fn resolve_effective_excludes_correction_events_and_keeps_superseded_targets() {
     let dir = tempfile::tempdir().unwrap();
     let path = ledger_path(&dir);
     let mut ledger = Ledger::new(&path);
@@ -307,9 +305,9 @@ fn resolve_drops_only_events_superseded_later() {
 
     let (events, _) = ledger.read_recovered().unwrap();
     assert_eq!(events.len(), 3);
-    let resolved = resolve(&events);
-    let ids: Vec<&str> = resolved.iter().map(|event| event.id.as_str()).collect();
-    assert_eq!(ids, vec![SECOND, THIRD]);
+    let effective = resolve_effective(&events);
+    let ids: Vec<&str> = effective.iter().map(|event| event.id.as_str()).collect();
+    assert_eq!(ids, vec![FIRST, THIRD]);
 }
 
 #[test]
