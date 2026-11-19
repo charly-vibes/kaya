@@ -32,3 +32,6 @@
 
 # turu/whisper local notes
 .whisper/
+
+# hegel failing-example database (kaya-nx4)
+.hegel/

@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-19-kaya-nx4-hegel-property-tests, pipeline-step:orient]
+---
+
+ORIENT kaya-nx4. Confirmed: P1, lane afk, complexity m, files Cargo.toml + tests/event_properties.rs + tests/ledger_properties.rs + tests/status_build_properties.rs; base metadata predates syx/152 work; current pin ac450bc. Acceptance restated: approved properties as deterministic isolated Hegel tests; cargo test green; product unchanged; .hegel/ ignored (done); build+runtime recorded; discovered bugs get separate tickets (8 filed at 152). Approved set + scope domains + exclusions come from antithesis/scratchbook/evaluation/synthesis.md (ticket kaya-152, closed): one-event-one-line, canonical-line-convergence (event_properties); correction-totality, append-byte-monotonicity (ledger_properties); status-build-parity subprocess machine ACCEPTED cost + envelope-exit-code oracle (status_build_properties). Anti-goals honored: no ledger format or recovery change; excluded arms = tickets cl6, 8k5, 1y9, 8tn, g11, 8yw, 7ma, sh6.

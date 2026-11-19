@@ -59,3 +59,4 @@ ulid = "1"
 [dev-dependencies]
 assert_cmd = "2"
 tempfile = "3"
+hegeltest = { version = "=0.52.7", features = ["static-engine"] }
