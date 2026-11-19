@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-19-kaya-1y9-ledger-lock-recovery, pipeline-step:orient]
+---
+
+ORIENT kaya-1y9 P1: unlocked check-then-append races (duplicate-line poisoning, torn writes) and destructive recovery vs in-flight appends (truncate, mid-write newline). Fix in src/ledger.rs: flock via std File::lock_exclusive (stable 1.89; no new dep) held across load+append+recover critical section; recovery REFUSES with new label kaya.ledger.locked when the lock cannot be taken instead of truncating/repairing; single-process behavior unchanged (lock released at guard drop). Tests: preserve-branch regression (complete event minus newline preserved, Recovery{appended_newline:true} — the q7 gap); lock-contention test (second open + lock_exclusive in-process, then read_recovered/append -> labeled locked refusal, bytes unchanged). Recovery behavior under lock: unchanged (truncate/repair allowed while holding it). Acceptance: cargo test green incl. new tests; Hegel suites green; product single-user behavior identical.

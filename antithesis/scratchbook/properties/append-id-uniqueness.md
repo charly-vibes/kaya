@@ -24,3 +24,5 @@ No test exercises the preserve branch of `recover` (complete event minus `\n`) â
 ## Open questions
 
 - None for the assessment itself; kaya-1y9 carries the lock design decision.
+
+Post-kaya-1y9 update (implemented): the "no lock anywhere" finding is resolved â€” every load/append/recovery now holds an exclusive advisory lock (std `File::try_lock`, RAII guard, label `kaya.ledger.locked` under contention); `load_optional` was absorbed into the guarded `load_held`. The pin-stamped assessment above describes cb8be97.

@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "single-writer-lock-checked"
+description = "Property-mirror scenario: contended ledger operations refuse with kaya.ledger.locked leaving bytes untouched and succeed after the lock is released."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "append_under_contention_refuses_with_locked_label_then_succeeds_after_release"}]

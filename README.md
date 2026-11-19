@@ -107,7 +107,7 @@ beads (`bd ready` in a clone). This repository already dogfoods the compiler:
 ## Install
 
 The CLI is installed from this repository with a stable Rust toolchain
-(1.88 or newer):
+(1.89 or newer):
 
 ```sh
 cargo install --git https://github.com/charly-vibes/kaya kaya-vibes

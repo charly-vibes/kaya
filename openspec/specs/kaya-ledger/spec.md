@@ -22,6 +22,7 @@ localization, so the record stays git-diffable and crash-safe.
 | idempotent_replay        | invariant | `appending a record byte-identical to a stored one is acknowledged as a duplicate and changes no bytes`                                                     | [[kaya.ledger]] |
 | digest_bound             | invariant | `the ledger digest is the ordered SHA-256 over lines; a read refuses a mismatched ledger with a labeled error before serving anything`                      | [[kaya.ledger]] |
 | atomic_lines             | invariant | `lines are written atomically: a crash leaves at most one truncated final line, which recovery truncates and reports before any read`                       | [[kaya.ledger]] |
+| single_writer_lock       | invariant | `every load, append, and recovery holds an exclusive advisory lock on the ledger file; a concurrent operation is refused with kaya.ledger.locked and the bytes stay untouched` | [[kaya.ledger]] |
 | git_versionable          | invariant | `the ledger is one plain file under version control — no database, no sidecar state; a commit's diff is appended lines only`                                | [[kaya.ledger]] |
 
 ## Model
@@ -49,6 +50,7 @@ localization, so the record stays git-diffable and crash-safe.
 | digest_stability         | unit | [[kaya.ledger.digest_bound]]           | `same_ledger_twice()`           | `digest(content) == digest(content)`                          |
 | crash_tail_checked       | unit | [[kaya.ledger.atomic_lines]]           | `ledger_with_truncated_tail()`  | `recovery truncates ∧ reports ∧ subsequent read succeeds`     |
 | git_diffable             | unit | [[kaya.ledger.git_versionable]]        | `ledger_with_appended_lines()`  | `git diff shows additions only`                               |
+| single_writer_lock_checked | unit | [[kaya.ledger.single_writer_lock]]     | `append_under_contention_refuses_with_locked_label_then_succeeds_after_release()` | `contended operation refused with kaya.ledger.locked ∧ bytes untouched ∧ succeeds after release` |
 
 ## Requirements
 
@@ -149,3 +151,10 @@ dedicated scenario.
 - **WHEN** a ledger with appended lines is committed
 - **THEN** `git diff` shows only added lines
 - **VERIFIES** [[kaya.ledger.git_versionable]]
+
+#### Scenario: single_writer_lock_checked
+
+- **WHEN** a second writer holds the ledger's advisory lock
+- **THEN** operations refuse with `kaya.ledger.locked` leaving the bytes
+  untouched, and succeed once it is released
+- **VERIFIES** [[kaya.ledger.single_writer_lock]]

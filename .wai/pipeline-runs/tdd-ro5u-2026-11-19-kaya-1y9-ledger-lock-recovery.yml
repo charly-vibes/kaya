@@ -1,0 +1,13 @@
+run_id: tdd-ro5u-2026-11-19-kaya-1y9-ledger-lock-recovery
+pipeline: tdd-ro5u
+topic: kaya-1y9 ledger lock recovery
+created_at: '2026-11-19T19:20:46.352070892+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-19T20:05:10.111614867+00:00'
+  fix-review: '2026-11-19T20:04:40.043972134+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

@@ -12,7 +12,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File, OpenOptions, TryLockError};
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
@@ -26,6 +26,53 @@ const LABEL_RECORD_INVALID: &str = "kaya.ledger.record_invalid";
 const LABEL_ID_REUSE: &str = "kaya.ledger.id_reuse";
 const LABEL_DIGEST: &str = "kaya.ledger.digest_mismatch";
 const LABEL_SUPERSEDES_INVALID: &str = "kaya.ledger.supersedes_invalid";
+const LABEL_LOCKED: &str = "kaya.ledger.locked";
+
+/// Exclusive advisory lock on the ledger file, released when dropped.
+///
+/// Every ledger critical section (load, append, recovery) holds one so a
+/// concurrent reader never races a repair: contention is refused with
+/// [`LABEL_LOCKED`] and the bytes stay untouched.
+struct LockGuard(File);
+
+impl Drop for LockGuard {
+    fn drop(&mut self) {
+        let _ = self.0.unlock();
+    }
+}
+
+impl LockGuard {
+    /// Open `path` and take its exclusive advisory lock.
+    ///
+    /// With `create`, a missing file is created first (the append path);
+    /// otherwise a missing file surfaces as [`LABEL_MISSING`]. Contention
+    /// refuses with [`LABEL_LOCKED`] instead of blocking.
+    fn acquire(path: &Path, create: bool) -> Result<Self, LedgerError> {
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(create)
+            .open(path)
+            .map_err(|err| {
+                if !create && err.kind() == ErrorKind::NotFound {
+                    missing_error(path)
+                } else {
+                    io_error(path, "open", err)
+                }
+            })?;
+        match file.try_lock() {
+            Ok(()) => Ok(LockGuard(file)),
+            Err(TryLockError::WouldBlock) => Err(LedgerError::new(
+                LABEL_LOCKED,
+                format!(
+                    "ledger {} is locked; its bytes are held by another writer",
+                    path.display()
+                ),
+            )),
+            Err(TryLockError::Error(err)) => Err(io_error(path, "lock", err)),
+        }
+    }
+}
 
 /// A labeled refusal raised while reading from or appending to the ledger.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -180,14 +227,25 @@ impl Ledger {
             )
         })?;
 
-        let loaded = self.load_optional()?;
+        let pre_existing = self.path.exists();
+        let lock = LockGuard::acquire(&self.path, true)?;
+        let loaded = self.load_held(true, &lock)?;
+        // A refusal before any write must leave a not-yet-existing ledger
+        // absent, as it was before locking: a failed first append creates
+        // nothing.
+        let refuse = |err: LedgerError| -> Result<AppendOutcome, LedgerError> {
+            if !pre_existing && loaded.line_bytes.is_empty() {
+                let _ = fs::remove_file(&self.path);
+            }
+            Err(err)
+        };
         for existing in &loaded.line_bytes {
             if existing.as_slice() == line.as_bytes() {
                 return Ok(AppendOutcome::Duplicate);
             }
         }
         if let Some(existing) = loaded.events.iter().find(|stored| stored.id == event.id) {
-            return Err(LedgerError::new(
+            return refuse(LedgerError::new(
                 LABEL_ID_REUSE,
                 format!(
                     "event id \"{}\" already exists in the ledger with different bytes; ids are never reused — append a correction event naming \"{}\" in data.supersedes",
@@ -196,7 +254,9 @@ impl Ledger {
             ));
         }
 
-        validate_supersedes(event, &loaded.events)?;
+        if let Err(err) = validate_supersedes(event, &loaded.events) {
+            return refuse(err);
+        }
 
         let mut file = OpenOptions::new()
             .create(true)
@@ -214,11 +274,13 @@ impl Ledger {
         self.load_inner(false)
     }
 
-    fn load_optional(&self) -> Result<Loaded, LedgerError> {
-        self.load_inner(true)
+    fn load_inner(&self, allow_missing: bool) -> Result<Loaded, LedgerError> {
+        let _lock = LockGuard::acquire(&self.path, false)?;
+        self.load_held(allow_missing, &_lock)
     }
 
-    fn load_inner(&self, allow_missing: bool) -> Result<Loaded, LedgerError> {
+    /// Load under a lock already held on the ledger file.
+    fn load_held(&self, allow_missing: bool, _lock: &LockGuard) -> Result<Loaded, LedgerError> {
         let mut bytes = match fs::read(&self.path) {
             Ok(bytes) => bytes,
             Err(err) if allow_missing && err.kind() == ErrorKind::NotFound => {

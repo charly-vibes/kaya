@@ -42,3 +42,5 @@ Two-stage generator: (a) ids from a small alphabet with a uniqueness filter; obs
 ## Open questions
 
 - None that change the invariant in the scoped domain; the excluded arms are ticketed (kaya-cl6, kaya-8k5), and `ledger::resolve`'s status (public contract vs dead API) is folded into kaya-cl6.
+
+Post-kaya-1y9 update (implemented): appends and recovery now hold an exclusive advisory lock (std `File::try_lock`, RAII `LockGuard`); recovery-capable reads refuse with `kaya.ledger.locked` under contention instead of racing `recover`. The pin-stamped evidence above describes cb8be97 (pre-lock); the races documented here are closed for kaya-vs-kaya on the current tree.

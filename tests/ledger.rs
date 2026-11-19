@@ -815,3 +815,118 @@ fn valid_supersedes_chains_and_diamonds_still_append_and_resolve() {
     let first_effective = effective.iter().find(|e| e.id == FIRST).unwrap();
     assert_eq!(first_effective.data["passed"], 5);
 }
+
+/// Lock the ledger from a second in-process handle and return the handle.
+///
+/// A fresh `open` yields its own file description, so its exclusive advisory
+/// lock conflicts with `Ledger`'s operations but not with anything already
+/// open. Dropping the handle releases the lock.
+fn hold_exclusive_lock(path: &std::path::Path) -> std::fs::File {
+    use std::fs::TryLockError;
+
+    let handle = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+        .unwrap();
+    match handle.try_lock() {
+        Ok(()) => handle,
+        Err(TryLockError::WouldBlock) => panic!("second handle should acquire the lock"),
+        Err(TryLockError::Error(err)) => panic!("locking failed: {err}"),
+    }
+}
+
+#[test]
+fn complete_final_line_missing_only_its_newline_gains_exactly_that_newline() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    let second = experiment_event(SECOND, "experiment.run.completed", json!({"passed": 4}));
+    ledger.append(&first).unwrap();
+    ledger.append(&second).unwrap();
+
+    let clean = fs::read(&path).unwrap();
+    let mut unterminated = clean.clone();
+    unterminated.pop();
+    fs::write(&path, &unterminated).unwrap();
+
+    let (events, recovery) = ledger.read_recovered().unwrap();
+    assert_eq!(events, vec![first, second]);
+    assert_eq!(
+        recovery,
+        Recovery {
+            truncated_bytes: 0,
+            appended_newline: true,
+        }
+    );
+    assert_eq!(fs::read(&path).unwrap(), clean);
+}
+
+#[test]
+fn read_recovered_under_contention_refuses_with_locked_label() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    ledger.append(&first).unwrap();
+    let before = fs::read(&path).unwrap();
+
+    let _holder = hold_exclusive_lock(&path);
+    let err = ledger.read_recovered().unwrap_err();
+    assert_eq!(err.label, "kaya.ledger.locked");
+    assert!(
+        err.message.contains("held by another writer"),
+        "message should name the holder: {}",
+        err.message
+    );
+    assert!(err.message.contains(path.to_str().unwrap()));
+    assert_eq!(fs::read(&path).unwrap(), before);
+}
+
+#[test]
+fn append_under_contention_refuses_with_locked_label_then_succeeds_after_release() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let first = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    ledger.append(&first).unwrap();
+    let before = fs::read(&path).unwrap();
+
+    let holder = hold_exclusive_lock(&path);
+    let second = experiment_event(SECOND, "experiment.run.completed", json!({"passed": 4}));
+    let err = ledger.append(&second).unwrap_err();
+    assert_eq!(err.label, "kaya.ledger.locked");
+    assert!(
+        err.message.contains("held by another writer"),
+        "message should name the holder: {}",
+        err.message
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+
+    drop(holder);
+    // Closing the holder releases its flock, but under parallel test load the
+    // release can briefly stay visible as contention (the descriptor number
+    // is recycled by a sibling thread microseconds before the retry). Poll
+    // briefly for the release instead of asserting on the first attempt;
+    // anything other than `kaya.ledger.locked`, or contention lasting beyond
+    // the bound, still fails the test.
+    let appended = {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            match ledger.append(&second) {
+                Ok(outcome) => break outcome,
+                Err(err)
+                    if err.label == "kaya.ledger.locked"
+                        && std::time::Instant::now() < deadline =>
+                {
+                    std::thread::sleep(std::time::Duration::from_millis(1));
+                }
+                Err(err) => panic!("append still refused after lock release: {err}"),
+            }
+        }
+    };
+    assert_eq!(appended, AppendOutcome::Appended);
+    let expected = [before, to_line(&second).into_bytes()].concat();
+    assert_eq!(fs::read(&path).unwrap(), expected);
+}
