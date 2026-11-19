@@ -107,6 +107,38 @@ fn id_reuse_with_changed_bytes_is_refused() {
     assert_eq!(fs::read(&path).unwrap(), before);
 }
 
+/// Pin the documented replay policy (kaya-sh6): a semantically-equal replay
+/// whose stored line was hand-edited after storage (here: reordered keys and
+/// a dropped trailing newline, both accepted by the parser) refuses with
+/// id_reuse instead of deduping — the stored bytes are the record.
+#[test]
+fn cosmetically_different_replay_of_hand_edited_line_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = ledger_path(&dir);
+    let mut ledger = Ledger::new(&path);
+    let event = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
+    assert_eq!(ledger.append(&event).unwrap(), AppendOutcome::Appended);
+
+    // Hand-edit the stored line: re-serialize the parsed JSON with sorted
+    // keys and no trailing newline. serde_json parses it to the same Event,
+    // but the bytes differ from the canonical line.
+    let line = to_line(&event).expect("finite event serializes");
+    let parsed: serde_json::Value =
+        serde_json::from_str(line.trim_end()).expect("canonical line parses");
+    let hand_edited = serde_json::to_string(&parsed).expect("hand edit serializes");
+    assert_ne!(hand_edited.as_bytes(), line.as_bytes());
+    fs::write(&path, hand_edited.as_bytes()).unwrap();
+
+    let err = ledger.append(&event).unwrap_err();
+    assert_eq!(err.label, "kaya.ledger.id_reuse");
+    assert!(err.message.contains(FIRST), "{}", err.message);
+    // Recovery newline-terminates the hand-edited (unterminated) line before
+    // the refusal; the content bytes are otherwise untouched.
+    let mut stored = hand_edited.into_bytes();
+    stored.push(b'\n');
+    assert_eq!(fs::read(&path).unwrap(), stored);
+}
+
 #[test]
 fn corrections_supersede_without_rewriting_the_original_line() {
     let dir = tempfile::tempdir().unwrap();

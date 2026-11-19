@@ -206,9 +206,16 @@ impl Ledger {
 
     /// Append one event unless it is already stored byte-identically.
     ///
-    /// A byte-identical replay is a no-op acknowledged as a duplicate; the
-    /// same id with different bytes is refused, because ledger ids are never
-    /// reused. The write is one `write_all` of the whole line.
+    /// Replay policy: dedupe is BYTE-EXACT. A byte-identical replay is a
+    /// no-op acknowledged as a duplicate; the same id with different bytes
+    /// is refused (`kaya.ledger.id_reuse`), because ledger ids are never
+    /// reused. A semantically-equal replay of a line that was hand-edited
+    /// after storage (different whitespace or key order, both accepted by
+    /// the parser) therefore also refuses instead of deduping: the stored
+    /// bytes are the record, and kaya never silently absorbs divergent
+    /// spellings over them. (A hand-edit that leaves the line invalid — a
+    /// duplicated key, say — refuses earlier, at load, with the codec's
+    /// label.) The write is one `write_all` of the whole line.
     pub fn append(&mut self, event: &Event) -> Result<AppendOutcome, LedgerError> {
         let line = event::to_line(event).map_err(|err| {
             LedgerError::new(
