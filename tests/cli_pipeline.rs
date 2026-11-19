@@ -385,6 +385,11 @@ fn build_writes_index_with_generated_block_and_artifact() {
         built["data"]["ledger_digest"].is_string(),
         "build surfaces the ledger digest so callers can pin it: {built}"
     );
+    assert_eq!(
+        built["data"]["events"],
+        json!(1),
+        "build reports the number of ledger events it compiled"
+    );
     let recomputed = built["data"]["recomputed"]
         .as_array()
         .expect("recomputed is a list");

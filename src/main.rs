@@ -786,6 +786,7 @@ fn cmd_build(
             "omitted": omitted,
             "stale": stale,
             "sources": sources,
+            "events": events.len(),
             "pending_proposals": state.pending_count(),
             "ledger_digest": ledger_digest,
         }),

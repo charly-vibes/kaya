@@ -16,10 +16,11 @@
 //! derandomization.
 //!
 //! Scope: parity is asserted only inside the build-acceptance classifier's
-//! domain. The known divergences outside that domain are ticketed
-//! (kaya-g11 status.events accounting, kaya-8yw build-envelope events,
-//! kaya-7ma digest unification) and are deliberately not asserted here:
-//! no `status.events` comparisons, no build-envelope event counts.
+//! domain, where in-domain `status.events == build.events` parity and the
+//! build-envelope event count hold by construction. The known divergences
+//! outside that domain are ticketed (kaya-g11 status.events accounting on
+//! refused ledgers, kaya-7ma digest unification) and remain unasserted
+//! outside it; kaya-8yw is resolved by these assertions.
 //!
 //! Machine form: a plain `#[hegel::test]` that iterates all 10 cells
 //! sequentially (deterministic exhaustive sweep; the state-machine macro
@@ -175,6 +176,10 @@ fn run_cell(mutation: Mutation, profile: Profile) {
         assert_eq!(
             status["data"]["pending_proposals"], build["data"]["pending_proposals"],
             "cell {mutation:?} × {profile:?}: pending-proposal parity"
+        );
+        assert_eq!(
+            status["data"]["events"], build["data"]["events"],
+            "cell {mutation:?} × {profile:?}: event-count parity on accepted ledgers"
         );
     } else {
         assert_eq!(
