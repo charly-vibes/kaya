@@ -8,12 +8,24 @@
 //! generatable from any language and diffable in git, while refusing
 //! interpretation keys keeps hypothesis verdicts in `kaya.promotion` where
 //! they can be argued rather than silently asserted.
+//!
+//! Depth boundary: serde_json's reader recurses at most 128 nesting levels.
+//! `to_line` can therefore emit records deeper than that (events are built
+//! in memory, not read back), while `parse_line` refuses a deeper line with
+//! the existing `kaya.event.json` refusal carrying serde_json's "recursion
+//! limit exceeded" message. The ledger accepts every line it writes minus
+//! that one boundary; the boundary is serde_json's, not this schema's.
 
 use std::fmt;
 
 use chrono::{DateTime, FixedOffset};
+use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::collections::HashSet;
+use std::rc::Rc;
 
 /// The one event schema version this ingest accepts.
 pub const SCHEMA_V0: &str = "kaya.event/v0";
@@ -60,6 +72,8 @@ const LABEL_PROVENANCE: &str = "kaya.event.provenance_present";
 const LABEL_DATA: &str = "kaya.event.data_object";
 const LABEL_ARTIFACTS: &str = "kaya.event.artifacts_strings";
 const LABEL_OBSERVATION: &str = "kaya.event.observation_only";
+const LABEL_DUPLICATE_KEY: &str = "kaya.event.duplicate_key";
+const LABEL_NON_FINITE: &str = "kaya.event.non_finite";
 
 /// A labeled refusal raised while validating a `kaya.event/v0` record.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -189,6 +203,7 @@ pub fn parse_line(line: &str) -> Result<Event, EventError> {
             "empty line: a ledger line is exactly one kaya.event/v0 JSON object",
         ));
     }
+    refuse_duplicate_keys(text)?;
     let value: Value = serde_json::from_str(text)
         .map_err(|err| EventError::new(LABEL_JSON, format!("line is not valid JSON: {err}")))?;
     let Value::Object(map) = &value else {
@@ -245,23 +260,233 @@ pub fn parse_line(line: &str) -> Result<Event, EventError> {
 /// Serialize an event as one compact JSON line terminated by `\n`.
 ///
 /// Field order follows the declaration order of [`Event`], so equal events
-/// always produce equal bytes.
-pub fn to_line(event: &Event) -> String {
-    // `Event` holds only strings, arrays, and JSON values, so serialization
-    // has no failing path; if it ever did, the empty result is refused by
-    // `parse_line` rather than admitting a half-written record.
-    match serde_json::to_string(event) {
-        Ok(mut line) => {
-            line.push('\n');
-            line
-        }
-        Err(_) => String::new(),
-    }
+/// always produce equal bytes. Finite floats serialize with serde_json's
+/// shortest round-trip representation.
+///
+/// The write refuses data carrying NaN or an infinity at any depth: JSON
+/// has no spelling for a non-finite float and serde_json would silently
+/// serialize it as `null`, corrupting the observation.
+pub fn to_line(event: &Event) -> Result<String, EventError> {
+    check_finite(&event.data, &mut String::new())?;
+    let mut line = serde_json::to_string(event).map_err(|err| {
+        EventError::new(LABEL_JSON, format!("event could not be serialized: {err}"))
+    })?;
+    line.push('\n');
+    Ok(line)
 }
 
 /// Mint a fresh ULID for a new event.
 pub fn new_id() -> String {
     ulid::Ulid::new().to_string()
+}
+
+/// Refuse a line whose JSON carries the same key twice in one object.
+///
+/// `serde_json`'s map silently keeps the last occurrence, turning an
+/// ambiguous ledger line into an arbitrary record. This check walks the
+/// raw token stream with a `serde_json::Deserializer` and a key-tracking
+/// visitor — it never builds a map, so last-wins cannot happen.
+fn refuse_duplicate_keys(text: &str) -> Result<(), EventError> {
+    let duplicate: Rc<RefCell<Option<(String, String)>>> = Rc::new(RefCell::new(None));
+    let seed = DuplicateKeySeed {
+        path: Rc::new(RefCell::new(Vec::new())),
+        index: None,
+        duplicate: Rc::clone(&duplicate),
+    };
+    let mut deserializer = serde_json::Deserializer::from_str(text);
+    // A deserialize error is expected here: either the recorded duplicate
+    // or a malformed line, which `parse_line` reports with LABEL_JSON.
+    let _ = seed.deserialize(&mut deserializer);
+    if let Some((path, key)) = duplicate.borrow_mut().take() {
+        return Err(EventError::new(
+            LABEL_DUPLICATE_KEY,
+            format!(
+                "duplicate key \"{key}\" in object {path}; JSON objects must carry unique keys — a repeated key is ambiguous because serde's map would silently keep the last occurrence"
+            ),
+        ));
+    }
+    Ok(())
+}
+
+/// Visitor seed tracking object keys along the descent path, recording the
+/// first repeated key and the object path it appeared in.
+#[derive(Clone)]
+struct DuplicateKeySeed {
+    path: Rc<RefCell<Vec<String>>>,
+    index: Option<usize>,
+    duplicate: Rc<RefCell<Option<(String, String)>>>,
+}
+
+impl DuplicateKeySeed {
+    fn with_index(&self, index: usize) -> Self {
+        Self {
+            path: Rc::clone(&self.path),
+            index: Some(index),
+            duplicate: Rc::clone(&self.duplicate),
+        }
+    }
+
+    fn object_path(&self) -> String {
+        let path = self.path.borrow().join(".");
+        if path.is_empty() {
+            "record".to_owned()
+        } else {
+            format!("record.{path}")
+        }
+    }
+}
+
+impl<'de> DeserializeSeed<'de> for DuplicateKeySeed {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<(), D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(self)
+    }
+}
+
+impl<'de> Visitor<'de> for DuplicateKeySeed {
+    type Value = ();
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("any JSON value")
+    }
+
+    fn visit_bool<E>(self, _value: bool) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_i64<E>(self, _value: i64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_u64<E>(self, _value: u64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_f64<E>(self, _value: f64) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_str<E>(self, _value: &str) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_unit<E>(self) -> Result<(), E> {
+        Ok(())
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<(), A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut index = 0;
+        while seq.next_element_seed(self.with_index(index))?.is_some() {
+            index += 1;
+        }
+        Ok(())
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<(), A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let element = self.index;
+        // The index marks this object as one array element: stamp it onto
+        // the path (the last component is the array's own key), then clear
+        // it so nested objects are not stamped again.
+        if let Some(index) = element {
+            let mut path = self.path.borrow_mut();
+            match path.last_mut() {
+                Some(last) => last.push_str(&format!("[{index}]")),
+                None => path.push(format!("[{index}]")),
+            }
+        }
+        let mut child = self.clone();
+        child.index = None;
+        let result = (|| {
+            let mut seen = HashSet::new();
+            while let Some(key) = map.next_key::<Cow<'de, str>>()? {
+                // `Cow` decodes escape sequences, so `"pa\u0073sed"` and
+                // `"passed"` compare equal as `&str` — a plain `&'de str`
+                // visitor errors on any escaped key and silently degrades
+                // the whole scan to serde's last-wins.
+                let key = key.as_ref().to_owned();
+                if !seen.insert(key.clone()) {
+                    let path = self.object_path();
+                    *self.duplicate.borrow_mut() = Some((path, key));
+                    return Err(serde::de::Error::custom("duplicate key"));
+                }
+                self.path.borrow_mut().push(key);
+                let descended = map.next_value_seed(child.clone());
+                self.path.borrow_mut().pop();
+                descended?;
+            }
+            Ok(())
+        })();
+        if let Some(index) = element {
+            let suffix = format!("[{index}]");
+            let mut path = self.path.borrow_mut();
+            match path.last_mut() {
+                Some(last) if last.ends_with(&suffix) => {
+                    last.truncate(last.len() - suffix.len());
+                }
+                _ => {
+                    path.pop();
+                }
+            }
+        }
+        result
+    }
+}
+
+/// Refuse data carrying NaN or an infinity at any depth, naming the value
+/// and its field path.
+fn check_finite(value: &Value, path: &mut String) -> Result<(), EventError> {
+    match value {
+        Value::Number(number) => {
+            if let Some(float) = number.as_f64().filter(|float| !float.is_finite()) {
+                let spelled = if float.is_nan() {
+                    "NaN"
+                } else if float > 0.0 {
+                    "inf"
+                } else {
+                    "-inf"
+                };
+                return Err(EventError::new(
+                    LABEL_NON_FINITE,
+                    format!(
+                        "data{path} carries the non-finite value {spelled}; JSON has no spelling for it, so serialization would silently write null"
+                    ),
+                ));
+            }
+            Ok(())
+        }
+        Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                let mark = path.len();
+                path.push_str(&format!("[{index}]"));
+                let descended = check_finite(item, path);
+                path.truncate(mark);
+                descended?;
+            }
+            Ok(())
+        }
+        Value::Object(map) => {
+            for (key, item) in map {
+                let mark = path.len();
+                path.push('.');
+                path.push_str(key);
+                let descended = check_finite(item, path);
+                path.truncate(mark);
+                descended?;
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
 }
 
 fn check_field_set(map: &Map<String, Value>) -> Result<(), EventError> {

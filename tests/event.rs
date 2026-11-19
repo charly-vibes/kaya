@@ -36,14 +36,15 @@ fn edited(edit: impl FnOnce(&mut Map<String, Value>)) -> String {
 fn well_formed_record_round_trips_byte_identically() {
     let line = record();
     let event = parse_line(&line).expect("well-formed record parses");
-    assert_eq!(to_line(&event), line);
+    let written = to_line(&event).expect("event data is finite");
+    assert_eq!(written, line);
     assert_eq!(
-        parse_line(&to_line(&event)).expect("serialized record parses"),
+        parse_line(&written).expect("serialized record parses"),
         event
     );
     assert_eq!(
-        to_line(&parse_line(&to_line(&event)).unwrap()),
-        to_line(&event)
+        to_line(&parse_line(&written).unwrap()).expect("event data is finite"),
+        written
     );
 
     // The canonical line is newline-terminated; an unterminated line is still
@@ -53,7 +54,10 @@ fn well_formed_record_round_trips_byte_identically() {
         parse_line(unterminated).expect("unterminated line parses"),
         event
     );
-    assert_eq!(to_line(&parse_line(unterminated).unwrap()), line);
+    assert_eq!(
+        to_line(&parse_line(unterminated).unwrap()).expect("event data is finite"),
+        line
+    );
 }
 
 #[test]
@@ -301,7 +305,7 @@ fn non_object_line_is_refused() {
 #[test]
 fn actor_kind_serializes_lowercase() {
     let event = parse_line(&record()).expect("well-formed record parses");
-    let line = to_line(&event);
+    let line = to_line(&event).expect("event data is finite");
     assert!(
         line.contains(r#""actor":{"type":"tool","name":"cargo-test"}"#),
         "{line}"
@@ -331,7 +335,8 @@ fn actor_kind_serializes_lowercase() {
         },
         artifacts: Vec::new(),
     };
-    let round_tripped = parse_line(&to_line(&explicit)).expect("agent event parses");
+    let round_tripped =
+        parse_line(&to_line(&explicit).expect("event data is finite")).expect("agent event parses");
     assert_eq!(round_tripped, explicit);
     assert_eq!(round_tripped.actor.r#type, ActorType::Agent);
 }
@@ -351,4 +356,133 @@ fn new_ids_are_distinct_ulids() {
         "{first}"
     );
     assert!(!first.chars().any(|c| "ILOU".contains(c)), "{first}");
+}
+
+#[test]
+fn duplicate_top_level_key_is_refused() {
+    let line = record().replacen(
+        "\"type\":\"experiment.run.completed\"",
+        "\"type\":\"experiment.run.completed\",\"type\":\"experiment.run.completed\"",
+        1,
+    );
+    let err = parse_line(&line).expect_err("duplicate top-level key is refused");
+    assert_eq!(err.label, "kaya.event.duplicate_key");
+    assert!(
+        err.message.contains("\"type\""),
+        "message names the offending key: {}",
+        err.message
+    );
+}
+
+#[test]
+fn duplicate_nested_data_key_is_refused() {
+    let line = record_with(r#"{"passed":3,"passed":4}"#);
+    let err = parse_line(&line).expect_err("duplicate data key is refused");
+    assert_eq!(err.label, "kaya.event.duplicate_key");
+    assert!(
+        err.message.contains("\"passed\""),
+        "message names the offending key: {}",
+        err.message
+    );
+    assert!(
+        err.message.contains("data"),
+        "message names the object path: {}",
+        err.message
+    );
+}
+
+#[test]
+fn duplicate_key_deep_in_data_is_refused() {
+    let line = record_with(r#"{"nested":{"same":1,"same":2}}"#);
+    let err = parse_line(&line).expect_err("duplicate key at depth is refused");
+    assert_eq!(err.label, "kaya.event.duplicate_key");
+    assert!(
+        err.message.contains("\"same\"") && err.message.contains("data.nested"),
+        "message names key and path: {}",
+        err.message
+    );
+}
+
+#[test]
+fn escaped_key_lookalike_is_not_a_duplicate() {
+    // The JSON text "a\n" is the key "a" followed by a newline, not "a".
+    let line = record_with(r#"{"a":"one","a\n":"two"}"#);
+    let event = parse_line(&line).expect("escaped-key lookalike parses");
+    assert_eq!(
+        event.data.get("a"),
+        Some(&json!("one")),
+        "the plain key keeps its own value"
+    );
+    assert_eq!(
+        event.data.get("a\n"),
+        Some(&json!("two")),
+        "the newline-suffixed key is distinct, not a duplicate"
+    );
+}
+
+#[test]
+fn non_finite_floats_cannot_reach_a_write() {
+    // serde_json's `Value` cannot carry NaN or an infinity: `Number::from_f64`
+    // refuses them, `json!` collapses them to null before any write can see
+    // them, and the nearest JSON text spelling is refused at parse. The
+    // write-side `kaya.event.non_finite` guard in `to_line` covers the day a
+    // non-finite number becomes representable (e.g. the arbitrary_precision
+    // feature); today the parse side holds the boundary.
+    assert_eq!(serde_json::Number::from_f64(f64::NAN), None);
+    let line = record_with(r#"{"ratio": 1e999}"#);
+    let err = parse_line(&line).expect_err("overflowing float literal is refused");
+    assert_eq!(err.label, "kaya.event.json");
+}
+
+#[test]
+fn finite_float_data_round_trips_stably() {
+    let line = record_with(r#"{"big":1e300,"ratio":0.3333333333333333}"#);
+    let event = parse_line(&line).expect("finite float data parses");
+    let canonical = to_line(&event).expect("event data is finite");
+    // serde_json's shortest round-trip (ryu) representation is unchanged
+    // by a parse/serialize cycle.
+    assert!(
+        canonical.contains(r#""ratio":0.3333333333333333"#)
+            && canonical.contains(r#""big":1e+300"#),
+        "finite floats keep their shortest representation: {canonical}"
+    );
+    let again = to_line(&parse_line(&canonical).expect("canonical line parses"))
+        .expect("event data is finite");
+    assert_eq!(again, canonical, "serialization is idempotent");
+}
+
+#[test]
+fn escaped_spelled_duplicate_key_is_refused() {
+    // One occurrence of the key is spelled with an escape sequence; the
+    // decoded keys are equal, so the line must still be refused.
+    let line = record_with(r#"{"pa\u0073sed":3,"passed":4}"#);
+    let err = parse_line(&line).expect_err("escaped duplicate key is refused");
+    assert_eq!(err.label, "kaya.event.duplicate_key");
+    assert!(
+        err.message.contains("\"passed\""),
+        "message names the offending key: {}",
+        err.message
+    );
+    assert!(
+        err.message.contains("data"),
+        "message names the object path: {}",
+        err.message
+    );
+}
+
+#[test]
+fn duplicate_key_inside_array_element_names_the_index() {
+    let line = record_with(r#"{"items":[{"same":1,"same":2}]}"#);
+    let err = parse_line(&line).expect_err("duplicate key in array element is refused");
+    assert_eq!(err.label, "kaya.event.duplicate_key");
+    assert!(
+        err.message.contains("\"same\""),
+        "message names the offending key: {}",
+        err.message
+    );
+    assert!(
+        err.message.contains("data.items[0]"),
+        "message names the array index: {}",
+        err.message
+    );
 }

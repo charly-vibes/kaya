@@ -347,7 +347,7 @@ fn append_byte_monotonicity(tc: TestCase) {
         // the events stored so far — whole canonical lines only.
         let canonical: Vec<u8> = stored
             .iter()
-            .flat_map(|event| to_line(event).into_bytes())
+            .flat_map(|event| to_line(event).expect("event data is finite").into_bytes())
             .collect();
         assert_eq!(
             after, canonical,

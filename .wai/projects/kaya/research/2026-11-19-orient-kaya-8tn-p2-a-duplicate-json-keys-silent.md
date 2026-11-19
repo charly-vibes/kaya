@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-19-kaya-8tn-codec-hardening, pipeline-step:orient]
+---
+
+ORIENT kaya-8tn P2: (a) duplicate JSON keys silently last-win at parse_line (src/event.rs serde_json Map) diverging served data from stored bytes and anchor digests; (b) to_line serializes non-finite f64 as null — silent round-trip mutation (latent, no current producer); (c) depth limit: to_line emits >127-deep data that parse_line refuses (serde_json default), contained by append re-parse — document. Fix: parse_line refuses duplicate keys at any object depth (streaming visitor, labeled kaya.event.duplicate_key naming the key path); to_line refuses non-finite floats with labeled kaya.event.non_finite instead of null; doc comment records the 128-level parse depth boundary. Red tests: duplicate-key line refused with label + path; to_line(NAN/INF payload) errors; round-trip idempotence untouched for finite domain (Hegel suite stays green). Note: kaya-adapters turu adapter self-checks generated events via parse_line(to_line) — unaffected.

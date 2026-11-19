@@ -140,8 +140,14 @@ fn git_capture_emits_one_deterministic_event_per_commit() {
     );
 
     assert_eq!(first.len(), COMMITS.len(), "one event per commit");
-    let first_lines: Vec<String> = first.iter().map(to_line).collect();
-    let second_lines: Vec<String> = second.iter().map(to_line).collect();
+    let first_lines: Vec<String> = first
+        .iter()
+        .map(|event| to_line(event).expect("event data is finite"))
+        .collect();
+    let second_lines: Vec<String> = second
+        .iter()
+        .map(|event| to_line(event).expect("event data is finite"))
+        .collect();
     assert_eq!(
         first_lines, second_lines,
         "capture must replay byte-identically"
@@ -332,8 +338,8 @@ fn testrunner_capture_summarises_the_run_deterministically() {
     let second = testrunner::capture(&report, PROJECT).expect("second capture succeeds");
 
     assert_eq!(
-        to_line(&first),
-        to_line(&second),
+        to_line(&first).expect("event data is finite"),
+        to_line(&second).expect("event data is finite"),
         "capture replays identically"
     );
     assert_eq!(first, second);

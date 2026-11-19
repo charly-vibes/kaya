@@ -54,14 +54,21 @@ fn appends_only_extend_the_file() {
 
     assert_eq!(ledger.append(&first).unwrap(), AppendOutcome::Appended);
     let after_first = fs::read(&path).unwrap();
-    assert_eq!(after_first, to_line(&first).into_bytes());
+    assert_eq!(
+        after_first,
+        to_line(&first).expect("event data is finite").into_bytes()
+    );
 
     assert_eq!(ledger.append(&second).unwrap(), AppendOutcome::Appended);
     let after_second = fs::read(&path).unwrap();
     assert_eq!(&after_second[..after_first.len()], &after_first[..]);
     assert_eq!(
         after_second,
-        [after_first, to_line(&second).into_bytes()].concat()
+        [
+            after_first,
+            to_line(&second).expect("event data is finite").into_bytes()
+        ]
+        .concat()
     );
 }
 
@@ -120,7 +127,13 @@ fn corrections_supersede_without_rewriting_the_original_line() {
     assert_eq!(&after[..original_bytes.len()], &original_bytes[..]);
     assert_eq!(
         after,
-        [original_bytes, to_line(&correction).into_bytes()].concat()
+        [
+            original_bytes,
+            to_line(&correction)
+                .expect("event data is finite")
+                .into_bytes()
+        ]
+        .concat()
     );
 
     let (events, recovery) = ledger.read_recovered().unwrap();
@@ -238,7 +251,14 @@ fn crash_tail_is_recovered_and_reported() {
     assert_eq!(ledger.append(&third).unwrap(), AppendOutcome::Appended);
     let after = fs::read(&path).unwrap();
     assert_eq!(&after[..clean.len()], &clean[..]);
-    assert_eq!(after, [clean, to_line(&third).into_bytes()].concat());
+    assert_eq!(
+        after,
+        [
+            clean,
+            to_line(&third).expect("event data is finite").into_bytes()
+        ]
+        .concat()
+    );
 }
 
 #[test]
@@ -284,7 +304,10 @@ fn first_append_creates_the_ledger() {
     let mut ledger = Ledger::new(&path);
     let event = experiment_event(FIRST, "experiment.run.completed", json!({"passed": 3}));
     assert_eq!(ledger.append(&event).unwrap(), AppendOutcome::Appended);
-    assert_eq!(fs::read(&path).unwrap(), to_line(&event).into_bytes());
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        to_line(&event).expect("event data is finite").into_bytes()
+    );
 }
 
 #[test]
@@ -320,7 +343,10 @@ fn verified_read_accepts_growth_after_the_anchor() {
 
     ledger.append(&first).unwrap();
     let anchor = Anchor::of(&fs::read(&path).unwrap());
-    assert_eq!(anchor.byte_len, to_line(&first).len());
+    assert_eq!(
+        anchor.byte_len,
+        to_line(&first).expect("event data is finite").len()
+    );
 
     ledger.append(&second).unwrap();
     let (events, recovery) = ledger.read_verified(&anchor).unwrap();
@@ -328,7 +354,10 @@ fn verified_read_accepts_growth_after_the_anchor() {
     assert_eq!(recovery, Recovery::default());
 
     let bytes = fs::read(&path).unwrap();
-    assert_eq!(&bytes[..anchor.byte_len], to_line(&first).as_bytes());
+    assert_eq!(
+        &bytes[..anchor.byte_len],
+        to_line(&first).expect("event data is finite").as_bytes()
+    );
 }
 
 #[test]
@@ -396,7 +425,7 @@ fn verified_read_reports_an_appended_newline_on_growth() {
     let anchored = fs::read(&path).unwrap();
     let anchor = Anchor::of(&anchored);
 
-    let second_line = to_line(&second);
+    let second_line = to_line(&second).expect("event data is finite");
     let mut unterminated = [anchored.clone(), second_line.clone().into_bytes()].concat();
     assert_eq!(unterminated.pop(), Some(b'\n'));
     fs::write(&path, &unterminated).unwrap();
@@ -446,8 +475,12 @@ fn duplicate_ids_with_changed_bytes_are_refused_on_read() {
     fs::write(
         &path,
         [
-            to_line(&original).into_bytes(),
-            to_line(&changed).into_bytes(),
+            to_line(&original)
+                .expect("event data is finite")
+                .into_bytes(),
+            to_line(&changed)
+                .expect("event data is finite")
+                .into_bytes(),
         ]
         .concat(),
     )
@@ -476,7 +509,9 @@ fn resolve_effective_applies_a_run_counts_correction() {
     );
 
     ledger.append(&original).unwrap();
-    let original_line = to_line(&original).into_bytes();
+    let original_line = to_line(&original)
+        .expect("event data is finite")
+        .into_bytes();
     let before = fs::read(&path).unwrap();
     ledger.append(&correction).unwrap();
     let after = fs::read(&path).unwrap();
@@ -538,7 +573,7 @@ fn stale_anchor_for_a_shorter_ledger_is_refused_naming_the_missing_line() {
     ledger.append(&second).unwrap();
 
     let anchor = Anchor::of(&fs::read(&path).unwrap());
-    fs::write(&path, to_line(&first)).unwrap();
+    fs::write(&path, to_line(&first).expect("event data is finite")).unwrap();
 
     let err = ledger.read_verified(&anchor).unwrap_err();
     assert_eq!(err.label, "kaya.ledger.digest_mismatch");
@@ -693,7 +728,7 @@ fn mutual_supersedes_cycle_is_refused() {
         "experiment.run.completed",
         json!({"passed": 3, "supersedes": SECOND}),
     );
-    fs::write(&path, to_line(&a)).unwrap();
+    fs::write(&path, to_line(&a).expect("event data is finite")).unwrap();
     let mut ledger = Ledger::new(&path);
     let b = experiment_event(
         SECOND,
@@ -714,7 +749,7 @@ fn three_event_supersedes_cycle_is_refused() {
         "experiment.run.completed",
         json!({"passed": 3, "supersedes": THIRD}),
     );
-    fs::write(&path, to_line(&a)).unwrap();
+    fs::write(&path, to_line(&a).expect("event data is finite")).unwrap();
     let mut ledger = Ledger::new(&path);
     let b = experiment_event(
         SECOND,
@@ -927,6 +962,10 @@ fn append_under_contention_refuses_with_locked_label_then_succeeds_after_release
         }
     };
     assert_eq!(appended, AppendOutcome::Appended);
-    let expected = [before, to_line(&second).into_bytes()].concat();
+    let expected = [
+        before,
+        to_line(&second).expect("event data is finite").into_bytes(),
+    ]
+    .concat();
     assert_eq!(fs::read(&path).unwrap(), expected);
 }

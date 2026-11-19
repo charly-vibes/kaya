@@ -150,7 +150,14 @@ fn capture_entry(
     };
 
     // Refuse to emit a record the ledger would later reject.
-    event::parse_line(&event::to_line(&event)).map_err(|err| {
+    let line = event::to_line(&event).map_err(|err| {
+        entry_failure(
+            bundle_name,
+            &entry_id,
+            format!("generated event could not be written: {err}"),
+        )
+    })?;
+    event::parse_line(&line).map_err(|err| {
         entry_failure(
             bundle_name,
             &entry_id,

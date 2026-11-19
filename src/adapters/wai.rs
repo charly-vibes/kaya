@@ -139,7 +139,13 @@ fn capture_file(
     };
 
     // Refuse to emit a record the ledger would later reject.
-    event::parse_line(&event::to_line(&event)).map_err(|err| {
+    let line = event::to_line(&event).map_err(|err| {
+        record_failure(
+            &event.provenance.reference,
+            format!("generated event could not be written: {err}"),
+        )
+    })?;
+    event::parse_line(&line).map_err(|err| {
         record_failure(
             &event.provenance.reference,
             format!("generated event rejected: {err}"),

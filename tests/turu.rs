@@ -158,8 +158,14 @@ fn capture_sorts_by_id_and_replays_identically() {
     );
 
     assert_eq!(first, second, "capture replays identically");
-    let first_lines: Vec<String> = first.iter().map(to_line).collect();
-    let second_lines: Vec<String> = second.iter().map(to_line).collect();
+    let first_lines: Vec<String> = first
+        .iter()
+        .map(|event| to_line(event).expect("event data is finite"))
+        .collect();
+    let second_lines: Vec<String> = second
+        .iter()
+        .map(|event| to_line(event).expect("event data is finite"))
+        .collect();
     assert_eq!(first_lines, second_lines, "replay is byte-identical");
 }
 
@@ -217,7 +223,7 @@ fn bundle_entry_text_is_never_copied_into_events() {
         "the fixture entries carry the marker in their text"
     );
     for event in &events {
-        let line = to_line(event);
+        let line = to_line(event).expect("event data is finite");
         assert!(
             !line.contains(MARKER),
             "entry text leaked into an event line: {line}"

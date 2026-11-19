@@ -210,16 +210,12 @@ impl Ledger {
     /// same id with different bytes is refused, because ledger ids are never
     /// reused. The write is one `write_all` of the whole line.
     pub fn append(&mut self, event: &Event) -> Result<AppendOutcome, LedgerError> {
-        let line = event::to_line(event);
-        if line.is_empty() {
-            return Err(LedgerError::new(
-                LABEL_RECORD_INVALID,
-                format!(
-                    "event \"{}\" could not be serialized; refusing to append a partial record",
-                    event.id
-                ),
-            ));
-        }
+        let line = event::to_line(event).map_err(|err| {
+            LedgerError::new(
+                err.label,
+                format!("refusing to append event \"{}\": {}", event.id, err.message),
+            )
+        })?;
         event::parse_line(&line).map_err(|err| {
             LedgerError::new(
                 err.label,

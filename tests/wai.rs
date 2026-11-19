@@ -186,8 +186,14 @@ fn capture_sorts_by_id_and_replays_byte_identically() {
     }
 
     assert_eq!(first, second);
-    let first_lines: Vec<String> = first.iter().map(to_line).collect();
-    let second_lines: Vec<String> = second.iter().map(to_line).collect();
+    let first_lines: Vec<String> = first
+        .iter()
+        .map(|event| to_line(event).expect("event data is finite"))
+        .collect();
+    let second_lines: Vec<String> = second
+        .iter()
+        .map(|event| to_line(event).expect("event data is finite"))
+        .collect();
     assert_eq!(first_lines, second_lines);
 }
 

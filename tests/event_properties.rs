@@ -199,7 +199,7 @@ fn write_json(value: &Value, order: &[String], sep: &str) -> String {
 /// Respell the canonical line: permuted top-level and data keys,
 /// whitespace between tokens, no trailing newline.
 fn respell(event: &Event, top_order: &[String], data_order: &[String], sep: &str) -> String {
-    let canonical = to_line(event);
+    let canonical = to_line(event).expect("event data is finite");
     let value: Value =
         serde_json::from_str(canonical.trim_end_matches('\n')).expect("canonical line is JSON");
     let map = value.as_object().expect("canonical line is an object");
@@ -220,7 +220,7 @@ fn respell(event: &Event, top_order: &[String], data_order: &[String], sep: &str
 #[hegel::test]
 fn one_event_one_line(tc: TestCase) {
     let event = tc.draw(events());
-    let line = to_line(&event);
+    let line = to_line(&event).expect("event data is finite");
 
     // Exactly one newline, and it terminates the line, even when field
     // values themselves contain newlines (they are escaped by serde_json).
@@ -236,14 +236,15 @@ fn one_event_one_line(tc: TestCase) {
     assert_eq!(parsed, event, "round trip must preserve the event");
 
     // Serialization is idempotent: the second pass is byte-identical.
-    let again = to_line(&parse_line(&line).expect("canonical line re-parses"));
+    let again = to_line(&parse_line(&line).expect("canonical line re-parses"))
+        .expect("event data is finite");
     assert_eq!(again, line, "to_line must be idempotent");
 }
 
 #[hegel::test]
 fn canonical_line_convergence(tc: TestCase) {
     let event = tc.draw(events());
-    let canonical = to_line(&event);
+    let canonical = to_line(&event).expect("event data is finite");
 
     let top_order = tc.draw(gs::permutations(
         TOP_KEYS.iter().map(|k| k.to_string()).collect::<Vec<_>>(),
@@ -272,7 +273,7 @@ fn canonical_line_convergence(tc: TestCase) {
         "key order and whitespace must not change the event"
     );
     assert_eq!(
-        to_line(&from_variant),
+        to_line(&from_variant).expect("event data is finite"),
         canonical,
         "every spelling must converge to the same canonical bytes"
     );
@@ -282,11 +283,17 @@ fn canonical_line_convergence(tc: TestCase) {
     let stripped = variant.trim_end_matches(['\n', '\t', ' ']);
     let from_stripped = parse_line(stripped).expect("unterminated respelled line parses");
     assert_eq!(from_stripped, event);
-    assert_eq!(to_line(&from_stripped), canonical);
+    assert_eq!(
+        to_line(&from_stripped).expect("event data is finite"),
+        canonical
+    );
 
     // So does the canonical line itself, stripped of its trailing newline.
     let bare = canonical.trim_end_matches('\n');
     let from_bare = parse_line(bare).expect("unterminated canonical line parses");
     assert_eq!(from_bare, event);
-    assert_eq!(to_line(&from_bare), canonical);
+    assert_eq!(
+        to_line(&from_bare).expect("event data is finite"),
+        canonical
+    );
 }
