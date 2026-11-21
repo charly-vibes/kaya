@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "title-attributes-omitted-when-file-empty-or-heading-less"
+description = "Scenario mirror: empty or heading-less artifacts omit the title and title_digest keys entirely."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "capture_omits_title_attributes_when_file_empty_or_heading_less"}]

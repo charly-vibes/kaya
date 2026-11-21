@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "title-and-digest-derive-deterministically"
+description = "Scenario mirror: the same artifact captured twice yields byte-identical title and title_digest attributes."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "capture_extracts_first_hash_space_heading_as_title"}]

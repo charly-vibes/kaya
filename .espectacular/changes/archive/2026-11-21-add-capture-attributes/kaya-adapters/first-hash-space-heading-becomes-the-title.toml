@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "first-hash-space-heading-becomes-the-title"
+description = "Scenario mirror: the first `# ` heading line becomes the bounded title attribute, with its 16-hex sha256 digest."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "capture_extracts_first_hash_space_heading_as_title"}]

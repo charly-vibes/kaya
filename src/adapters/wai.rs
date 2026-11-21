@@ -1,11 +1,13 @@
 //! wai adapter: `.wai/` markdown artifacts to `capture.artifact.observed`.
 //!
 //! Purpose: record that a research, design, plan, or handoff artifact exists
-//! in the wai artifact tree, without copying or interpreting its contents.
-//! Responsibilities: walk the artifact tree read-only, derive a deterministic
-//! event id per artifact, and abort atomically when a record cannot be read.
-//! Rationale: wai owns the artifact text; kaya only needs a stable, replayable
-//! observation naming where the artifact lives.
+//! in the wai artifact tree, with a bounded, content-derived title digest for
+//! stable identification. Responsibilities: walk the artifact tree read-only,
+//! derive a deterministic event id per artifact, and abort atomically when a
+//! record cannot be read. Rationale: ownership decision — bounded
+//! content-derived attribute != text ownership; wai keeps full text. kaya
+//! copies only the bounded first-heading title and its digest, never the
+//! artifact body, and never interprets it.
 
 use std::fs;
 use std::io::ErrorKind;
@@ -35,6 +37,14 @@ const DATE_LEN: usize = 10;
 
 /// Hex characters kept from the digest in a deterministic event id.
 const ID_DIGEST_LEN: usize = 26;
+
+/// Upper bound on the copied title attribute, in characters.
+///
+/// Titles longer than this are cut on a character boundary, never mid-codepoint.
+pub const TITLE_MAX_LEN: usize = 80;
+
+/// Hex characters kept from the digest of the bounded title.
+const TITLE_DIGEST_LEN: usize = 16;
 
 /// Hex characters kept from the digest when a file stem has no slug.
 const SLUG_FALLBACK_LEN: usize = 8;
@@ -96,6 +106,24 @@ pub fn capture(root: &Path, project: &str) -> Result<Vec<Event>, AdapterError> {
     Ok(events)
 }
 
+/// Derive the bounded content-derived attributes from an artifact's text.
+///
+/// Returns `(title, title_digest)` when the text carries a line starting
+/// with `# `: the title is that line's remainder trimmed and truncated to
+/// [`TITLE_MAX_LEN`] characters, the digest the first [`TITLE_DIGEST_LEN`]
+/// hex of sha256 over the bounded title's bytes. `None` when no such
+/// heading exists, which covers an empty file. The digest is over the
+/// bounded title, so the same heading always yields the same pair.
+pub fn capture_attributes(contents: &str) -> Option<(String, String)> {
+    let heading = contents
+        .lines()
+        .find(|line| line.starts_with("# "))
+        .map(|line| line[2..].trim())?;
+    let title: String = heading.chars().take(TITLE_MAX_LEN).collect();
+    let digest = sha256_hex(title.as_bytes())[..TITLE_DIGEST_LEN].to_owned();
+    Some((title, digest))
+}
+
 /// Translate one markdown artifact into an observation event.
 fn capture_file(
     root: &Path,
@@ -106,15 +134,24 @@ fn capture_file(
 ) -> Result<Event, AdapterError> {
     let relative = relative_path(root, path)?;
 
-    // Reading proves the record is both accessible and valid UTF-8; the
-    // contents stay wai's truth and are never copied into the event.
-    fs::read_to_string(path)
+    // Reading proves the record is both accessible and valid UTF-8; beyond
+    // the bounded title attribute the contents stay wai's truth and are
+    // never copied into the event.
+    let contents = fs::read_to_string(path)
         .map_err(|err| record_failure(&relative, format!("read record: {err}")))?;
 
     let timestamp = timestamp_for(path, &relative)?;
-    let data = json!({ "kind": kind, "path": relative.clone() });
+    // The id hashes the path-identity payload only, never the content-derived
+    // attributes: editing a file's heading moves the title, never the id.
+    let mut data = json!({ "kind": kind, "path": relative.clone() });
+    let id = event_id(project, &timestamp, &relative, &data);
+    if let Some((title, title_digest)) = capture_attributes(&contents) {
+        let map = data.as_object_mut().expect("data is an object");
+        map.insert("title".to_owned(), json!(title));
+        map.insert("title_digest".to_owned(), json!(title_digest));
+    }
     let event = Event {
-        id: event_id(project, &timestamp, &relative, &data),
+        id,
         schema: SCHEMA_V0.to_owned(),
         r#type: EVENT_TYPE.to_owned(),
         timestamp,
@@ -257,7 +294,7 @@ fn slug_for(path: &Path, relative: &str) -> String {
     slug
 }
 
-/// Deterministic event id over every field the event writes.
+/// Deterministic event id over the path-identity payload.
 ///
 /// Tool, tool version, project namespace, timestamp, source reference, and the
 /// serialized payload all contribute, so two captures from different

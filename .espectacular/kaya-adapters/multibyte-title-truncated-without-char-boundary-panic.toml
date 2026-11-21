@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "multibyte-title-truncated-without-char-boundary-panic"
+description = "Scenario mirror: multibyte titles truncate on a character boundary without panicking."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "capture_truncates_multibyte_title_without_char_boundary_panic"}]

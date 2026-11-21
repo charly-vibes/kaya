@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "long-title-truncated-to-the-bounded-constant"
+description = "Scenario mirror: titles longer than TITLE_MAX_LEN (80) truncate to the bound."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "capture_truncates_long_title_to_the_bounded_constant"}]

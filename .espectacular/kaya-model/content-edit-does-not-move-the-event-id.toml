@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "content-edit-does-not-move-the-event-id"
+description = "Scenario mirror: an edited heading moves only the title attribute; the event id stays path-derived."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "renamed_path_event_id_keeps_stem_digest_stability"}]

@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "renamed-path-event-id-keeps-stem-digest-stability"
+description = "Scenario mirror: editing a heading changes the title attribute but never the event id — id derivation stays path stem + digest."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "renamed_path_event_id_keeps_stem_digest_stability"}]
