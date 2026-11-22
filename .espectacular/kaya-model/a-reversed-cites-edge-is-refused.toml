@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "a-reversed-cites-edge-is-refused"
+description = "Scenario mirror: a reversed cites edge is refused naming Decision -> Source."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "cites_direction_is_decision_to_source_exact_pair"}]

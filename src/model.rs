@@ -5,7 +5,8 @@
 //! resolved first, so a corrected event contributes its corrected payload.
 //! The entity and relationship sets are closed, node ids are namespace-qualified
 //! as `<project>/<TYPE>/<key>`, every edge endpoint must resolve, relationship
-//! direction follows a fixed grammar, and the influence/derives subgraph
+//! direction follows a fixed grammar — including Decision-to-Source
+//! attribution via `cites` — and the influence/derives subgraph
 //! stays acyclic. Every violation is a labeled [`ModelError`].
 
 use std::collections::BTreeMap;
@@ -30,7 +31,7 @@ pub const RUN_COMPLETED_EVENT: &str = "experiment.run.completed";
 pub const ENTRY_OBSERVED_EVENT: &str = "capture.entry.observed";
 
 const ENTITY_TYPE_SET: &str = "{Project, Question, Idea, Hypothesis, Model, Experiment, Run, Artifact, Observation, Claim, Finding, Decision, Source}";
-const RELATIONSHIP_SET: &str = "{investigates, predicts, executes, observes, supports, challenges, influences, realizes, derives}";
+const RELATIONSHIP_SET: &str = "{investigates, predicts, executes, observes, supports, challenges, influences, realizes, derives, cites}";
 
 /// A labeled refusal produced while building the research graph.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -141,7 +142,8 @@ impl FromStr for EntityType {
     }
 }
 
-/// The nine admitted relationship kinds.
+/// The admitted relationship kinds, including the Decision-to-Source
+/// attribution edge `cites`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Relationship {
@@ -154,11 +156,12 @@ pub enum Relationship {
     Influences,
     Realizes,
     Derives,
+    Cites,
 }
 
 impl Relationship {
     /// Every admitted relationship, in vocabulary order.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Investigates,
         Self::Predicts,
         Self::Executes,
@@ -168,6 +171,7 @@ impl Relationship {
         Self::Influences,
         Self::Realizes,
         Self::Derives,
+        Self::Cites,
     ];
 
     /// The lowercase relationship name used on the wire and in event data.
@@ -182,6 +186,7 @@ impl Relationship {
             Self::Influences => "influences",
             Self::Realizes => "realizes",
             Self::Derives => "derives",
+            Self::Cites => "cites",
         }
     }
 
@@ -194,13 +199,14 @@ impl Relationship {
             Self::Derives => Some((EntityType::Finding, EntityType::Observation)),
             Self::Influences => Some((EntityType::Decision, EntityType::Finding)),
             Self::Realizes => Some((EntityType::Model, EntityType::Hypothesis)),
+            Self::Cites => Some((EntityType::Decision, EntityType::Source)),
             Self::Investigates | Self::Predicts | Self::Supports | Self::Challenges => None,
         }
     }
 
     /// Whether [`Self::fixed_direction`] admits only the exact pair.
     ///
-    /// The four structural relationships name a specific source and target
+    /// The five structural relationships name a specific source and target
     /// entity and refuse every other pair. `influences` keeps reversal-only
     /// semantics: only the exact reverse pair is refused, so a
     /// `Decision -> Decision` influence stays representable and acyclicity —
@@ -208,7 +214,7 @@ impl Relationship {
     fn requires_exact_pair(self) -> bool {
         matches!(
             self,
-            Self::Executes | Self::Observes | Self::Derives | Self::Realizes
+            Self::Executes | Self::Observes | Self::Derives | Self::Realizes | Self::Cites
         )
     }
 
@@ -236,7 +242,7 @@ impl FromStr for Relationship {
                 ModelError::new(
                     "kaya.model.relationship_set_closed",
                     format!(
-                        "unknown relationship \"{raw}\"; the closed nine-relationship set is {RELATIONSHIP_SET}"
+                        "unknown relationship \"{raw}\"; the closed relationship set is {RELATIONSHIP_SET}"
                     ),
                 )
             })

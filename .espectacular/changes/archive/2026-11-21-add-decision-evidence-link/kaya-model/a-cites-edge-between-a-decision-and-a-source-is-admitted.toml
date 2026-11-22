@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "a-cites-edge-between-a-decision-and-a-source-is-admitted"
+description = "Scenario mirror: a cites edge between a Decision and a Source is admitted."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "cites_relationship_joins_the_closed_set"}]

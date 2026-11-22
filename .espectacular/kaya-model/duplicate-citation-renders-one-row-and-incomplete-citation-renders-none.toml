@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "duplicate-citation-renders-one-row-and-incomplete-citation-renders-none"
+description = "Scenario mirror: a repeated citation renders one row, an incomplete citation renders none."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "duplicate_citation_renders_one_row_and_incomplete_citation_renders_none"}]

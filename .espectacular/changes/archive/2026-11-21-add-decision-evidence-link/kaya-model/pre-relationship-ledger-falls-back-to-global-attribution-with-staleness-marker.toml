@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "pre-relationship-ledger-falls-back-to-global-attribution-with-staleness-marker"
+description = "Scenario mirror: a decision citing no Source keeps global evidence with a staleness marker naming it."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "pre_relationship_ledger_falls_back_to_global_attribution_with_staleness_marker"}]

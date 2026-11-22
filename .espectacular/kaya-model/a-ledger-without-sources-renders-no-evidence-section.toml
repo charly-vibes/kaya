@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "a-ledger-without-sources-renders-no-evidence-section"
+description = "Scenario mirror: a ledger without Sources renders no evidence section."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "decisions_only_ledger_renders_no_evidence_section"}]

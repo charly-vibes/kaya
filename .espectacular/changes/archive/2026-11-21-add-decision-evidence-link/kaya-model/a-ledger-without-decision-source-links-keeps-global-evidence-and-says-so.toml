@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "a-ledger-without-decision-source-links-keeps-global-evidence-and-says-so"
+description = "Scenario mirror: a ledger without decision-source links keeps global evidence and says so."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "pre_relationship_ledger_falls_back_to_global_attribution_with_staleness_marker"}]

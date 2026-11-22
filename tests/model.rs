@@ -541,6 +541,129 @@ fn wrong_entity_pairs_refused_for_each_exact_pair_relationship() {
 }
 
 #[test]
+fn cites_relationship_joins_the_closed_set() {
+    let decision = "alpha/Decision/DEC-001";
+    let source = "alpha/Source/SRC-001";
+    let events = [
+        entity_event("Decision", decision, json!({}), 1),
+        entity_event(
+            "Source",
+            source,
+            json!({ "path": "src/cache.rs", "commit": "abc123" }),
+            2,
+        ),
+        relationship_event("cites", decision, source, 3),
+    ];
+
+    let graph = expect_graph(build(&events));
+
+    let edge = graph
+        .edges
+        .iter()
+        .find(|edge| edge.from == decision && edge.to == source)
+        .expect("the cites edge is admitted into the graph");
+    assert_eq!(
+        edge.relationship.as_str(),
+        "cites",
+        "the wire name is the lowercase verb: {}",
+        edge.relationship.as_str()
+    );
+}
+
+#[test]
+fn unknown_relationship_refusal_names_cites_in_the_closed_set() {
+    let events = [
+        entity_event("Decision", "alpha/Decision/DEC-001", json!({}), 1),
+        entity_event("Source", "alpha/Source/SRC-001", json!({}), 2),
+        relationship_event(
+            "depends_on",
+            "alpha/Decision/DEC-001",
+            "alpha/Source/SRC-001",
+            3,
+        ),
+    ];
+
+    let error = expect_refusal(build(&events));
+
+    assert_eq!(error.label, "kaya.model.relationship_set_closed");
+    assert!(
+        error.message.contains("cites"),
+        "the closed set must name cites: {}",
+        error.message
+    );
+}
+
+#[test]
+fn cites_direction_is_decision_to_source_exact_pair() {
+    let cases = [
+        (
+            "Source",
+            "alpha/Source/SRC-001",
+            "Decision",
+            "alpha/Decision/DEC-001",
+        ),
+        ("Run", "alpha/Run/RUN-001", "Source", "alpha/Source/SRC-002"),
+        (
+            "Decision",
+            "alpha/Decision/DEC-002",
+            "Decision",
+            "alpha/Decision/DEC-001",
+        ),
+        (
+            "Finding",
+            "alpha/Finding/FND-001",
+            "Source",
+            "alpha/Source/SRC-003",
+        ),
+    ];
+
+    for (from_type, from_id, to_type, to_id) in cases {
+        let events = [
+            entity_event(from_type, from_id, json!({}), 1),
+            entity_event(to_type, to_id, json!({}), 2),
+            relationship_event("cites", from_id, to_id, 3),
+        ];
+
+        let error = expect_refusal(build(&events));
+
+        assert_eq!(
+            error.label, "kaya.model.direction_fixed",
+            "cites {from_type} -> {to_type} must be refused by the grammar"
+        );
+        assert!(error.message.contains("cites"), "{}", error.message);
+        assert!(
+            error.message.contains("Decision -> Source"),
+            "the refusal names the grammar's rule: {}",
+            error.message
+        );
+        assert!(error.message.contains(from_id), "{}", error.message);
+        assert!(error.message.contains(to_id), "{}", error.message);
+    }
+}
+
+#[test]
+fn cites_to_an_unknown_node_is_refused_as_dangling() {
+    let events = [
+        entity_event("Decision", "alpha/Decision/DEC-001", json!({}), 1),
+        relationship_event(
+            "cites",
+            "alpha/Decision/DEC-001",
+            "alpha/Source/SRC-404",
+            2,
+        ),
+    ];
+
+    let error = expect_refusal(build(&events));
+
+    assert_eq!(error.label, "kaya.model.references_resolve");
+    assert!(
+        error.message.contains("alpha/Source/SRC-404"),
+        "{}",
+        error.message
+    );
+}
+
+#[test]
 fn self_loop_influence_refused_by_acyclicity_not_direction() {
     let decision = "alpha/Decision/DEC-001";
     let events = [

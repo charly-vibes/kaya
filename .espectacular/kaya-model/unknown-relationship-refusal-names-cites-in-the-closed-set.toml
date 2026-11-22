@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "unknown-relationship-refusal-names-cites-in-the-closed-set"
+description = "Scenario mirror: the closed-set refusal names cites among the set."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "unknown_relationship_refusal_names_cites_in_the_closed_set"}]

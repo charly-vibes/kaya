@@ -14,7 +14,7 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, NaiveDate, SecondsFormat, Utc};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::event::{self, Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject};
 
@@ -66,43 +66,73 @@ pub fn capture(root: &Path, project: &str) -> Result<Vec<Event>, AdapterError> {
     };
 
     for project_dir in project_dirs {
-        let metadata = fs::metadata(&project_dir)
-            .map_err(|err| io_failure(&project_dir, "inspect project directory", err))?;
-        if !metadata.is_dir() {
-            continue;
-        }
-        let Some(source_project) = project_dir.file_name().and_then(|name| name.to_str()) else {
-            return Err(io_failure(
-                &project_dir,
-                "read project directory name",
-                "is not UTF-8",
-            ));
-        };
-        for kind in KINDS {
-            let Some(artifacts) = read_dir_sorted(&project_dir.join(kind))? else {
-                continue;
-            };
-            for artifact in artifacts {
-                if artifact.extension().and_then(|ext| ext.to_str()) != Some("md") {
-                    continue;
-                }
-                let metadata = fs::metadata(&artifact)
-                    .map_err(|err| io_failure(&artifact, "inspect artifact", err))?;
-                if !metadata.is_file() {
-                    continue;
-                }
-                events.push(capture_file(
-                    root,
-                    source_project,
-                    project,
-                    kind,
-                    &artifact,
-                )?);
-            }
-        }
+        events.extend(capture_project(root, &project_dir, project)?);
     }
 
     events.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(events)
+}
+
+/// Capture every artifact of one source project.
+fn capture_project(
+    root: &Path,
+    project_dir: &Path,
+    project: &str,
+) -> Result<Vec<Event>, AdapterError> {
+    let metadata = fs::metadata(project_dir)
+        .map_err(|err| io_failure(project_dir, "inspect project directory", err))?;
+    if !metadata.is_dir() {
+        return Ok(Vec::new());
+    }
+    let Some(source_project) = project_dir.file_name().and_then(|name| name.to_str()) else {
+        return Err(io_failure(
+            project_dir,
+            "read project directory name",
+            "is not UTF-8",
+        ));
+    };
+    let mut events = Vec::new();
+    for kind in KINDS {
+        events.extend(capture_kind(
+            root,
+            project_dir,
+            source_project,
+            project,
+            kind,
+        )?);
+    }
+    Ok(events)
+}
+
+/// Capture every markdown artifact of one kind of one source project.
+fn capture_kind(
+    root: &Path,
+    project_dir: &Path,
+    source_project: &str,
+    project: &str,
+    kind: &str,
+) -> Result<Vec<Event>, AdapterError> {
+    let Some(artifacts) = read_dir_sorted(&project_dir.join(kind))? else {
+        return Ok(Vec::new());
+    };
+    let mut events = Vec::new();
+    for artifact in artifacts {
+        if artifact.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let metadata = fs::metadata(&artifact)
+            .map_err(|err| io_failure(&artifact, "inspect artifact", err))?;
+        if !metadata.is_file() {
+            continue;
+        }
+        events.push(capture_file(
+            root,
+            source_project,
+            project,
+            kind,
+            &artifact,
+        )?);
+    }
     Ok(events)
 }
 
@@ -145,38 +175,67 @@ fn capture_file(
     // attributes: editing a file's heading moves the title, never the id.
     let mut data = json!({ "kind": kind, "path": relative.clone() });
     let id = event_id(project, &timestamp, &relative, &data);
-    if let Some((title, title_digest)) = capture_attributes(&contents) {
-        let map = data.as_object_mut().expect("data is an object");
-        map.insert("title".to_owned(), json!(title));
-        map.insert("title_digest".to_owned(), json!(title_digest));
-    }
+    add_capture_attributes(&mut data, &contents);
+
     let event = Event {
         id,
         schema: SCHEMA_V0.to_owned(),
         r#type: EVENT_TYPE.to_owned(),
         timestamp,
-        actor: Actor {
-            r#type: ActorType::Tool,
-            name: TOOL.to_owned(),
-        },
-        subject: Subject {
-            r#type: "Artifact".to_owned(),
-            id: format!(
-                "{source_project}/Artifact/{kind}-{}",
-                slug_for(path, &relative)
-            ),
-        },
+        actor: tool_actor(),
+        subject: artifact_subject(source_project, kind, path, &relative),
         data,
-        provenance: Provenance {
-            tool: TOOL.to_owned(),
-            version: SOURCE_VERSION.to_owned(),
-            reference: relative.clone(),
-        },
+        provenance: artifact_provenance(&relative),
         artifacts: vec![relative],
     };
 
     // Refuse to emit a record the ledger would later reject.
-    let line = event::to_line(&event).map_err(|err| {
+    validated_line(&event)?;
+    Ok(event)
+}
+
+/// The tool actor every wai observation carries.
+fn tool_actor() -> Actor {
+    Actor {
+        r#type: ActorType::Tool,
+        name: TOOL.to_owned(),
+    }
+}
+
+/// The subject of an artifact observation: its source project, kind, and slug.
+fn artifact_subject(source_project: &str, kind: &str, path: &Path, relative: &str) -> Subject {
+    Subject {
+        r#type: "Artifact".to_owned(),
+        id: format!(
+            "{source_project}/Artifact/{kind}-{}",
+            slug_for(path, relative)
+        ),
+    }
+}
+
+/// The provenance of an artifact observation: this adapter, its version, and
+/// the artifact's path below the project root.
+fn artifact_provenance(relative: &str) -> Provenance {
+    Provenance {
+        tool: TOOL.to_owned(),
+        version: SOURCE_VERSION.to_owned(),
+        reference: relative.to_owned(),
+    }
+}
+
+/// Copy the bounded content-derived attributes into the event's data map.
+fn add_capture_attributes(data: &mut Value, contents: &str) {
+    let Some((title, title_digest)) = capture_attributes(contents) else {
+        return;
+    };
+    let map = data.as_object_mut().expect("data is an object");
+    map.insert("title".to_owned(), json!(title));
+    map.insert("title_digest".to_owned(), json!(title_digest));
+}
+
+/// Prove the generated event round-trips: the ledger must accept it.
+fn validated_line(event: &Event) -> Result<(), AdapterError> {
+    let line = event::to_line(event).map_err(|err| {
         record_failure(
             &event.provenance.reference,
             format!("generated event could not be written: {err}"),
@@ -187,7 +246,8 @@ fn capture_file(
             &event.provenance.reference,
             format!("generated event rejected: {err}"),
         )
-    })
+    })?;
+    Ok(())
 }
 
 /// List a directory's entries as sorted paths; missing directories are `None`.

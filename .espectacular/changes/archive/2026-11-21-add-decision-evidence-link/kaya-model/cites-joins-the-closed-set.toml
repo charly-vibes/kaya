@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "cites-joins-the-closed-set"
+description = "Scenario mirror: cites joins the closed typed relationship set."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "cites_relationship_joins_the_closed_set"}]

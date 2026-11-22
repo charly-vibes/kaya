@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "a-cites-edge-naming-an-absent-source-is-refused"
+description = "Scenario mirror: a cites edge naming an absent Source is refused."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "cites_to_an_unknown_node_is_refused_as_dangling"}]

@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "a-shared-source-renders-one-row-per-citing-decision"
+description = "Scenario mirror: a shared source renders one row per citing decision."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "source_cited_by_two_decisions_renders_one_row_per_reference"}]

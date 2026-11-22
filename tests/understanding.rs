@@ -12,7 +12,7 @@ use tempfile::TempDir;
 use kaya::model::{EntityType, Graph, GraphBuilder, Relationship};
 use kaya::projection::report::{
     DECISION_BLOCK, FINDINGS_BLOCK, Kind, LABEL_LEGACY_BLOCK, Omitted, REASON_NO_RECORDS,
-    build_understanding,
+    attribution_stale_row, build_understanding,
 };
 
 const UNDERSTANDING: &str = "docs/research/understanding.md";
@@ -35,6 +35,12 @@ fn edge(builder: &mut GraphBuilder, relationship: Relationship, from: &str, to: 
     builder
         .relationship(relationship, from, to)
         .expect("relationship direction follows the grammar");
+}
+
+/// The staleness marker a decision without `cites` edges carries: global
+/// attribution is never mistaken for per-decision scoping.
+fn stale_marker(decision_id: &str) -> String {
+    attribution_stale_row(decision_id)
 }
 
 /// Findings, observations, and claims alongside records that the understanding
@@ -134,6 +140,169 @@ fn graph_with_decisions_and_evidence() -> Graph {
         Relationship::Influences,
         "p/Decision/d1",
         "p/Finding/f2",
+    );
+    builder.build().expect("graph is acyclic and complete")
+}
+
+/// Two decisions whose evidence must be scoped: each cites its own Source,
+/// one Source is cited by both decisions, one complete Source is cited by
+/// nothing, and one incomplete Source is cited (a cite cannot resurrect a
+/// missing `path` or `commit` half).
+fn graph_with_scoped_decision_evidence() -> Graph {
+    let mut builder = GraphBuilder::new();
+    titled(
+        &mut builder,
+        "p/Decision/d1",
+        EntityType::Decision,
+        "Ship the cache",
+    );
+    titled(
+        &mut builder,
+        "p/Decision/d2",
+        EntityType::Decision,
+        "Defer the migration",
+    );
+    titled(
+        &mut builder,
+        "p/Finding/f1",
+        EntityType::Finding,
+        "Cache hit rate rose",
+    );
+    node(
+        &mut builder,
+        "p/Source/src1",
+        EntityType::Source,
+        json!({ "path": "src/cache.rs", "commit": "abc123" }),
+    );
+    node(
+        &mut builder,
+        "p/Source/src2",
+        EntityType::Source,
+        json!({ "path": "docs/notes.md", "commit": "def456" }),
+    );
+    // Cited by both decisions: one evidence row per citing decision.
+    node(
+        &mut builder,
+        "p/Source/src3",
+        EntityType::Source,
+        json!({ "path": "shared/notes.md", "commit": "789aaa" }),
+    );
+    // Complete but cited by no decision: no row, no source-map entry.
+    node(
+        &mut builder,
+        "p/Source/src4",
+        EntityType::Source,
+        json!({ "path": "reports/x.md", "commit": "111bbb" }),
+    );
+    // Cited but incomplete: still skipped entirely.
+    node(
+        &mut builder,
+        "p/Source/src5",
+        EntityType::Source,
+        json!({ "path": "src/only-path.rs" }),
+    );
+    edge(
+        &mut builder,
+        Relationship::Influences,
+        "p/Decision/d1",
+        "p/Finding/f1",
+    );
+    edge(&mut builder, Relationship::Cites, "p/Decision/d1", "p/Source/src1");
+    edge(&mut builder, Relationship::Cites, "p/Decision/d2", "p/Source/src2");
+    edge(&mut builder, Relationship::Cites, "p/Decision/d1", "p/Source/src3");
+    edge(&mut builder, Relationship::Cites, "p/Decision/d2", "p/Source/src3");
+    edge(&mut builder, Relationship::Cites, "p/Decision/d1", "p/Source/src5");
+    builder.build().expect("graph is acyclic and complete")
+}
+
+/// One decision cites a Source; a second decision cites nothing, so its own
+/// evidence stays ledger-global and is marked.
+fn graph_with_mixed_decision_evidence() -> Graph {
+    let mut builder = GraphBuilder::new();
+    titled(
+        &mut builder,
+        "p/Decision/d1",
+        EntityType::Decision,
+        "Ship the cache",
+    );
+    titled(
+        &mut builder,
+        "p/Decision/d2",
+        EntityType::Decision,
+        "Defer the migration",
+    );
+    node(
+        &mut builder,
+        "p/Source/src1",
+        EntityType::Source,
+        json!({ "path": "src/cache.rs", "commit": "abc123" }),
+    );
+    node(
+        &mut builder,
+        "p/Source/src2",
+        EntityType::Source,
+        json!({ "path": "docs/notes.md", "commit": "def456" }),
+    );
+    edge(
+        &mut builder,
+        Relationship::Cites,
+        "p/Decision/d1",
+        "p/Source/src1",
+    );
+    builder.build().expect("graph is acyclic and complete")
+}
+
+/// A decision with no Source at all: the record renders no evidence section.
+fn graph_with_decisions_only() -> Graph {
+    let mut builder = GraphBuilder::new();
+    titled(
+        &mut builder,
+        "p/Decision/d1",
+        EntityType::Decision,
+        "Ship the cache",
+    );
+    builder.build().expect("graph is acyclic and complete")
+}
+
+/// One decision citing the same Source twice and an incomplete Source: the
+/// duplicate renders one row, the incomplete citation renders none.
+fn graph_with_duplicate_and_incomplete_citations() -> Graph {
+    let mut builder = GraphBuilder::new();
+    titled(
+        &mut builder,
+        "p/Decision/d1",
+        EntityType::Decision,
+        "Ship the cache",
+    );
+    node(
+        &mut builder,
+        "p/Source/src1",
+        EntityType::Source,
+        json!({ "path": "src/cache.rs", "commit": "abc123" }),
+    );
+    node(
+        &mut builder,
+        "p/Source/src2",
+        EntityType::Source,
+        json!({ "path": "src/only-path.rs" }),
+    );
+    edge(
+        &mut builder,
+        Relationship::Cites,
+        "p/Decision/d1",
+        "p/Source/src1",
+    );
+    edge(
+        &mut builder,
+        Relationship::Cites,
+        "p/Decision/d1",
+        "p/Source/src1",
+    );
+    edge(
+        &mut builder,
+        Relationship::Cites,
+        "p/Decision/d1",
+        "p/Source/src2",
     );
     builder.build().expect("graph is acyclic and complete")
 }
@@ -412,6 +581,7 @@ fn incomplete_sources_never_render_or_enter_the_source_map() {
             "- p/Decision/d1 — Ship the cache",
             "### Evidence",
             "- p/Source/src1 — src/cache.rs@abc123",
+            stale_marker("p/Decision/d1").as_str(),
         ]),
         "only a Source with a path and a commit renders one evidence row: {after}"
     );
@@ -461,6 +631,8 @@ fn decision_record_renders_decisions_and_evidence_references() {
             "- p/Finding/f2 — see p/Decision/d1",
             "- p/Source/src1 — src/cache.rs@abc123",
             "- p/Source/src2 — docs/notes.md@def456",
+            stale_marker("p/Decision/d1").as_str(),
+            stale_marker("p/Decision/d2").as_str(),
         ]),
         "decisions sort by id and evidence by id then reference: {after}"
     );
@@ -523,6 +695,247 @@ fn decision_record_renders_decisions_and_evidence_references() {
             "p/Source/src2",
         ])),
         "the decision record's source map traces decisions and evidence: {:?}",
+        built.summary.sources
+    );
+}
+
+#[test]
+fn decision_evidence_lists_only_sources_the_decision_cites() {
+    let dir = TempDir::new().expect("temp dir");
+    let path = document_path(&dir);
+
+    let built = build_understanding(&graph_with_scoped_decision_evidence(), &path)
+        .expect("understanding builds");
+
+    let after = read(&path);
+    assert_eq!(
+        block_lines(&after, DECISION_BLOCK),
+        lines(&[
+            "### Decisions",
+            "- p/Decision/d1 — Ship the cache",
+            "- p/Decision/d2 — Defer the migration",
+            "### Evidence",
+            "- p/Finding/f1 — see p/Decision/d1",
+            "- p/Source/src1 — src/cache.rs@abc123 — see p/Decision/d1",
+            "- p/Source/src2 — docs/notes.md@def456 — see p/Decision/d2",
+            "- p/Source/src3 — shared/notes.md@789aaa — see p/Decision/d1",
+            "- p/Source/src3 — shared/notes.md@789aaa — see p/Decision/d2",
+        ]),
+        "each decision's evidence lists only its own cited sources: {after}"
+    );
+
+    let decision_body = block_body(&after, DECISION_BLOCK);
+    for forbidden in [
+        "src4",
+        "src5",
+        "reports/x.md",
+        "src/only-path.rs",
+        "attribution-stale",
+    ] {
+        assert!(
+            !decision_body.contains(forbidden),
+            "an uncited source renders no row and no staleness marker appears once cites exist ({forbidden}): {decision_body}"
+        );
+    }
+
+    assert_eq!(
+        built.summary.sources.get(DECISION_BLOCK),
+        Some(&lines(&[
+            "p/Decision/d1",
+            "p/Decision/d2",
+            "p/Finding/f1",
+            "p/Source/src1",
+            "p/Source/src2",
+            "p/Source/src3",
+        ])),
+        "the source map traces decisions and cited sources only: {:?}",
+        built.summary.sources
+    );
+}
+
+#[test]
+fn mixed_ledger_scopes_the_cited_decision_and_marks_the_uncited_one() {
+    let dir = TempDir::new().expect("temp dir");
+    let path = document_path(&dir);
+
+    let built = build_understanding(&graph_with_mixed_decision_evidence(), &path)
+        .expect("understanding builds");
+
+    let after = read(&path);
+    assert_eq!(
+        block_lines(&after, DECISION_BLOCK),
+        lines(&[
+            "### Decisions",
+            "- p/Decision/d1 — Ship the cache",
+            "- p/Decision/d2 — Defer the migration",
+            "### Evidence",
+            "- p/Source/src1 — src/cache.rs@abc123",
+            "- p/Source/src1 — src/cache.rs@abc123 — see p/Decision/d1",
+            "- p/Source/src2 — docs/notes.md@def456",
+            stale_marker("p/Decision/d2").as_str(),
+        ]),
+        "the cited decision scopes its evidence and the uncited one falls back with a marker: {after}"
+    );
+
+    assert_eq!(
+        built.summary.sources.get(DECISION_BLOCK),
+        Some(&lines(&[
+            "p/Decision/d1",
+            "p/Decision/d2",
+            "p/Source/src1",
+            "p/Source/src2",
+        ])),
+        "the source map traces both decisions and every rendered source: {:?}",
+        built.summary.sources
+    );
+}
+
+#[test]
+fn decisions_only_ledger_renders_no_evidence_section() {
+    let dir = TempDir::new().expect("temp dir");
+    let path = document_path(&dir);
+
+    let built = build_understanding(&graph_with_decisions_only(), &path)
+        .expect("understanding builds");
+
+    let after = read(&path);
+    assert_eq!(
+        block_lines(&after, DECISION_BLOCK),
+        lines(&["### Decisions", "- p/Decision/d1 — Ship the cache"]),
+        "a ledger with no Source renders no evidence section: {after}"
+    );
+    assert!(
+        !block_body(&after, DECISION_BLOCK).contains("attribution-stale"),
+        "no evidence means no staleness marker: {after}"
+    );
+    assert_eq!(
+        built.summary.sources.get(DECISION_BLOCK),
+        Some(&lines(&["p/Decision/d1"])),
+        "only the decision enters the source map: {:?}",
+        built.summary.sources
+    );
+}
+
+#[test]
+fn duplicate_citation_renders_one_row_and_incomplete_citation_renders_none() {
+    let dir = TempDir::new().expect("temp dir");
+    let path = document_path(&dir);
+
+    let built = build_understanding(&graph_with_duplicate_and_incomplete_citations(), &path)
+        .expect("understanding builds");
+
+    let after = read(&path);
+    assert_eq!(
+        block_lines(&after, DECISION_BLOCK),
+        lines(&[
+            "### Decisions",
+            "- p/Decision/d1 — Ship the cache",
+            "### Evidence",
+            "- p/Source/src1 — src/cache.rs@abc123 — see p/Decision/d1",
+        ]),
+        "a repeated citation renders one row and an incomplete citation none: {after}"
+    );
+    let decision_body = block_body(&after, DECISION_BLOCK);
+    assert!(
+        !decision_body.contains("only-path.rs") && !decision_body.contains("attribution-stale"),
+        "a citation cannot resurrect an incomplete Source and cites suppress the marker: {decision_body}"
+    );
+    assert_eq!(
+        built.summary.sources.get(DECISION_BLOCK),
+        Some(&lines(&["p/Decision/d1", "p/Source/src1"])),
+        "the incomplete Source never enters the source map: {:?}",
+        built.summary.sources
+    );
+}
+
+#[test]
+fn source_cited_by_two_decisions_renders_one_row_per_reference() {
+    let dir = TempDir::new().expect("temp dir");
+    let path = document_path(&dir);
+
+    let built = build_understanding(&graph_with_scoped_decision_evidence(), &path)
+        .expect("understanding builds");
+
+    let after = read(&path);
+    assert_eq!(
+        block_lines(&after, DECISION_BLOCK),
+        lines(&[
+            "### Decisions",
+            "- p/Decision/d1 — Ship the cache",
+            "- p/Decision/d2 — Defer the migration",
+            "### Evidence",
+            "- p/Finding/f1 — see p/Decision/d1",
+            "- p/Source/src1 — src/cache.rs@abc123 — see p/Decision/d1",
+            "- p/Source/src2 — docs/notes.md@def456 — see p/Decision/d2",
+            "- p/Source/src3 — shared/notes.md@789aaa — see p/Decision/d1",
+            "- p/Source/src3 — shared/notes.md@789aaa — see p/Decision/d2",
+        ]),
+        "one row per citing decision for a shared source: {after}"
+    );
+    assert_eq!(
+        built.summary.sources.get(DECISION_BLOCK),
+        Some(&lines(&[
+            "p/Decision/d1",
+            "p/Decision/d2",
+            "p/Finding/f1",
+            "p/Source/src1",
+            "p/Source/src2",
+            "p/Source/src3",
+        ])),
+        "the source map traces decisions and cited sources only: {:?}",
+        built.summary.sources
+    );
+}
+
+#[test]
+fn pre_relationship_ledger_falls_back_to_global_attribution_with_staleness_marker() {
+    let dir = TempDir::new().expect("temp dir");
+    let path = document_path(&dir);
+
+    let built = build_understanding(&graph_with_decisions_and_evidence(), &path)
+        .expect("understanding builds");
+
+    let after = read(&path);
+    assert_eq!(
+        block_lines(&after, DECISION_BLOCK),
+        lines(&[
+            "### Decisions",
+            "- p/Decision/d1 — Ship the cache",
+            "- p/Decision/d2 — Defer the migration",
+            "### Evidence",
+            "- p/Finding/f1 — see p/Decision/d1",
+            "- p/Finding/f1 — see p/Decision/d2",
+            "- p/Finding/f2 — see p/Decision/d1",
+            "- p/Source/src1 — src/cache.rs@abc123",
+            "- p/Source/src2 — docs/notes.md@def456",
+            stale_marker("p/Decision/d1").as_str(),
+            stale_marker("p/Decision/d2").as_str(),
+        ]),
+        "a pre-relationship ledger keeps global attribution and carries the marker: {after}"
+    );
+
+    let decision_body = block_body(&after, DECISION_BLOCK);
+    for row in [
+        "- p/Source/src1 — src/cache.rs@abc123\n",
+        "- p/Source/src2 — docs/notes.md@def456\n",
+    ] {
+        assert!(
+            decision_body.contains(row),
+            "fallback rows keep the pre-relationship format with no `see` suffix: {decision_body}"
+        );
+    }
+
+    assert_eq!(
+        built.summary.sources.get(DECISION_BLOCK),
+        Some(&lines(&[
+            "p/Decision/d1",
+            "p/Decision/d2",
+            "p/Finding/f1",
+            "p/Finding/f2",
+            "p/Source/src1",
+            "p/Source/src2",
+        ])),
+        "the fallback source map stays ledger-global: {:?}",
         built.summary.sources
     );
 }

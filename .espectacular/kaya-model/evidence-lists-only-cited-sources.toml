@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "evidence-lists-only-cited-sources"
+description = "Scenario mirror: a scoped decision renders only the Sources it cites."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "decision_evidence_lists_only_sources_the_decision_cites"}]

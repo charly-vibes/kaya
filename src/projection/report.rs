@@ -46,6 +46,15 @@ pub const FINDINGS_BLOCK: &str = "understanding.findings-and-analysis";
 pub const DECISION_BLOCK: &str = "understanding.decision-record";
 /// Reason reported for a family-kind with no source records.
 pub const REASON_NO_RECORDS: &str = "no-records";
+/// The Evidence line a decision without `cites` edges carries: its source
+/// evidence stayed ledger-global because the ledger records no decision-source
+/// links, so global attribution is never mistaken for per-decision scoping.
+pub fn attribution_stale_row(decision_id: &str) -> String {
+    format!(
+        "- attribution-stale — decision {decision_id}: no decision-source links in this ledger; \
+         source evidence is ledger-global"
+    )
+}
 /// Label refusing a family or kind outside the closed vocabulary.
 pub const LABEL_UNKNOWN_KIND: &str = "kaya.documents.unknown_kind_refused";
 /// Label refusing a generated block outside the closed block vocabulary.
@@ -843,12 +852,23 @@ fn render_findings(graph: &Graph) -> Option<RenderedBlock> {
 /// Decision records plus their evidence: the decisions themselves, the source
 /// revisions backing them, and the findings that influenced them.
 ///
-/// Emptiness is the decision records only. Sources are ledger-global repo
-/// pins, so on their own they never conjure a decision record; as with
-/// promotion assertions in the experiment report, they only enrich a record
-/// that renders. A Source node needs both `path` and `commit` to become a
-/// reference: a missing or blank half skips the node entirely, with no row and
-/// no source-map entry.
+/// Emptiness is the decision records only. As with promotion assertions in
+/// the experiment report, sources only enrich a record that renders. A
+/// Source node needs both `path` and `commit` to become a reference: a
+/// missing or blank half skips the node entirely, with no row and no
+/// source-map entry.
+///
+/// Two attribution regimes exist, decided per decision. A decision that cites
+/// at least one Source scopes its evidence to those Sources (each row names
+/// the citing decision); a decision that cites none predates
+/// Decision-to-Source attribution for its own rows — its evidence stays
+/// ledger-global, exactly as before the relationship existed, and one
+/// explicit staleness marker ([`attribution_stale_row`]) names that decision.
+/// Sources no decision cites render no row and enter no source map in a
+/// scoped decision; a ledger-global decision keeps every complete Source in
+/// the map. A ledger with no complete Source renders no Evidence section at
+/// all, so a decisions-only record never claims global evidence it does not
+/// have.
 fn render_decision(graph: &Graph) -> Option<RenderedBlock> {
     let (decisions, mut sources) = entity_rows(graph, &[EntityType::Decision]);
     if decisions.is_empty() {
@@ -860,19 +880,74 @@ fn render_decision(graph: &Graph) -> Option<RenderedBlock> {
     // `path` or `commit` is not a reference: it renders no row and enters no
     // source map.
     let mut evidence: Vec<(String, String, String)> = Vec::new();
-    for node in graph
-        .nodes()
-        .filter(|node| node.entity == EntityType::Source)
-    {
-        let Some(reference) = source_reference(node) else {
+
+    // Citations per decision. A decision that cites at least one Source
+    // scopes its evidence to those Sources; a decision that cites none falls
+    // back to ledger-global evidence and says so with a staleness marker.
+    let mut citations: Vec<(String, String)> = Vec::new();
+    for edge in graph.edges() {
+        if edge.relationship != Relationship::Cites {
+            continue;
+        }
+        let (Some(from), Some(to)) = (graph.node(&edge.from), graph.node(&edge.to)) else {
             continue;
         };
-        evidence.push((
-            node.id.clone(),
-            reference.clone(),
-            format!("- {} — {reference}", node.id),
-        ));
-        sources.insert(node.id.clone());
+        if from.entity != EntityType::Decision || to.entity != EntityType::Source {
+            continue;
+        }
+        citations.push((from.id.clone(), to.id.clone()));
+    }
+
+    // Complete Sources only: a Source missing or blank in `path` or `commit`
+    // is not a reference and never renders a row.
+    let complete_sources: Vec<(String, String)> = graph
+        .nodes()
+        .filter(|node| node.entity == EntityType::Source)
+        .filter_map(|node| source_reference(node).map(|reference| (node.id.clone(), reference)))
+        .collect();
+
+    let mut stale_markers: Vec<String> = Vec::new();
+    let decision_ids: Vec<String> = graph
+        .nodes()
+        .filter(|node| node.entity == EntityType::Decision)
+        .map(|node| node.id.clone())
+        .collect();
+    for decision in decision_ids {
+        let cited: Vec<&String> = citations
+            .iter()
+            .filter(|(from, _)| from == &decision)
+            .map(|(_, to)| to)
+            .collect();
+        if cited.is_empty() {
+            // No decision-source link: the evidence stays ledger-global, as
+            // before the relationship existed, and the marker says so.
+            for (source, reference) in &complete_sources {
+                evidence.push((
+                    source.clone(),
+                    reference.clone(),
+                    format!("- {source} — {reference}"),
+                ));
+                sources.insert(source.clone());
+            }
+            if !complete_sources.is_empty() {
+                stale_markers.push(attribution_stale_row(&decision));
+            }
+            continue;
+        }
+        for source in cited {
+            let Some(node) = graph.node(source) else {
+                continue;
+            };
+            let Some(reference) = source_reference(node) else {
+                continue;
+            };
+            evidence.push((
+                source.clone(),
+                format!("{reference} — see {decision}"),
+                format!("- {source} — {reference} — see {decision}"),
+            ));
+            sources.insert(source.clone());
+        }
     }
     for edge in graph.edges() {
         if edge.relationship != Relationship::Influences {
@@ -897,7 +972,11 @@ fn render_decision(graph: &Graph) -> Option<RenderedBlock> {
     evidence.sort();
     evidence.dedup();
 
-    let evidence_lines: Vec<String> = evidence.into_iter().map(|(_, _, line)| line).collect();
+    let mut evidence_lines: Vec<String> = evidence.into_iter().map(|(_, _, line)| line).collect();
+    // The markers end the Evidence section so a ledger-global attribution is
+    // never mistaken for per-decision scoping.
+    stale_markers.sort();
+    evidence_lines.extend(stale_markers);
 
     let mut body = String::new();
     push_heading(&mut body, 3, "Decisions", &decisions);

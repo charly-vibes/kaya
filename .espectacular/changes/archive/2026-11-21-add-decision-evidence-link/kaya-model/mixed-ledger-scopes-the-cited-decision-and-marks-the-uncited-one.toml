@@ -1,0 +1,11 @@
+tool_version = "0.12.2"
+
+id = "mixed-ledger-scopes-the-cited-decision-and-marks-the-uncited-one"
+description = "Scenario mirror: a cited decision scopes its evidence, an uncited one keeps global evidence with its marker."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.2"
+
+[tests]
+cargo = [{flags = "mixed_ledger_scopes_the_cited_decision_and_marks_the_uncited_one"}]
