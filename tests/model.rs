@@ -645,12 +645,7 @@ fn cites_direction_is_decision_to_source_exact_pair() {
 fn cites_to_an_unknown_node_is_refused_as_dangling() {
     let events = [
         entity_event("Decision", "alpha/Decision/DEC-001", json!({}), 1),
-        relationship_event(
-            "cites",
-            "alpha/Decision/DEC-001",
-            "alpha/Source/SRC-404",
-            2,
-        ),
+        relationship_event("cites", "alpha/Decision/DEC-001", "alpha/Source/SRC-404", 2),
     ];
 
     let error = expect_refusal(build(&events));

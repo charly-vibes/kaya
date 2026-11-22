@@ -59,7 +59,10 @@ fn capture_truncates_multibyte_title_without_char_boundary_panic() {
     let event = by_path(&events, record);
 
     let title = event.data["title"].as_str().expect("title present");
-    assert!(title.is_char_boundary(title.len()), "cut lands on a boundary");
+    assert!(
+        title.is_char_boundary(title.len()),
+        "cut lands on a boundary"
+    );
     assert_eq!(title.chars().count(), 80);
 }
 
@@ -116,7 +119,13 @@ fn renamed_path_event_id_keeps_stem_digest_stability() {
     let second = wai::capture(temp.path(), PROJECT).unwrap();
     let after = by_path(&second, record);
 
-    assert_eq!(before.id, after.id, "id stays path-derived, not content-derived");
+    assert_eq!(
+        before.id, after.id,
+        "id stays path-derived, not content-derived"
+    );
     assert_eq!(before.subject.id, after.subject.id);
-    assert_ne!(before.data["title"], after.data["title"], "the edit is real");
+    assert_ne!(
+        before.data["title"], after.data["title"],
+        "the edit is real"
+    );
 }

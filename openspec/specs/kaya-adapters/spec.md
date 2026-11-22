@@ -58,11 +58,7 @@ never emits conclusions about what the events mean.
 An adapter SHALL read its source's records and SHALL never write to the
 source's store, and SHALL never author content that duplicates what the
 source already owns — kaya holds projections and interpretation, the source
-holds its own truth. A bounded content-derived attribute != text ownership;
-wai keeps full text: the wai adapter MAY copy only a bounded first-heading
-title and its digest from a record's own structure, and SHALL never copy the
-artifact body or any arbitrary text. A bounded first-heading title is an
-observation of the file's own structure, not an interpretation.
+holds its own truth.
 
 #### Scenario: Adapter writes nothing to its source
 
@@ -75,6 +71,14 @@ observation of the file's own structure, not an interpretation.
 - **WHEN** the same wai decision is captured twice
 - **THEN** the second capture is acknowledged as a duplicate of the first
   (by source reference), not a second authored copy
+
+### Requirement: Bounded content-derived attributes
+
+A bounded content-derived attribute != text ownership; wai keeps full
+text: the wai adapter MAY copy only a bounded first-heading title and its
+digest from a record's own structure, and SHALL never copy the artifact
+body or any arbitrary text. A bounded first-heading title is an observation
+of the file's own structure, not an interpretation.
 
 #### Scenario: First hash-space heading becomes the title
 

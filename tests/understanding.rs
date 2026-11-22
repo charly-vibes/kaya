@@ -207,11 +207,36 @@ fn graph_with_scoped_decision_evidence() -> Graph {
         "p/Decision/d1",
         "p/Finding/f1",
     );
-    edge(&mut builder, Relationship::Cites, "p/Decision/d1", "p/Source/src1");
-    edge(&mut builder, Relationship::Cites, "p/Decision/d2", "p/Source/src2");
-    edge(&mut builder, Relationship::Cites, "p/Decision/d1", "p/Source/src3");
-    edge(&mut builder, Relationship::Cites, "p/Decision/d2", "p/Source/src3");
-    edge(&mut builder, Relationship::Cites, "p/Decision/d1", "p/Source/src5");
+    edge(
+        &mut builder,
+        Relationship::Cites,
+        "p/Decision/d1",
+        "p/Source/src1",
+    );
+    edge(
+        &mut builder,
+        Relationship::Cites,
+        "p/Decision/d2",
+        "p/Source/src2",
+    );
+    edge(
+        &mut builder,
+        Relationship::Cites,
+        "p/Decision/d1",
+        "p/Source/src3",
+    );
+    edge(
+        &mut builder,
+        Relationship::Cites,
+        "p/Decision/d2",
+        "p/Source/src3",
+    );
+    edge(
+        &mut builder,
+        Relationship::Cites,
+        "p/Decision/d1",
+        "p/Source/src5",
+    );
     builder.build().expect("graph is acyclic and complete")
 }
 
@@ -795,8 +820,8 @@ fn decisions_only_ledger_renders_no_evidence_section() {
     let dir = TempDir::new().expect("temp dir");
     let path = document_path(&dir);
 
-    let built = build_understanding(&graph_with_decisions_only(), &path)
-        .expect("understanding builds");
+    let built =
+        build_understanding(&graph_with_decisions_only(), &path).expect("understanding builds");
 
     let after = read(&path);
     assert_eq!(
