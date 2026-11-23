@@ -63,11 +63,33 @@ def record(case: ET.Element) -> dict[str, str]:
 def convert(report: Path) -> list[dict[str, str]]:
     """Every test record the report states, in report order.
 
-    Raises ET.ParseError when the report is not well-formed XML.
+    Raises ET.ParseError when the report is not well-formed XML, and
+    ValueError when it states no test case at all.
     """
     tree = ET.parse(report)
     cases = (node for node in tree.getroot().iter() if local_name(node.tag) == "testcase")
-    return [record(case) for case in cases]
+    records = [record(case) for case in cases]
+    if not records:
+        raise ValueError("the report states no test case")
+    return records
+
+
+def write_atomically(output: Path, body: str) -> None:
+    """Write `body` to `output` so a reader never sees a partial report.
+
+    The report is written to a sibling temporary file and renamed into place:
+    a rename is atomic, so the output is either the previous report or the
+    whole new one. Writing in place would leave a truncated file whose
+    surviving records still parse - a report that silently under-counts the
+    run.
+    """
+    temporary = output.with_name(output.name + ".partial")
+    try:
+        temporary.write_text(body, encoding="utf-8")
+        temporary.replace(output)
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def main() -> int:
@@ -84,10 +106,13 @@ def main() -> int:
     except OSError as err:
         print(f"junit-to-libtest: cannot read {args.report}: {err}", file=sys.stderr)
         return 1
+    except ValueError as err:
+        print(f"junit-to-libtest: {args.report} is not a test report: {err}", file=sys.stderr)
+        return 1
 
     body = "".join(json.dumps(entry) + "\n" for entry in records)
     try:
-        Path(args.output).write_text(body, encoding="utf-8")
+        write_atomically(Path(args.output), body)
     except OSError as err:
         print(f"junit-to-libtest: cannot write {args.output}: {err}", file=sys.stderr)
         return 1

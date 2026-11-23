@@ -46,6 +46,9 @@ this is an error</error>
 /// A JUnit document that is not well-formed XML.
 const MALFORMED_REPORT: &str = "<testsuites><testsuite><testcase name=\"broken\"";
 
+/// A well-formed XML document that is not a test report at all.
+const NOT_A_REPORT: &str = "<?xml version=\"1.0\"?><config><item key=\"value\"/></config>";
+
 /// Where the converter writes the report the adapter reads.
 const REPORT_PATH: &str = "cargo-test-results.jsonl";
 
@@ -253,5 +256,60 @@ fn malformed_report_is_refused_and_writes_nothing() {
     assert!(
         stderr.contains("junit.xml"),
         "the refusal names the report it could not read: {stderr}"
+    );
+}
+
+#[test]
+fn a_document_with_no_test_cases_is_refused() {
+    let dir = tempfile::tempdir().expect("temp workspace");
+    let report = write(&dir, "not-a-report.xml", NOT_A_REPORT);
+    let out = dir.path().join(REPORT_PATH);
+
+    let output = convert(&report, &out);
+
+    assert!(
+        !output.status.success(),
+        "a document that states no test case is not a report; stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        !out.exists(),
+        "a refused conversion writes no report: {}",
+        out.display()
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("not-a-report.xml"),
+        "the refusal names the document it refused: {stderr}"
+    );
+}
+
+#[test]
+fn a_refused_conversion_leaves_the_previous_report_intact() {
+    let dir = tempfile::tempdir().expect("temp workspace");
+    let good = write(&dir, "junit.xml", JUNIT_REPORT);
+    let out = dir.path().join(REPORT_PATH);
+
+    let first = convert(&good, &out);
+    assert!(
+        first.status.success(),
+        "the first conversion must succeed; stderr: {}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let before = fs::read(&out).expect("the first report is readable");
+
+    let bad = write(&dir, "broken.xml", MALFORMED_REPORT);
+    let second = convert(&bad, &out);
+
+    assert!(
+        !second.status.success(),
+        "the second conversion must fail; stdout: {}",
+        String::from_utf8_lossy(&second.stdout)
+    );
+    assert_eq!(
+        fs::read(&out).expect("the previous report is readable"),
+        before,
+        "a refused conversion leaves the previous report byte-identical, so a \
+         later import never records a half-written run"
     );
 }
