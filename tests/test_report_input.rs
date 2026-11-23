@@ -167,6 +167,21 @@ fn conversion_names_every_test_and_its_outcome() {
     );
 }
 
+/// One `kaya import test` over the converted report, asserted successful,
+/// returning the parsed envelope.
+fn import_test_report(dir: &TempDir) -> Value {
+    let imported = kaya(dir)
+        .args(["import", "test", "--report", REPORT_PATH])
+        .output()
+        .expect("kaya runs");
+    assert!(
+        imported.status.success(),
+        "the import must succeed; stderr: {}",
+        String::from_utf8_lossy(&imported.stderr)
+    );
+    parse_envelope(&imported)
+}
+
 #[test]
 fn converted_report_imports_once_and_dedupes_the_second_time() {
     let dir = tempfile::tempdir().expect("temp workspace");
@@ -182,39 +197,21 @@ fn converted_report_imports_once_and_dedupes_the_second_time() {
     let init = kaya(&dir).arg("init").output().expect("kaya runs");
     assert!(init.status.success(), "init must succeed");
 
-    let first = kaya(&dir)
-        .args(["import", "test", "--report", REPORT_PATH])
-        .output()
-        .expect("kaya runs");
-    assert!(
-        first.status.success(),
-        "the first import must succeed; stderr: {}",
-        String::from_utf8_lossy(&first.stderr)
-    );
-    let envelope = parse_envelope(&first);
-    assert_eq!(envelope["ok"], Value::Bool(true));
-    assert_eq!(envelope["data"]["source"], "test-runner");
-    assert_eq!(envelope["data"]["events"], 1, "one run is one event");
-    assert_eq!(envelope["data"]["appended"], 1);
-    assert_eq!(envelope["data"]["duplicates"], 0);
+    let first = import_test_report(&dir);
+    assert_eq!(first["ok"], Value::Bool(true));
+    assert_eq!(first["data"]["source"], "test-runner");
+    assert_eq!(first["data"]["events"], 1, "one run is one event");
+    assert_eq!(first["data"]["appended"], 1);
+    assert_eq!(first["data"]["duplicates"], 0);
 
-    let second = kaya(&dir)
-        .args(["import", "test", "--report", REPORT_PATH])
-        .output()
-        .expect("kaya runs");
-    assert!(
-        second.status.success(),
-        "the second import must succeed; stderr: {}",
-        String::from_utf8_lossy(&second.stderr)
-    );
-    let envelope = parse_envelope(&second);
+    let second = import_test_report(&dir);
     assert_eq!(
-        envelope["data"]["appended"], 0,
-        "the same report adds no second event: {envelope}"
+        second["data"]["appended"], 0,
+        "the same report adds no second event: {second}"
     );
     assert_eq!(
-        envelope["data"]["duplicates"], 1,
-        "the same report is a duplicate: {envelope}"
+        second["data"]["duplicates"], 1,
+        "the same report is a duplicate: {second}"
     );
 
     // The counted outcomes reach the record: one passed, two failed, one
