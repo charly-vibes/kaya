@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-23-kaya-yvr-document-ir-materialization, pipeline-step:red]
+---
+
+RED kaya-yvr: command=cargo test --test document_ir; expected failure=6 compile errors: E0432 unresolved import kaya::projection::ir (module missing) x5 + E0609 no field ir on report::Built x1 — precisely the missing IR surface the plan targets, no fixture/setup breakage (other suites untouched). Test shapes pinned: ir_materializes_deterministically, generated_provenance_equals_the_source_map, provenance_names_assertion_event_ids, authored_record_references_not_copies (region hash + no authored bytes in serialization), authored_hash_tracks_region_bytes, cache_outside_sources_leaves_ir_identical (CLI kaya ir + planted cache/copy), composed_record_holds_document_records. Planned API: ir::materialize(&[SourceDocument], &[RenderedDocument], &BTreeMap<page, contained record ids>) -> DocumentIr{records BTreeMap<String,Record>}; Record{id, kind GeneratedDocument{family,kind}/AuthoredBlock/Composed, content_hash, provenance, cites, artifacts, contains}; Built gains pub ir.

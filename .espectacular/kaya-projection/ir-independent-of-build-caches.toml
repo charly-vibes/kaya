@@ -1,0 +1,9 @@
+id = "ir-independent-of-build-caches"
+description = "Deleting caches, sidecars, or rendered copies outside the document sources leaves the materialized IR identical."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "cache_outside_sources_leaves_ir_identical"}]

@@ -284,6 +284,8 @@ pub struct Built {
     pub summary: Summary,
     /// Family-kinds with no source records, in block order.
     pub omitted: Vec<Omitted>,
+    /// The document IR materialized from the planned document.
+    pub ir: crate::projection::ir::DocumentIr,
 }
 
 /// The bytes and bookkeeping a projection would commit, without touching disk.
@@ -324,10 +326,19 @@ pub fn build(
     if planned.changed {
         write(path, &planned.document)?;
     }
-    Ok(Built {
-        summary: planned.summary,
+    Ok(built(path, planned))
+}
+
+/// Assemble the built result: canonicalize the summary's source map into the
+/// record provenance and materialize the document IR from the planned bytes.
+fn built(path: &Path, planned: Planned) -> Built {
+    let mut summary = planned.summary;
+    let ir = crate::projection::ir::for_document(path, &planned.document, &mut summary);
+    Built {
+        summary,
         omitted: planned.omitted,
-    })
+        ir,
+    }
 }
 
 /// The bytes and bookkeeping `build` would commit, without touching disk.
@@ -434,10 +445,7 @@ pub fn build_understanding(graph: &Graph, path: &Path) -> Result<Built, Projecti
     let existing = read_existing(path)?;
     let planned = plan_understanding(graph, existing.as_deref())?;
     commit_project_document(path, &planned)?;
-    Ok(Built {
-        summary: planned.summary,
-        omitted: planned.omitted,
-    })
+    Ok(built(path, planned))
 }
 
 /// The bytes and bookkeeping `build_understanding` would commit.
@@ -472,10 +480,7 @@ pub fn build_overview(graph: &Graph, path: &Path) -> Result<Built, ProjectionErr
     let existing = read_existing(path)?;
     let planned = plan_overview(graph, existing.as_deref())?;
     commit_project_document(path, &planned)?;
-    Ok(Built {
-        summary: planned.summary,
-        omitted: planned.omitted,
-    })
+    Ok(built(path, planned))
 }
 
 /// The bytes and bookkeeping `build_overview` would commit.
@@ -1075,7 +1080,7 @@ fn authored_blocks(doc: &str) -> Vec<(String, String)> {
 ///
 /// The marker text is kept verbatim so a refusal can quote exactly what the
 /// author wrote. A marker with no ids is well-formed and cites nothing.
-fn citation_markers(body: &str) -> Vec<(&str, Vec<String>)> {
+pub(crate) fn citation_markers(body: &str) -> Vec<(&str, Vec<String>)> {
     let mut markers = Vec::new();
     let mut cursor = 0usize;
     while let Some(found) = body[cursor..].find(CITES_PREFIX) {

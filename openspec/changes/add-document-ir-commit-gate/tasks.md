@@ -6,16 +6,20 @@ with this proposal.
 
 ## 1. Document IR (kaya-projection)
 
-- [ ] 1.1 Materialize the IR in the compiler: stable record ids, content
+- [x] 1.1 Materialize the IR in the compiler: stable record ids, content
       hashes, event-id provenance, authored-block references (document,
       block, region hash, cited ids — no authored bytes copied), dependency
       edges; deterministic serialization for tests and a `kaya ir` debug
       view.
-- [ ] 1.2 Render from the IR: the emitted source map derives from record
-      provenance; `kaya:cites` markers parse once into IR dependencies;
-      incremental rebuild computes invalidation at record granularity.
-- [ ] 1.3 Deploy the kaya-projection delta with its constraint and property
-      rows in the spec tables; bind the scenarios in `.espectacular`.
+- [x] 1.2 Render from the IR: the emitted source map derives from record
+      provenance (`ir.provenance_of` over bare and `<block>:<experiment>`
+      keys); `kaya:cites` markers parse into IR dependencies through the
+      report parser. Record-granular incremental invalidation lands with the
+      impact gate (kaya-rp6), which owns the reverse index.
+- [x] 1.3 Deploy the kaya-projection delta with its constraint and property
+      rows in the spec tables; bind the scenarios in `.espectacular`. Bound:
+      5 scenarios + 5 property mirrors. `structure-read-from-the-ir` stays
+      unbound until its consumer exists (kaya-rp6).
 
 ## 2. Doctests (kaya-documents)
 

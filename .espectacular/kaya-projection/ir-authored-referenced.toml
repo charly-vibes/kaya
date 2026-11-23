@@ -1,0 +1,9 @@
+id = "ir-authored-referenced"
+description = "Property mirror: authored blocks are referenced, never copied."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "authored_record_references_not_copies"}]

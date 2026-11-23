@@ -1,0 +1,9 @@
+id = "identical-state-yields-identical-ir"
+description = "Materializing the document IR twice from identical state yields identical record ids, hashes, edges, and validation state."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "ir_materializes_deterministically"}]

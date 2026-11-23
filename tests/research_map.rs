@@ -385,8 +385,12 @@ fn map_is_deterministic_and_idempotent() {
     let second_path = dir.path().join("second.md");
     let graph = edge_graph();
 
-    let first = build(&graph, &first_path, 4).expect("the research map must build");
-    let second = build(&graph, &second_path, 4).expect("the research map must build");
+    let first = build(&graph, &first_path, 4)
+        .expect("the research map must build")
+        .summary;
+    let second = build(&graph, &second_path, 4)
+        .expect("the research map must build")
+        .summary;
 
     assert_eq!(
         read(&first_path),
@@ -399,7 +403,9 @@ fn map_is_deterministic_and_idempotent() {
     let bytes = read(&first_path);
     let modified = fs::metadata(&first_path).unwrap().modified().unwrap();
 
-    let third = build(&graph, &first_path, 4).expect("the research map must rebuild");
+    let third = build(&graph, &first_path, 4)
+        .expect("the research map must rebuild")
+        .summary;
 
     assert!(
         third.recomputed.is_empty(),

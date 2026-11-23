@@ -85,6 +85,8 @@ pub struct Built {
     pub summary: Summary,
     /// Family-kinds with no source records, in block order.
     pub omitted: Vec<Omitted>,
+    /// The document IR materialized from the planned documents.
+    pub ir: crate::projection::ir::DocumentIr,
 }
 
 /// One reuse document's planned bytes, before the write phase.
@@ -137,6 +139,7 @@ pub fn build(inputs: &Inputs, out: &Path) -> Result<Built, ProjectionError> {
 
     let mut summary = Summary::default();
     let mut omitted = Vec::new();
+    let mut ir = crate::projection::ir::DocumentIr::default();
     for planned in plan(inputs, out, &existing)? {
         let previous = existing.get(&planned.path).cloned().flatten();
         match &planned.document {
@@ -152,11 +155,22 @@ pub fn build(inputs: &Inputs, out: &Path) -> Result<Built, ProjectionError> {
                 }
             }
         }
-        merge(&mut summary, planned.summary);
+        let mut planned_summary = planned.summary;
+        let planned_ir = crate::projection::ir::for_document(
+            &planned.path,
+            planned.document.as_deref().unwrap_or(""),
+            &mut planned_summary,
+        );
+        ir.records.extend(planned_ir.records);
+        merge(&mut summary, planned_summary);
         omitted.extend(planned.omitted);
     }
 
-    Ok(Built { summary, omitted })
+    Ok(Built {
+        summary,
+        omitted,
+        ir,
+    })
 }
 
 /// The bytes each reuse document would hold, without touching the disk.

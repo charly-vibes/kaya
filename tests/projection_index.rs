@@ -90,7 +90,7 @@ fn authored_and_foreign_bytes_survive_recomputation() {
         EntityType::Question,
         json!({"title": "Why?"}),
     )]);
-    let summary = index::build(&graph, &path, 3).unwrap();
+    let summary = index::build(&graph, &path, 3).unwrap().summary;
     assert_eq!(summary.recomputed, vec![BLOCK.to_owned()]);
 
     let rebuilt = read(&path);
@@ -189,12 +189,12 @@ fn second_build_reports_unchanged_and_does_not_rewrite() {
         json!({"title": "Choose A"}),
     )]);
 
-    let first = index::build(&graph, &path, 3).unwrap();
+    let first = index::build(&graph, &path, 3).unwrap().summary;
     assert_eq!(first.recomputed, vec![BLOCK.to_owned()]);
     let bytes = read(&path);
     let modified = fs::metadata(&path).unwrap().modified().unwrap();
 
-    let second = index::build(&graph, &path, 3).unwrap();
+    let second = index::build(&graph, &path, 3).unwrap().summary;
     assert!(second.recomputed.is_empty());
     assert_eq!(second.unchanged, vec![BLOCK.to_owned()]);
     assert_eq!(read(&path), bytes);
@@ -231,7 +231,7 @@ fn new_node_recomputes_only_the_generated_block() {
             json!({"title": "Second"}),
         ),
     ]);
-    let summary = index::build(&second_graph, &path, 4).unwrap();
+    let summary = index::build(&second_graph, &path, 4).unwrap().summary;
     assert_eq!(summary.recomputed, vec![BLOCK.to_owned()]);
     assert!(summary.unchanged.is_empty());
 
@@ -289,7 +289,7 @@ fn sources_name_every_rendered_node_and_order_is_deterministic() {
         ),
     ]);
 
-    let summary = index::build(&graph, &path, 3).unwrap();
+    let summary = index::build(&graph, &path, 3).unwrap().summary;
     let document = read(&path);
     let rendered: Vec<&str> = document
         .lines()
@@ -347,7 +347,7 @@ fn artifact_and_run_sections_render_attributes_and_feed_sources() {
         ("p/Artifact/A-3", EntityType::Artifact, json!({})),
     ]);
 
-    let summary = index::build(&graph, &path, 3).unwrap();
+    let summary = index::build(&graph, &path, 3).unwrap().summary;
     let document = read(&path);
 
     assert!(

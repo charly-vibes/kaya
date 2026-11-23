@@ -1,0 +1,9 @@
+id = "ir-containment-edges"
+description = "Property mirror: composed records hold containment edges."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "composed_record_holds_document_records"}]

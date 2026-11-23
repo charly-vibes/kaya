@@ -33,6 +33,7 @@ never finding out.
 | citation_markers         | invariant | `every id in a kaya:cites marker resolves to an admitted event; an unknown id is refused naming document, marker, and id; markers outside authored blocks are inert`                                   | [[kaya.projection]] |
 | staleness_scope          | invariant | `a cited id ages its block only when a supersede changes that id's effective data; newly appended events never age a block`                                                                          | [[kaya.projection]] |
 | acknowledgment_effect    | invariant | `a human-recorded acknowledgment clears exactly the named document, block, and cited ids, refuses an unknown document or block, never alters authored bytes, and never enters the research graph (verification events are ignored by the model)`    | [[kaya.projection]] |
+| document_ir              | invariant | `the compiler materializes a deterministic document IR between the ledger-model state and every rendered projection: records carry stable ids, content hashes, and their event ids; generated records come from the compiler's rendering results, authored blocks are referenced by document, block, region hash, and cited ids and never copied, composed records hold containment edges to the records they contain; rendered projections compile from the IR and the emitted source map equals record provenance`    | [[kaya.projection]] |
 
 ## Model
 
@@ -62,6 +63,11 @@ never finding out.
 | markers_validated        | unit | [[kaya.projection.citation_markers]]      | `authored_block_with_unknown_cite()` | `build refuses ∧ names marker and id`                    |
 | corrections_only         | unit | [[kaya.projection.staleness_scope]]       | `new_event_for_cited_block()`        | `not stale unless a cited id was superseded`             |
 | ack_scoped               | unit | [[kaya.projection.acknowledgment_effect]] | `half_acknowledged_block()`          | `stale until every changed id is acknowledged ∧ bytes unchanged` |
+| ir_deterministic         | unit | [[kaya.projection.document_ir]]          | `same_state_built_twice()`           | `identical state yields identical record ids, hashes, edges` |
+| ir_provenance_complete   | unit | [[kaya.projection.document_ir]]          | `arbitrary_generated_block()`        | `emitted source map entry == record provenance`          |
+| ir_authored_referenced   | unit | [[kaya.projection.document_ir]]          | `authored_block_with_cites()`        | `record names document ∧ block ∧ region hash ∧ cites ∧ stores no bytes` |
+| ir_cache_independent     | unit | [[kaya.projection.document_ir]]          | `planted_cache_and_copy()`           | `deleting caches/sidecars/copies outside sources leaves the IR identical` |
+| ir_containment_edges     | unit | [[kaya.projection.document_ir]]          | `composed_page_over_documents()`     | `composed record holds edges to contained document records` |
 
 ## Requirements
 
@@ -205,6 +211,48 @@ accepted and SHALL have no effect.
 - **WHEN** `kaya acknowledge` names a document or block that does not exist
 - **THEN** it fails with a labeled error and appends no event
 
+### Requirement: Document IR materialization
+
+The compiler SHALL materialize a deterministic document IR between the
+ledger-model state and every rendered projection, and SHALL compile every
+rendered projection from it. Each record SHALL carry a stable id, a content
+hash, and its event ids; records SHALL cover generated documents (family and
+kind), authored blocks, and composed records; edges SHALL link a record to
+the event ids, cited ids, source artifacts, and contained records it depends
+on.
+
+#### Scenario: Identical state yields identical IR
+
+- **WHEN** the document IR is materialized twice from identical ledger,
+  graph, and document-source state
+- **THEN** both materializations are identical — same record ids, hashes,
+  edges, and validation state
+
+#### Scenario: Provenance complete per record
+
+- **WHEN** a generated record is derived from ledger events
+- **THEN** the record names those event ids, and the emitted source map for
+  its rendered block is exactly that provenance
+
+#### Scenario: Authored block referenced, not copied
+
+- **WHEN** an authored block is modeled in the IR
+- **THEN** its record names the document and the block, carries the region
+  hash and its cited ids, and stores none of the authored bytes
+
+#### Scenario: IR independent of build caches
+
+- **WHEN** a build cache, stale sidecar, or rendered copy outside the
+  document sources is deleted and the IR is materialized
+- **THEN** the IR is identical to the materialization before the deletion
+
+#### Scenario: Containment edges carry transitive impact
+
+- **WHEN** a composed record — a publication page or collection — holds a
+  document record
+- **THEN** the composed record holds an edge to that document record, so a
+  change reaching the document reaches the composed record's impact set
+
 ### Requirement: Property coverage mirror
 
 Every property row in the layer sidecar SHALL be verified by exactly one
@@ -263,3 +311,34 @@ dedicated scenario.
 - **WHEN** a block has two changed cited ids and only one is acknowledged
 - **THEN** the block remains stale naming the other id, bytes unchanged
 - **VERIFIES** [[kaya.projection.acknowledgment_effect]]
+
+#### Scenario: ir_deterministic
+
+- **WHEN** identical state is materialized twice
+- **THEN** the two IRs are identical
+- **VERIFIES** [[kaya.projection.document_ir]]
+
+#### Scenario: ir_provenance_complete
+
+- **WHEN** a generated block's source map entry is compared with its record
+- **THEN** the record provenance equals the emitted map entry
+- **VERIFIES** [[kaya.projection.document_ir]]
+
+#### Scenario: ir_authored_referenced
+
+- **WHEN** an authored block with cited evidence is modeled
+- **THEN** the record names document, block, region hash, and cites and
+  stores none of the authored bytes
+- **VERIFIES** [[kaya.projection.document_ir]]
+
+#### Scenario: ir_cache_independent
+
+- **WHEN** a build cache and a rendered copy outside the sources are planted
+- **THEN** the materialized IR is unchanged
+- **VERIFIES** [[kaya.projection.document_ir]]
+
+#### Scenario: ir_containment_edges
+
+- **WHEN** a composed page holds document records
+- **THEN** the page record contains those document record ids
+- **VERIFIES** [[kaya.projection.document_ir]]

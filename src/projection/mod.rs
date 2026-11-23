@@ -21,6 +21,7 @@ use std::path::Path;
 use crate::model::Node;
 
 pub mod index;
+pub mod ir;
 pub mod report;
 pub mod reuse;
 

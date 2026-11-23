@@ -1,0 +1,9 @@
+id = "authored-block-referenced-not-copied"
+description = "An authored record names document, block, region hash, and cites and stores none of the authored bytes."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "authored_record_references_not_copies"}]

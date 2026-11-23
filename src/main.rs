@@ -25,7 +25,9 @@ use kaya::adapters::{AdapterError, git, testrunner, turu, wai};
 use kaya::envelope::Envelope;
 use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, new_id, parse_line};
 use kaya::model::{self, EntityType, ModelError};
-use kaya::projection::{ProjectionError, StaleBlock, Summary, index, report, reuse};
+use kaya::projection::{
+    BlockKind, ProjectionError, StaleBlock, Summary, index, ir, report, reuse, scan,
+};
 use kaya::promotion::{self, PromotionError, PromotionState};
 use kaya::publication;
 use kaya::verification;
@@ -70,6 +72,18 @@ enum Command {
         #[arg(long, default_value = "docs/research", value_name = "DIR")]
         out: PathBuf,
         /// Refuse to build unless the ledger's digest is exactly this hex value
+        #[arg(long, value_name = "HEX")]
+        expect_digest: Option<String>,
+        /// Accept an untracked ledger whose history git cannot verify
+        #[arg(long)]
+        allow_uncommitted: bool,
+    },
+    /// Print the document IR of the record without writing anything
+    Ir {
+        /// Research projection directory read for its document sources
+        #[arg(long, default_value = "docs/research", value_name = "DIR")]
+        out: PathBuf,
+        /// Refuse to materialize unless the ledger's digest is exactly this hex value
         #[arg(long, value_name = "HEX")]
         expect_digest: Option<String>,
         /// Accept an untracked ledger whose history git cannot verify
@@ -229,6 +243,11 @@ fn main() -> ExitCode {
             expect_digest,
             allow_uncommitted,
         } => cmd_build(&out, expect_digest.as_deref(), allow_uncommitted),
+        Command::Ir {
+            out,
+            expect_digest,
+            allow_uncommitted,
+        } => cmd_ir(&out, expect_digest.as_deref(), allow_uncommitted),
         Command::Publish { out } => cmd_publish(&out),
         Command::Check {
             root,
@@ -665,7 +684,8 @@ fn cmd_build(
     })?;
     let index_path = out.join("index.md");
     let mut summary = index::build(&graph, &index_path, report::recorded_event_count(&events))
-        .map_err(projection_failure)?;
+        .map_err(projection_failure)?
+        .summary;
     flag_stale_authored(&mut summary, &index_path, &changed_ids, &known_ids, &events)?;
 
     let experiments: Vec<String> = graph
@@ -790,6 +810,151 @@ fn cmd_build(
             "ledger_digest": ledger_digest,
         }),
     ))
+}
+
+/// Print the document IR of the compiled record without writing anything.
+///
+/// The plans run read-only against the existing document sources and the
+/// ledger: nothing outside the document sources and the ledger feeds the IR,
+/// so build caches and stale sidecars cannot change it. The IR covers the
+/// research index, every experiment report, the understanding and overview
+/// documents, and the reuse family.
+fn cmd_ir(
+    out: &Path,
+    expect_digest: Option<&str>,
+    allow_uncommitted: bool,
+) -> Result<Envelope, Failure> {
+    let (events, _) = read_build_ledger(expect_digest, allow_uncommitted)?;
+    let graph = model::build(&events).map_err(model_failure)?;
+    let state = PromotionState::from_events(&events).map_err(promotion_failure)?;
+
+    let mut collector = IrCollector::default();
+
+    let index_path = out.join("index.md");
+    let existing = read_document(&index_path)?;
+    let (document, summary) = index::plan(
+        &graph,
+        &index_path,
+        existing.as_deref(),
+        report::recorded_event_count(&events),
+    )
+    .map_err(projection_failure)?;
+    collector.collect(&index_path, &document, summary);
+
+    let experiments: Vec<String> = graph
+        .nodes()
+        .filter(|node| node.entity == EntityType::Experiment)
+        .map(|node| node.id.clone())
+        .collect();
+    let experiments_dir = out.join("experiments");
+    for experiment_id in experiments {
+        let report_path = experiments_dir.join(format!("{}.md", experiment_id.replace('/', "-")));
+        let existing = read_document(&report_path)?;
+        let planned = report::plan(&graph, &experiment_id, existing.as_deref(), &state)
+            .map_err(projection_failure)?;
+        collector.collect(&report_path, &planned.document, planned.summary);
+    }
+
+    let understanding_path = out.join("understanding.md");
+    let existing = read_document(&understanding_path)?;
+    let planned =
+        report::plan_understanding(&graph, existing.as_deref()).map_err(projection_failure)?;
+    collector.collect(&understanding_path, &planned.document, planned.summary);
+
+    let overview_path = out.join("overview.md");
+    let existing = read_document(&overview_path)?;
+    let planned = report::plan_overview(&graph, existing.as_deref()).map_err(projection_failure)?;
+    collector.collect(&overview_path, &planned.document, planned.summary);
+
+    let reuse_inputs = reuse::inputs(&graph).map_err(projection_failure)?;
+    let mut existing_map = BTreeMap::new();
+    for (_, path) in reuse::documents(out) {
+        let document = read_document(&path)?;
+        existing_map.insert(path, document);
+    }
+    for planned in reuse::plan(&reuse_inputs, out, &existing_map).map_err(projection_failure)? {
+        let reuse::PlannedDocument {
+            path,
+            document,
+            summary,
+            ..
+        } = planned;
+        if let Some(document) = document {
+            collector.collect(&path, &document, summary);
+        }
+    }
+
+    let document_ir = ir::materialize(&collector.sources, &collector.rendered, &BTreeMap::new());
+    let payload = serde_json::to_value(&document_ir).map_err(|error| {
+        failure(
+            "ir-serialize",
+            format!("failed to serialize the document IR: {error}"),
+        )
+    })?;
+    Ok(Envelope::ok("ir", payload))
+}
+
+/// Read a document source, treating absence as no document.
+///
+/// Mirrors the projection reader's semantics without crossing into the
+/// library's crate-private surface.
+fn read_document(path: &Path) -> Result<Option<String>, Failure> {
+    match fs::read_to_string(path) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(failure(
+            "ir-io",
+            format!("failed to read {}: {error}", path.display()),
+        )),
+    }
+}
+
+/// Accumulates the document sources and rendered blocks the IR materializes
+/// from.
+#[derive(Default)]
+struct IrCollector {
+    sources: Vec<ir::SourceDocument>,
+    rendered: Vec<ir::RenderedDocument>,
+}
+
+impl IrCollector {
+    /// Record one planned document: its bytes as a source, its generated
+    /// blocks as rendered records.
+    fn collect(&mut self, path: &Path, document: &str, summary: Summary) {
+        let path_string = path.to_string_lossy().to_string();
+        self.sources.push(ir::SourceDocument {
+            path: path_string.clone(),
+            bytes: document.to_string(),
+        });
+        let blocks: Vec<ir::RenderedBlock> = scan(document)
+            .map_err(|error| {
+                failure(
+                    "ir-grammar",
+                    format!(
+                        "{} broke the managed-block grammar: {error}",
+                        path.display()
+                    ),
+                )
+            })
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|block| match block.kind {
+                BlockKind::Generated(name) => {
+                    let provenance = ir::provenance_of(&summary, &name);
+                    Some(ir::RenderedBlock {
+                        name,
+                        body: block.body,
+                        provenance,
+                    })
+                }
+                BlockKind::Authored => None,
+            })
+            .collect();
+        self.rendered.push(ir::RenderedDocument {
+            path: path_string,
+            blocks,
+        });
+    }
 }
 
 /// Compose the eleven declared products and both declared packages over the

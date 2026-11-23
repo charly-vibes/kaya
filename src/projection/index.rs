@@ -25,6 +25,15 @@ use super::{
 /// Name of the generated block this projection owns.
 pub const RESEARCH_MAP_BLOCK: &str = "orientation.research-map";
 
+/// The result of the index projection: bookkeeping plus the document IR.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Built {
+    /// Recomputed, unchanged, and source-map bookkeeping.
+    pub summary: Summary,
+    /// The document IR materialized from the planned document.
+    pub ir: crate::projection::ir::DocumentIr,
+}
+
 /// Build the research map at `path` from `graph`.
 ///
 /// The existing document is validated against the closed generated-block
@@ -36,13 +45,14 @@ pub const RESEARCH_MAP_BLOCK: &str = "orientation.research-map";
 /// [`Summary::recomputed`]. [`Summary::sources`] maps the block name to every
 /// rendered node id. The trailing summary line reports `event_count` events,
 /// the number of ledger records the graph was built from.
-pub fn build(graph: &Graph, path: &Path, event_count: usize) -> Result<Summary, ProjectionError> {
+pub fn build(graph: &Graph, path: &Path, event_count: usize) -> Result<Built, ProjectionError> {
     let existing = read_existing(path)?;
-    let (document, summary) = plan(graph, path, existing.as_deref(), event_count)?;
+    let (document, mut summary) = plan(graph, path, existing.as_deref(), event_count)?;
     if existing.as_deref() != Some(document.as_str()) {
         write(path, &document)?;
     }
-    Ok(summary)
+    let ir = crate::projection::ir::for_document(path, &document, &mut summary);
+    Ok(Built { summary, ir })
 }
 
 /// The bytes and bookkeeping `build` would commit, without touching the disk.

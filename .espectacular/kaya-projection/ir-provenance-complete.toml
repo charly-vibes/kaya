@@ -1,0 +1,9 @@
+id = "ir-provenance-complete"
+description = "Property mirror: the emitted source map entry equals the record provenance."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "generated_provenance_equals_the_source_map"}]

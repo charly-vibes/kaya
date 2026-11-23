@@ -1,0 +1,9 @@
+id = "ir-cache-independent"
+description = "Property mirror: caches and copies outside the sources cannot change the IR."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "cache_outside_sources_leaves_ir_identical"}]
