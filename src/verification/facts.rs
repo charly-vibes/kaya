@@ -18,22 +18,16 @@ use chrono::{DateTime, FixedOffset};
 use serde::Serialize;
 
 use crate::event::Event;
+use crate::model::{
+    ARTIFACT_OBSERVED_EVENT, COMMIT_OBSERVED_EVENT, ENTRY_OBSERVED_EVENT, RUN_COMPLETED_EVENT,
+};
 use crate::projection::{self, BlockKind, ProjectionError};
 
 /// The canonical `events_by_source` keys, in report order.
 ///
 /// A capture family or provenance names the source; no other name, and in
 /// particular no actor name, ever becomes a key.
-pub const SOURCES: [&str; 4] = ["wai", "git", "test-runner", "model"];
-
-/// The event type the git adapter records one commit as.
-const CAPTURE_COMMIT: &str = "capture.commit.observed";
-
-/// The event type the test-runner adapter records one run as.
-const RUN_COMPLETED: &str = "experiment.run.completed";
-
-/// The event type the wai adapter records one artifact as.
-const CAPTURE_ARTIFACT: &str = "capture.artifact.observed";
+pub const SOURCES: [&str; 5] = ["wai", "git", "test-runner", "model", "turu"];
 
 /// The provenance tool that makes an artifact observation a wai source.
 const WAI_TOOL: &str = "wai";
@@ -101,9 +95,10 @@ fn events_by_source(events: &[Event]) -> BTreeMap<String, usize> {
 /// The canonical source an event belongs to, from its type and provenance.
 fn source_of(event: &Event) -> Option<&'static str> {
     match event.r#type.as_str() {
-        CAPTURE_COMMIT => Some("git"),
-        RUN_COMPLETED => Some("test-runner"),
-        CAPTURE_ARTIFACT if event.provenance.tool == WAI_TOOL => Some("wai"),
+        COMMIT_OBSERVED_EVENT => Some("git"),
+        RUN_COMPLETED_EVENT => Some("test-runner"),
+        ARTIFACT_OBSERVED_EVENT if event.provenance.tool == WAI_TOOL => Some("wai"),
+        ENTRY_OBSERVED_EVENT => Some("turu"),
         other if other.starts_with("model.") => Some("model"),
         _ => None,
     }
@@ -121,7 +116,7 @@ fn source_of(event: &Event) -> Option<&'static str> {
 fn last_capture_commit(events: &[Event]) -> Option<String> {
     events
         .iter()
-        .filter(|event| event.r#type == CAPTURE_COMMIT)
+        .filter(|event| event.r#type == COMMIT_OBSERVED_EVENT)
         .filter(|event| event.data.get("sha").is_some_and(|sha| sha.is_string()))
         .max_by(|left, right| {
             compare_timestamps(&left.timestamp, &right.timestamp)

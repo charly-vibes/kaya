@@ -59,7 +59,7 @@ kaya challenge <conclusion> --events <id>... --actor <name>
   `ledger_digest`, `last_capture_commit`, `newest_event_at`,
   `events_by_source`, `emitted_kinds`, and `omitted_kinds`; kaya evaluates no
   thresholds. `--require-kind <family.kind>`, `--require-source
-  <wai|git|test-runner|model>`, and `--fail-on-stale-authored` turn those
+  <wai|git|test-runner|model|turu>`, and `--fail-on-stale-authored` turn those
   findings into exit 1.
 - Authored prose may cite ledger evidence with a
   `<!-- kaya:cites <event-id> -->` marker inside a `kaya:authored` block.

@@ -607,7 +607,48 @@ const WAI_NOTE: &str = ".wai/projects/kaya/research/2026-11-18-note.md";
 
 /// The canonical `events_by_source` keys: capture family and provenance, never
 /// the actor name.
-const SOURCES: [&str; 4] = ["wai", "git", "test-runner", "model"];
+const SOURCES: [&str; 5] = ["wai", "git", "test-runner", "model", "turu"];
+
+/// A turu whisper bundle with one entry, in the layout `turu bundle pack`
+/// produces: a repo key, a scope, and the entries themselves.
+const TURU_BUNDLE: &str = concat!(
+    "{\"repo_key\":\"charly/whisper-notes\",\"scope\":\"daily-log\",\"entries\":[",
+    "{\"ts\":\"2026-01-02T03:04:05Z\",",
+    "\"id\":\"5f8a1f60bd1e3a19c2e77b0aa1c4d9e2f3b4c5d6e7f8091a2b3c4d5e6f708192\",",
+    "\"topic\":\"morning-musing\",\"text\":\"a whisper the adapter never copies\"}",
+    "]}",
+);
+
+/// Where a fixture writes the turu bundle it imports.
+const TURU_BUNDLE_PATH: &str = "whisper-2026-01.turubundle";
+
+/// Write the turu bundle under `root` and return its path.
+fn write_turu_bundle(root: &Path) -> PathBuf {
+    let path = root.join(TURU_BUNDLE_PATH);
+    fs::write(&path, TURU_BUNDLE).expect("write the turu bundle");
+    path
+}
+
+/// A record holding one turu whisper-bundle entry: import the bundle, then
+/// rebuild, publish, and commit the grown ledger, so `check` reads a record
+/// whose committed history it can verify.
+fn record_with_turu_source(root: &Path) {
+    let bundle = write_turu_bundle(root);
+    let bundle = bundle.to_str().expect("the bundle path is UTF-8");
+    run_ok(root, &["import", "turu", "--bundle", bundle]);
+    run_ok(root, &["build"]);
+    run_ok(root, &["publish"]);
+    git(root, &["add", "--all"]);
+    git(
+        root,
+        &[
+            "commit",
+            "--quiet",
+            "--message",
+            "record the imported turu observation",
+        ],
+    );
+}
 
 /// Write one human-authored research note into the wai tree.
 fn add_wai_artifact(root: &Path) {
@@ -1786,6 +1827,10 @@ fn check_sources_and_kinds_canonical() {
         counts["test-runner"], 0,
         "no run report was imported, so test-runner is zero: {envelope}"
     );
+    assert_eq!(
+        counts["turu"], 0,
+        "no turu bundle was imported, so turu is zero: {envelope}"
+    );
     assert!(
         !counts.contains_key("charly"),
         "the seed's human actor name never becomes a source key: {envelope}"
@@ -1807,6 +1852,106 @@ fn check_sources_and_kinds_canonical() {
     assert!(
         omitted.contains(&"understanding.decision-record".to_owned()),
         "the seed holds no decision, so that kind is omitted for no-records: {envelope}"
+    );
+}
+
+#[test]
+fn check_facts_turu_source() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+
+    // A record holding one turu whisper-bundle entry beside the seed's model
+    // events: the entry is observed, never interpreted, and counted under the
+    // turu source alone.
+    record_with_turu_source(root);
+
+    let output = fixture.output(&["check"]);
+
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "the record with a turu entry still verifies against its projections: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    let facts = record_facts(&envelope);
+
+    let counts = source_counts(facts);
+    assert_eq!(
+        counts["turu"], 1,
+        "the imported whisper entry counts under turu: {envelope}"
+    );
+    assert_eq!(
+        counts["wai"], 0,
+        "the turu entry is not a wai artifact: {envelope}"
+    );
+    assert_eq!(
+        counts["git"], 0,
+        "the turu entry is not a commit observation: {envelope}"
+    );
+    assert_eq!(
+        counts["test-runner"], 0,
+        "the turu entry is not a run observation: {envelope}"
+    );
+    assert_eq!(
+        counts.values().sum::<u64>(),
+        facts["events"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("check reports an integer event count: {envelope}")),
+        "the canonical counts partition every event: {envelope}"
+    );
+}
+
+#[test]
+fn check_required_source_turu_absent() {
+    let fixture = Fixture::new();
+
+    let output = fixture.output(&["check", "--require-source", "turu"]);
+
+    assert_eq!(
+        exit_code(&output),
+        1,
+        "a required turu source with no events is a violation: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        drift_entries(&envelope).is_empty(),
+        "the committed record itself matches its projections: {envelope}"
+    );
+    assert_eq!(
+        required_entries(&envelope),
+        vec![json!({
+            "area": "source",
+            "name": "turu",
+            "reason": "no-events",
+        })],
+        "the report names the absent turu source and its reason: {envelope}"
+    );
+}
+
+#[test]
+fn check_required_source_turu_satisfied() {
+    let fixture = Fixture::new();
+    let root = fixture.root();
+
+    record_with_turu_source(root);
+
+    let output = fixture.output(&["check", "--require-source", "turu"]);
+
+    assert_eq!(
+        exit_code(&output),
+        0,
+        "a satisfied turu requirement is not a violation: {}",
+        stderr(&output)
+    );
+    let envelope = parse_envelope(&output);
+    assert_check_envelope(&envelope);
+    assert!(
+        required_entries(&envelope).is_empty(),
+        "the satisfied requirement reports no unmet item: {envelope}"
     );
 }
 

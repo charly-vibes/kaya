@@ -1,0 +1,9 @@
+id = "required-turu-source-satisfied"
+description = "--require-source turu over a record holding a turu entry observation exits 0 and reports no unmet requirement."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "check_required_source_turu_satisfied"}]

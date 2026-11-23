@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bundle appends nothing (`src/adapters/turu.rs`).
 - Adapters for the `.wai/` artifact tree, git history, and libtest JSONL run
   reports (`src/adapters/`).
+- Verification facts census: `turu` joins the canonical source list, so a
+  whisper-bundle entry is counted under `turu` in `events_by_source` and
+  `--require-source turu` is a valid request that fails (exit 1, `no-events`)
+  when the record holds no turu event (`src/verification/facts.rs`).
 - `tdd-ro5u` wai pipeline config (`orient` → `plan` → `red` → `green` →
   `refactor` → `ro5u-review` → `fix-review` → `quality-ledger` →
   `ship-close`), gated on passing tests and human approval.

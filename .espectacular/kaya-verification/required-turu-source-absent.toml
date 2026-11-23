@@ -1,0 +1,9 @@
+id = "required-turu-source-absent"
+description = "--require-source turu over a record without turu events exits 1 and names turu with reason no-events."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "check_required_source_turu_absent"}]

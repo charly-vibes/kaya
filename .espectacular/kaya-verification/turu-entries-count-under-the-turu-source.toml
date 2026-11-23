@@ -1,0 +1,9 @@
+id = "turu-entries-count-under-the-turu-source"
+description = "A turu whisper-bundle entry is counted under the turu source and under no other canonical source."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "check_facts_turu_source"}]

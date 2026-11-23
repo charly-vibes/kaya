@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-22-kaya-xjp-verification-facts-census
+pipeline: tdd-ro5u
+topic: kaya-xjp verification facts census
+created_at: '2026-11-22T17:51:05.615013895+00:00'
+current_step: 8
+approvals:
+  ship-close: '2026-11-23T13:52:53.913106711+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []
