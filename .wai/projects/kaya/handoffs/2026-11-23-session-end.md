@@ -35,11 +35,12 @@ phase: research
 ### open_issues
 
 ```
+○ kaya-7es P1 Doctest execution contracts (add-document-ir-commit-gate tasks 2.x)
 ○ kaya-3tm P2 Release 0.2.0
-○ kaya-aaz P3 Design thread: DocIR, doctests, documentation commit gate
+○ kaya-rp6 P2 Impact gate kaya.impact (add-document-ir-commit-gate tasks 3.x-4.x)
 
 --------------------------------------------------------------------------------
-Total: 2 issues (2 open, 0 in progress)
+Total: 3 issues (3 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
