@@ -839,7 +839,7 @@ fn cmd_ir(
         report::recorded_event_count(&events),
     )
     .map_err(projection_failure)?;
-    collector.collect(&index_path, &document, summary);
+    collector.collect(&index_path, &document, summary)?;
 
     let experiments: Vec<String> = graph
         .nodes()
@@ -852,19 +852,19 @@ fn cmd_ir(
         let existing = read_document(&report_path)?;
         let planned = report::plan(&graph, &experiment_id, existing.as_deref(), &state)
             .map_err(projection_failure)?;
-        collector.collect(&report_path, &planned.document, planned.summary);
+        collector.collect(&report_path, &planned.document, planned.summary)?;
     }
 
     let understanding_path = out.join("understanding.md");
     let existing = read_document(&understanding_path)?;
     let planned =
         report::plan_understanding(&graph, existing.as_deref()).map_err(projection_failure)?;
-    collector.collect(&understanding_path, &planned.document, planned.summary);
+    collector.collect(&understanding_path, &planned.document, planned.summary)?;
 
     let overview_path = out.join("overview.md");
     let existing = read_document(&overview_path)?;
     let planned = report::plan_overview(&graph, existing.as_deref()).map_err(projection_failure)?;
-    collector.collect(&overview_path, &planned.document, planned.summary);
+    collector.collect(&overview_path, &planned.document, planned.summary)?;
 
     let reuse_inputs = reuse::inputs(&graph).map_err(projection_failure)?;
     let mut existing_map = BTreeMap::new();
@@ -880,7 +880,7 @@ fn cmd_ir(
             ..
         } = planned;
         if let Some(document) = document {
-            collector.collect(&path, &document, summary);
+            collector.collect(&path, &document, summary)?;
         }
     }
 
@@ -920,7 +920,10 @@ struct IrCollector {
 impl IrCollector {
     /// Record one planned document: its bytes as a source, its generated
     /// blocks as rendered records.
-    fn collect(&mut self, path: &Path, document: &str, summary: Summary) {
+    ///
+    /// A document that breaks the managed-block grammar is a labeled refusal:
+    /// the IR never silently drops a document's records.
+    fn collect(&mut self, path: &Path, document: &str, summary: Summary) -> Result<(), Failure> {
         let path_string = path.to_string_lossy().to_string();
         self.sources.push(ir::SourceDocument {
             path: path_string.clone(),
@@ -935,8 +938,7 @@ impl IrCollector {
                         path.display()
                     ),
                 )
-            })
-            .unwrap_or_default()
+            })?
             .into_iter()
             .filter_map(|block| match block.kind {
                 BlockKind::Generated(name) => {
@@ -954,6 +956,7 @@ impl IrCollector {
             path: path_string,
             blocks,
         });
+        Ok(())
     }
 }
 
