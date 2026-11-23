@@ -92,28 +92,15 @@ pub fn plan(
     // the output directory. A refusal must leave the tree byte-untouched.
     let (products, packages) = partition_declarations(decls)?;
     check_admission(&products)?;
-    let declared_products: BTreeSet<&str> =
-        products.iter().map(|decl| decl.name.as_str()).collect();
-    check_package_members(&packages, &declared_products)?;
+    check_package_members(&packages, &products)?;
     let (composed, omitted) = compose_products(&products, docs);
-    let (owners, emitted_names) = assign_owners(&composed);
+    let ownership = assign_owners(&composed);
+    // One rendering per fact: later products cross-reference the first holder.
+    let rendered = render_pages(&products, &packages, &composed, &ownership, docs);
 
-    // One rendering per fact: the first emitted product in page order carries
-    // the body; every later product cross-references it.
-    let rendered = render_pages(
-        &products,
-        &packages,
-        &composed,
-        &owners,
-        &emitted_names,
-        docs,
-    );
-
-    // Phase one: compute every byte this build publishes. Reading the existing
-    // tree is safe here, and nothing is written until every page document and
-    // the export are in hand.
+    // Phase one computes every byte this build publishes before any write.
     let pages = plan_pages(rendered, &composed, out, &mut read_text)?;
-    let export = export_json(&products, &packages, &composed, &emitted_names, docs);
+    let export = export_json(&products, &packages, &composed, &ownership.emitted, docs);
     let (export, export_path, export_previous) = plan_export(export, out, &mut read_bytes)?;
 
     // Phase two plans the pages an omitted product would have occupied: a
@@ -193,10 +180,9 @@ fn check_admission(products: &[&Decl]) -> Result<(), PublicationError> {
 }
 
 /// Check every package member: a package lists declared products, nothing else.
-fn check_package_members(
-    packages: &[&Decl],
-    declared_products: &BTreeSet<&str>,
-) -> Result<(), PublicationError> {
+fn check_package_members(packages: &[&Decl], products: &[&Decl]) -> Result<(), PublicationError> {
+    let declared_products: BTreeSet<&str> =
+        products.iter().map(|decl| decl.name.as_str()).collect();
     for package in packages {
         for member in &package.members {
             if !PRODUCTS.contains(&member.as_str()) || !declared_products.contains(member.as_str())
@@ -221,16 +207,13 @@ fn plan_pages(
         let block = block_name(tier, &name);
         let path = out.join(format!("{name}.md"));
         let previous = read_text(&path)?;
-        // A page carries one managed block, and its name must be inside the
-        // publication vocabulary: a stale block from an earlier scheme would
-        // otherwise survive beside the one this build writes, and no gate
-        // would name it.
+        // One managed block per page, named inside the publication vocabulary:
+        // a stale block from an earlier scheme would otherwise survive beside
+        // the one this build writes. Bytes outside the block are the human's
+        // and survive untouched; the block always holds exactly one rendering.
         if let Some(existing) = previous.as_deref() {
             validate_page_blocks(&path, existing)?;
         }
-        // A page is a managed block inside whatever document already lives at
-        // its path: bytes outside the block are the human's and survive
-        // untouched, while the block always holds exactly one rendering.
         let document = replace_generated(previous.as_deref().unwrap_or(""), &block, &content)
             .map_err(|error| compose_error(&path, error))?;
         planned.push(PlannedPage {

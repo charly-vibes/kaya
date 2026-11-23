@@ -258,8 +258,7 @@ fn project_site_over_overview_and_reference() {
         "no overview page exists without a backing document"
     );
 
-    let tree = read_tree(&out);
-    let pages = markdown(&tree);
+    let pages = markdown(&read_tree(&out));
     let reference_page = pages
         .get("reference.md")
         .expect("the reference page is written");

@@ -197,54 +197,6 @@ fn check_index_stale_parity() {
         })],
         "index mode names the same document, block, and evidence as the worktree: {envelope}"
     );
-
-    // A worktree-only citation with clean staged copies is invisible to an
-    // index check: the commit this tree would record does not hold it, so the
-    // stale block is the worktree's, not the index's.
-    let (noisy, noisy_cited) = record_with_a_stale_authored_block();
-    let root = noisy.root();
-
-    assert_eq!(
-        index_bytes(root, LEDGER),
-        head_bytes(root, LEDGER),
-        "the staged ledger is HEAD's clean bytes"
-    );
-    assert_eq!(
-        index_bytes(root, INDEX),
-        head_bytes(root, INDEX),
-        "the staged document is HEAD's clean bytes"
-    );
-
-    let worktree = noisy.output(&["check", "--fail-on-stale-authored"]);
-    assert_eq!(
-        exit_code(&worktree),
-        1,
-        "the worktree run reports the unstaged citation as stale: {}",
-        stderr(&worktree)
-    );
-    assert_eq!(
-        stale_entries(&parse_envelope(&worktree)),
-        vec![json!({
-            "path": INDEX,
-            "block": "authored-1",
-            "evidence": [noisy_cited],
-        })],
-        "the worktree run names the document, block, and evidence"
-    );
-
-    let output = noisy.output(&["check", "--index", "--fail-on-stale-authored"]);
-    assert_eq!(
-        exit_code(&output),
-        0,
-        "unstaged staleness does not fail an index check: {}",
-        stderr(&output)
-    );
-    let envelope = parse_envelope(&output);
-    assert_check_envelope(&envelope);
-    assert!(
-        stale_entries(&envelope).is_empty(),
-        "index mode reports no staleness from worktree bytes: {envelope}"
-    );
 }
 
 /// A worktree-only citation with clean staged copies is invisible to an index

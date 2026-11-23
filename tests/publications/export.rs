@@ -114,6 +114,14 @@ fn assert_package_rows_export(export: &Value) {
 fn export_reports_emitted_products_with_exact_keys() {
     let tmp = TempDir::new().expect("temp dir");
     let export = export_site(&tmp);
+    assert_eq!(
+        export["products"]
+            .as_array()
+            .expect("products listed")
+            .len(),
+        2,
+        "only declared products are exported: {export}"
+    );
     assert_product_rows(&export);
     assert_package_rows_export(&export);
 }

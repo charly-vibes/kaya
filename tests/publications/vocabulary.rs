@@ -72,29 +72,34 @@ fn assert_unknown_names_refused() {
     }
 }
 
+/// One product binds a reader question and an admission row of vocabulary kinds.
+fn assert_product_admission_pinned(product: &str) {
+    assert!(
+        QUESTIONS.iter().any(|(name, _)| *name == product),
+        "product {product} must declare a reader question"
+    );
+    assert!(
+        reader_question(product).is_some(),
+        "product {product} binds exactly one reader question"
+    );
+    let row = admission(product);
+    assert!(
+        !row.is_empty(),
+        "product {product} admits at least one document kind"
+    );
+    for kind in row {
+        assert!(
+            DOCUMENT_KINDS.contains(kind),
+            "the admission row for {product} names a kind outside the document vocabulary: {kind}"
+        );
+    }
+}
+
 /// Every product binds a reader question and an admission row of vocabulary
 /// kinds, and nothing outside the vocabularies resolves.
 fn assert_questions_and_admissions_pinned() {
     for product in PRODUCTS {
-        assert!(
-            QUESTIONS.iter().any(|(name, _)| *name == product),
-            "product {product} must declare a reader question"
-        );
-        assert!(
-            reader_question(product).is_some(),
-            "product {product} binds exactly one reader question"
-        );
-        let row = admission(product);
-        assert!(
-            !row.is_empty(),
-            "product {product} admits at least one document kind"
-        );
-        for kind in row {
-            assert!(
-                DOCUMENT_KINDS.contains(kind),
-                "the admission row for {product} names a kind outside the document vocabulary: {kind}"
-            );
-        }
+        assert_product_admission_pinned(product);
     }
     for (product, question) in QUESTIONS {
         assert_eq!(
@@ -111,6 +116,11 @@ fn assert_questions_and_admissions_pinned() {
 
 #[test]
 fn tier_resolved_for_every_name_and_unknown_refused() {
+    assert_eq!(
+        kind_label(resolve_name("overview").expect("overview resolves").0),
+        "product",
+        "a vocabulary name resolves to its tier"
+    );
     assert_every_name_resolves();
     assert_unknown_names_refused();
     assert_questions_and_admissions_pinned();

@@ -47,20 +47,26 @@ pub(super) fn compose_products(
     (composed, omitted)
 }
 
+/// Who renders each fact, and which publication names are emitted.
+pub(super) struct Ownership {
+    /// The first emitted product carrying each document kind's body.
+    pub(super) owners: BTreeMap<String, String>,
+    /// The names of products with a backing document.
+    pub(super) emitted: BTreeSet<String>,
+}
+
 /// Assign each kind to the first emitted product that composes it, and
 /// collect the emitted names for package member availability.
-pub(super) fn assign_owners(
-    composed: &BTreeMap<String, Vec<String>>,
-) -> (BTreeMap<String, String>, BTreeSet<String>) {
-    let mut owners: BTreeMap<String, String> = BTreeMap::new();
-    let mut emitted_names: BTreeSet<String> = BTreeSet::new();
+pub(super) fn assign_owners(composed: &BTreeMap<String, Vec<String>>) -> Ownership {
+    let mut owners = BTreeMap::new();
+    let mut emitted = BTreeSet::new();
     for (name, kinds) in composed {
-        emitted_names.insert(name.clone());
+        emitted.insert(name.clone());
         for kind in kinds {
             owners.entry(kind.clone()).or_insert_with(|| name.clone());
         }
     }
-    (owners, emitted_names)
+    Ownership { owners, emitted }
 }
 
 /// Render every page document: products first, then packages, sorted by name.
@@ -68,8 +74,7 @@ pub(super) fn render_pages(
     products: &[&Decl],
     packages: &[&Decl],
     composed: &BTreeMap<String, Vec<String>>,
-    owners: &BTreeMap<String, String>,
-    emitted: &BTreeSet<String>,
+    ownership: &Ownership,
     docs: &Documents,
 ) -> Vec<(String, Tier, String)> {
     let mut rendered: Vec<(String, Tier, String)> = Vec::new();
@@ -77,11 +82,11 @@ pub(super) fn render_pages(
         let Some(kinds) = composed.get(&product.name) else {
             continue;
         };
-        let page = render_product_page(product, kinds, owners, docs);
+        let page = render_product_page(product, kinds, &ownership.owners, docs);
         rendered.push((product.name.clone(), Tier::Product, page));
     }
     for package in packages {
-        let page = render_package_page(package, emitted);
+        let page = render_package_page(package, &ownership.emitted);
         rendered.push((package.name.clone(), Tier::Package, page));
     }
     rendered.sort_by(|left, right| left.0.cmp(&right.0));
