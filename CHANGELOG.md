@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whisper-bundle entry is counted under `turu` in `events_by_source` and
   `--require-source turu` is a valid request that fails (exit 1, `no-events`)
   when the record holds no turu event (`src/verification/facts.rs`).
+- Test report input on a stable toolchain: `scripts/junit-to-libtest.py`
+  converts the JUnit XML nextest emits into the libtest JSONL
+  `kaya import test --report` consumes, so a stable Rust toolchain can feed
+  the test-runner adapter without libtest's nightly-only `--format json`.
 - `tdd-ro5u` wai pipeline config (`orient` → `plan` → `red` → `green` →
   `refactor` → `ro5u-review` → `fix-review` → `quality-ledger` →
   `ship-close`), gated on passing tests and human approval.

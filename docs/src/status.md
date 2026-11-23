@@ -52,6 +52,37 @@ MVP-1 implements those capabilities end to end as a static research compiler.
 - Every executed command prints exactly one JSON envelope to stdout, success
   or failure; `--help` and `--version` print clap's own text.
 
+## Test report input
+
+`kaya import test --report <path>` reads a libtest JSONL report. The stable
+Rust toolchain cannot produce one: libtest's `--format json` is nightly-only,
+and stable libtest rejects `-Z unstable-options` outright. The repository
+therefore converts the JUnit XML that nextest does emit, which needs no
+nightly:
+
+```toml
+# .config/nextest.toml
+[profile.ci.junit]
+path = "junit.xml"
+```
+
+```sh
+cargo nextest run --profile ci            # writes target/nextest/ci/junit.xml
+python3 scripts/junit-to-libtest.py \
+  target/nextest/ci/junit.xml cargo-test-results.jsonl
+kaya import test --report cargo-test-results.jsonl
+```
+
+The converter names each test and the outcome its element states — a
+`<failure>` or `<error>` fails, a `<skipped>` is ignored, anything else
+passed — and refuses a report it cannot read without writing anything. The
+adapter is unchanged: the converted file is the libtest JSONL it always
+consumed.
+
+The alternative, documenting the nightly invocation
+(`cargo +nightly test -Z unstable-options --format json`), was rejected: it
+requires a nightly toolchain and an upstream format that is still unstable.
+
 ## In progress
 
 MVP-2 seams — continuous capture, agent traces, deduplication, relationship

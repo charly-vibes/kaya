@@ -30,7 +30,7 @@ kaya init                          # create .kaya/ledger.jsonl if absent
 kaya status                        # event count, byte size, digest, pending proposals
 kaya import wai                    # observe the .wai/ artifact tree
 kaya import git                    # observe recent commits
-kaya import test --report <path>    # observe one libtest JSONL run
+kaya import test --report <path>    # observe one libtest JSONL run (stable-toolchain path: docs/src/status.md)
 kaya import turu --bundle <bundle> --project <name>   # observe whisper entries from a turu bundle
 kaya import model --file <seed>    # record research-structure events from JSONL
 kaya build                         # compile docs/research (index + experiment reports)
