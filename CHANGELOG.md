@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-23
+
 ### Added
 - Repository bootstrapped on the dulce-de-leche fleet standard: wai tracking,
   beads issue tracking (no-db, tracked export), OpenSpec, lefthook gates

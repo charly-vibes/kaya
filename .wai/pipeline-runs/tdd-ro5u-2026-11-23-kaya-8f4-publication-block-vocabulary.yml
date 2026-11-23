@@ -2,8 +2,9 @@ run_id: tdd-ro5u-2026-11-23-kaya-8f4-publication-block-vocabulary
 pipeline: tdd-ro5u
 topic: kaya-8f4 publication block vocabulary
 created_at: '2026-11-23T15:08:15.831494377+00:00'
-current_step: 8
-approvals: {}
+current_step: 9
+approvals:
+  ship-close: '2026-11-23T16:10:53.864884789+00:00'
 epic: null
 child_issues: []
 child_runs: []
