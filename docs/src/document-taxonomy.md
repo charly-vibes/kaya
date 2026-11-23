@@ -40,6 +40,12 @@ principles, but do not adopt them as the taxonomy.
 
 A product is never a document kind, and a collection is never a product.
 
+Each layer owns its own managed-block vocabulary. A record document's blocks
+are named `<family>.<kind>`; a publication page carries one
+`publication.<tier>.<name>` block, with the tier and the name from that tier's
+closed vocabulary. The build refuses a managed block whose name is outside the
+vocabulary of the layer that produced it.
+
 ## Record layer: four families, eleven kinds
 
 | Family | Kind | Reader question | Source records |

@@ -1,0 +1,9 @@
+id = "tier-and-name-agree"
+description = "A publication page carrying publication.<tier>.<name> where the name belongs to another tier's vocabulary is refused."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "publication_page_with_a_name_outside_its_tier_is_refused"}]

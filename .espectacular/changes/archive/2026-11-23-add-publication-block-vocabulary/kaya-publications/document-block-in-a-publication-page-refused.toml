@@ -1,0 +1,9 @@
+id = "document-block-in-a-publication-page-refused"
+description = "A publication page carrying a document-vocabulary block name is refused, naming the block."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "publication_page_with_a_document_block_is_refused"}]

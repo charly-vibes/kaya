@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "document-block-in-a-publication-page-refused"
+description = "Document block in a publication page refused."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{ flags = "publication_page_with_a_document_block_is_refused" }]

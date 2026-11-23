@@ -169,3 +169,37 @@ Every property row in the layer sidecar SHALL be verified by exactly one dedicat
 - **WHEN** two delivery formats are projected from the same source
 - **THEN** both trace every fact to the same event ids
 - **VERIFIES** [[kaya.publications.format_attribution]]
+
+#### Scenario: page_block_owned
+
+- **WHEN** a publication page carries a managed block whose name is outside
+  the publication block vocabulary
+- **THEN** the build is refused naming the block and the page, with the page
+  byte-identical
+- **VERIFIES** [[kaya.publications.page_block_owned]]
+
+### Requirement: Publication block vocabulary
+
+A publication page SHALL carry exactly one managed block, named
+`publication.<tier>.<name>`, with `<tier>` one of the three closed tier names
+and `<name>` a member of that tier's closed vocabulary; a managed block whose
+name is outside that vocabulary SHALL be refused with a labeled error naming
+the block and the page, before any page is written.
+
+#### Scenario: Page block outside the vocabulary refused
+
+- **WHEN** a publication page carries a managed block whose name is not
+  `publication.<tier>.<name>` for that tier's vocabulary
+- **THEN** the build is refused with a labeled error naming the block and the
+  page, and the page is left byte-identical
+
+#### Scenario: Document block in a publication page refused
+
+- **WHEN** a publication page carries a document-vocabulary block name
+- **THEN** the build is refused with a labeled error naming the block
+
+#### Scenario: Tier and name agree
+
+- **WHEN** a publication page carries `publication.<tier>.<name>` and the name
+  belongs to another tier's vocabulary
+- **THEN** the build is refused with a labeled error naming the block

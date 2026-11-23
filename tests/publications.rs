@@ -2035,3 +2035,119 @@ fn read_documents_reads_a_vocabulary_kind_from_a_non_canonical_file() {
         "the page renders the compiled technical-reference body: {page}"
     );
 }
+
+// 12. kaya.publications.block_vocabulary — a publication page's managed block
+// name is inside the publication vocabulary, and a stale or misspelled one is
+// refused before anything is written.
+#[test]
+fn publication_page_with_a_misspelled_block_is_refused() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+
+    let stale = "publication.produkt.reference";
+    let page = format!(
+        "<!-- kaya:begin generated:{stale} -->\n\
+         stale body from a misspelled tier\n\
+         <!-- kaya:end generated:{stale} -->\n"
+    );
+    let page_path = out.join("reference.md");
+    fs::write(&page_path, &page).expect("the page is writable");
+
+    let decls = [product("reference", &[MAP_KIND])];
+    let docs = documents(&[(MAP_KIND, MAP_BODY, &["evt-map"])]);
+
+    let error = build(&decls, &docs, &out)
+        .expect_err("a page outside the publication vocabulary is refused");
+    assert_eq!(
+        error.label, "kaya.publications.block_vocabulary",
+        "a block outside the publication vocabulary is a labeled refusal: {}",
+        error.message
+    );
+    assert!(
+        error.message.contains(stale),
+        "the refusal names the offending block: {}",
+        error.message
+    );
+    assert!(
+        error.message.contains("reference.md"),
+        "the refusal names the page it refused: {}",
+        error.message
+    );
+    assert_eq!(
+        fs::read_to_string(&page_path).expect("the page is readable"),
+        page,
+        "a refused build leaves the page byte-identical"
+    );
+}
+
+#[test]
+fn publication_page_with_a_document_block_is_refused() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+
+    let foreign = MAP_KIND;
+    let page = format!(
+        "<!-- kaya:begin generated:{foreign} -->\n\
+         a research document block inside a publication page\n\
+         <!-- kaya:end generated:{foreign} -->\n"
+    );
+    let page_path = out.join("reference.md");
+    fs::write(&page_path, &page).expect("the page is writable");
+
+    let decls = [product("reference", &[MAP_KIND])];
+    let docs = documents(&[(MAP_KIND, MAP_BODY, &["evt-map"])]);
+
+    let error = build(&decls, &docs, &out)
+        .expect_err("a research document block inside a publication page is refused");
+    assert_eq!(
+        error.label, "kaya.publications.block_vocabulary",
+        "a document-vocabulary block in a publication page is refused: {}",
+        error.message
+    );
+    assert!(
+        error.message.contains(foreign),
+        "the refusal names the offending block: {}",
+        error.message
+    );
+    assert_eq!(
+        fs::read_to_string(&page_path).expect("the page is readable"),
+        page,
+        "a refused build leaves the page byte-identical"
+    );
+}
+
+#[test]
+fn publication_page_with_a_name_outside_its_tier_is_refused() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+
+    // "glossary" is a collection name, so it does not belong under the product
+    // tier: the vocabulary is tier-scoped, not a flat name list.
+    let wrong_tier = "publication.product.glossary";
+    let page = format!(
+        "<!-- kaya:begin generated:{wrong_tier} -->\n\
+         a collection name under the product tier\n\
+         <!-- kaya:end generated:{wrong_tier} -->\n"
+    );
+    let page_path = out.join("reference.md");
+    fs::write(&page_path, &page).expect("the page is writable");
+
+    let decls = [product("reference", &[MAP_KIND])];
+    let docs = documents(&[(MAP_KIND, MAP_BODY, &["evt-map"])]);
+
+    let error =
+        build(&decls, &docs, &out).expect_err("a name outside the tier's vocabulary is refused");
+    assert_eq!(
+        error.label, "kaya.publications.block_vocabulary",
+        "a name outside the tier vocabulary is refused: {}",
+        error.message
+    );
+    assert!(
+        error.message.contains(wrong_tier),
+        "the refusal names the offending block: {}",
+        error.message
+    );
+}

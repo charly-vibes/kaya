@@ -99,6 +99,8 @@ pub const LABEL_TIER_UNIMPLEMENTED: &str = "kaya.publications.tier_unimplemented
 pub const LABEL_DOCUMENT_KIND: &str = "kaya.publications.document_kind";
 /// Label for a generated block repeated inside one compiled document.
 pub const LABEL_DUPLICATE_BLOCK: &str = "kaya.publications.duplicate_block";
+/// Label for a managed block name outside the publication block vocabulary.
+pub const LABEL_BLOCK_VOCABULARY: &str = "kaya.publications.block_vocabulary";
 /// Label for document read and publication write failures.
 pub const LABEL_IO: &str = "kaya.publications.io";
 
@@ -248,6 +250,18 @@ impl PublicationError {
             format!(
                 "failed to read \"{}\": generated block \"{block}\" appears more than once \
                  in one compiled document",
+                file.display()
+            ),
+        )
+    }
+
+    fn block_vocabulary(file: &Path, block: &str) -> Self {
+        Self::new(
+            LABEL_BLOCK_VOCABULARY,
+            format!(
+                "failed to read \"{}\": generated block \"{block}\" is outside the publication \
+                 block vocabulary: a publication page carries one publication.<tier>.<name> block, \
+                 with the tier and the name from that tier's closed vocabulary",
                 file.display()
             ),
         )
@@ -828,6 +842,13 @@ pub fn plan(
         let block = block_name(tier, &name);
         let path = out.join(format!("{name}.md"));
         let previous = read_text(&path)?;
+        // A page carries one managed block, and its name must be inside the
+        // publication vocabulary: a stale block from an earlier scheme would
+        // otherwise survive beside the one this build writes, and no gate would
+        // name it.
+        if let Some(existing) = previous.as_deref() {
+            validate_page_blocks(&path, existing)?;
+        }
         // A page is a managed block inside whatever document already lives at
         // its path: bytes outside the block are the human's and survive
         // untouched, while the block always holds exactly one rendering.
@@ -932,6 +953,52 @@ fn block_name(tier: Tier, name: &str) -> String {
     format!("publication.{}.{name}", tier.as_str())
 }
 
+/// Whether a managed block name is inside the publication block vocabulary.
+///
+/// A publication page carries one `publication.<tier>.<name>` block, with the
+/// tier and the name from that tier's closed vocabulary. A name outside it —
+/// a misspelled tier, a name from another tier, or a document-vocabulary kind —
+/// is refused rather than left in the page beside the block the build writes.
+fn is_publication_block(name: &str) -> bool {
+    let Some(rest) = name.strip_prefix("publication.") else {
+        return false;
+    };
+    let Some((tier, entry)) = rest.split_once('.') else {
+        return false;
+    };
+    let Some(resolved) = tier_for_name(tier) else {
+        return false;
+    };
+    match resolve_name(entry) {
+        Ok((found, _)) => found == resolved,
+        Err(_) => false,
+    }
+}
+
+/// The tier a vocabulary name names, if it names one.
+fn tier_for_name(name: &str) -> Option<Tier> {
+    match name {
+        "product" => Some(Tier::Product),
+        "collection" => Some(Tier::Collection),
+        "package" => Some(Tier::Package),
+        _ => None,
+    }
+}
+
+/// Refuse a publication page carrying a managed block outside the vocabulary.
+fn validate_page_blocks(file: &Path, document: &str) -> Result<(), PublicationError> {
+    let blocks = scan(document).map_err(|error| compose_error(file, error))?;
+    for block in blocks {
+        let BlockKind::Generated(name) = block.kind else {
+            continue;
+        };
+        if !is_publication_block(&name) {
+            return Err(PublicationError::block_vocabulary(file, &name));
+        }
+    }
+    Ok(())
+}
+
 /// The heading anchor a document kind is listed under on its holder's page.
 ///
 /// The page lists each kind as an `### <kind>` heading, whose anchor keeps only
@@ -1013,6 +1080,9 @@ fn plan_removal(
             document: None,
         });
     };
+    // The page is about to lose its managed block, so any other block it
+    // carries is named before it is written back.
+    validate_page_blocks(&path, document)?;
     let carries_block = scan(document)
         .map_err(|error| compose_error(&path, error))?
         .iter()

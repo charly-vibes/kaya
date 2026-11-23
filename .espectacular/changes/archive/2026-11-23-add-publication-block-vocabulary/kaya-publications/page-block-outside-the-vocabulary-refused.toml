@@ -1,0 +1,9 @@
+id = "page-block-outside-the-vocabulary-refused"
+description = "A publication page carrying a managed block whose name is outside the publication block vocabulary is refused, naming the block and the page."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "publication_page_with_a_misspelled_block_is_refused"}]
