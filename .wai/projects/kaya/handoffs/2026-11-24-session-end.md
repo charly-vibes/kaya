@@ -35,19 +35,18 @@ phase: research
 ### git_status
 
 ```
- M .wai/pipeline-runs/tdd-ro5u-2026-11-24-kaya-7es-doctest-execution-contracts.yml
-?? .wai/projects/kaya/research/2026-11-24-ship-kaya-7es-commit-7feff24a51-feat-documents.md
+ M .wai/pipeline-runs/tdd-ro5u-2026-11-24-kaya-rp6-impact-gate.yml
+?? .wai/projects/kaya/research/2026-11-24-ship-kaya-rp6-committed-in-three-commits-on-main.md
+?? .wai/resources/pipelines/.last-run
 ```
 
 ### open_issues
 
 ```
 ○ kaya-3tm P2 Release 0.2.0
-○ kaya-rp6 P2 Impact gate kaya.impact (add-document-ir-commit-gate tasks 3.x-4.x)
-○ kaya-ys6 P3 Realign kaya-documents layer.md constraint and property tables (RO5U EXCL-001, cosmetic)
 
 --------------------------------------------------------------------------------
-Total: 3 issues (3 open, 0 in progress)
+Total: 1 issues (1 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
