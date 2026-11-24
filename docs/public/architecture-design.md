@@ -82,6 +82,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/7feff24 — 7feff24a5121fc22f2648f6f4b9bed7c75ab1712
 - kaya/Artifact/8121e40 — 8121e40e4d4e2d68c730d9c3506eadc9044140ee
 - kaya/Artifact/842cbfc — 842cbfc5f3ca18706f9ffaf78318b509a03b8bb6
+- kaya/Artifact/845e031 — 845e0316ff92b7855ecf318c0f57349949d79d27
 - kaya/Artifact/85e107b — 85e107b9c55d3916058eda68482c143e923ff586
 - kaya/Artifact/879b4d2 — 879b4d277606db28835c1f7bb3a3c5d953609df8
 - kaya/Artifact/88fad72 — 88fad729b2e70b97e33f8f115049f17acb65e908
@@ -112,6 +113,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/ab319d5 — ab319d59bb12c47e1da09783bb91c4300d61db61
 - kaya/Artifact/ad468ca — ad468ca1c267176873827c15f7a1b11b02485b22
 - kaya/Artifact/af016e5 — af016e5e6d35d05c0c5e146385b66dd650ead622
+- kaya/Artifact/afd222d — afd222d494fec2a7be1cecf9c385f93867e040f0
 - kaya/Artifact/b2ec883 — b2ec883693705b9fe6755ccf6d3de214440e1a73
 - kaya/Artifact/b439a38 — b439a38979aada65cb62213380a00304c45b47eb
 - kaya/Artifact/b4748f4 — b4748f4ccc623a1d091e8f271c6de22676944769
@@ -141,6 +143,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/d77ce26 — d77ce26ecc8618932ecbc4d3dc657781af31c5ca
 - kaya/Artifact/d798c72 — d798c7230f169dc61792d783842e87a90359b964
 - kaya/Artifact/de25f71 — de25f7145ffa17ffb1b8d1f10506ef70d656425e
+- kaya/Artifact/de6efeb — de6efeb65a4a3cb361c8aa3a7c3011129cffe1d1
 - kaya/Artifact/designs-2026-11-16-bootstrap-decisions-captured-in-openspec-changes-a — .wai/projects/kaya/designs/2026-11-16-bootstrap-decisions-captured-in-openspec-changes-a.md
 - kaya/Artifact/designs-2026-11-16-green-kaya-10k-serde-event-with-closed-field-set — .wai/projects/kaya/designs/2026-11-16-green-kaya-10k-serde-event-with-closed-field-set.md
 - kaya/Artifact/designs-2026-11-16-green-kaya-5cg-report-promotion-implemented-co — .wai/projects/kaya/designs/2026-11-16-green-kaya-5cg-report-promotion-implemented-co.md
@@ -772,6 +775,6 @@ Reader question: how is it structured and why
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_760 nodes from 891 events._
+_763 nodes from 894 events._
 
 <!-- kaya:end generated:publication.product.architecture-design -->
