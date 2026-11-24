@@ -2,9 +2,9 @@ run_id: tdd-ro5u-2026-11-24-kaya-9r2-archive-add-document-ir-commit-gate
 pipeline: tdd-ro5u
 topic: kaya-9r2 archive add-document-ir-commit-gate
 created_at: '2026-11-24T16:22:51.472844081+00:00'
-current_step: 8
+current_step: 9
 approvals:
-  ship-close: '2026-11-24T16:54:34.963206767+00:00'
+  ship-close: '2026-11-24T16:55:30.373240226+00:00'
 epic: null
 child_issues: []
 child_runs: []
