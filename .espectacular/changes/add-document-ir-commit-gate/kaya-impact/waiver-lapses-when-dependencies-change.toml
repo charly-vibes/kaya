@@ -1,0 +1,9 @@
+id = "waiver-lapses-when-dependencies-change"
+description = "A waived record whose dependency digest changes in a later change set is an unmet obligation again."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "waiver_lapses_when_dependencies_change"}]

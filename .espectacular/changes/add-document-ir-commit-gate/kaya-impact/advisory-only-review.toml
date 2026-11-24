@@ -1,0 +1,9 @@
+id = "advisory-only-review"
+description = "With only advisory findings the result is review, the exit code zero, and each finding reported with its rule."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "advisory_only_review"}]

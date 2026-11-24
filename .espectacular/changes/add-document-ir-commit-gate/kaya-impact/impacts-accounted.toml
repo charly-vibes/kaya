@@ -1,0 +1,9 @@
+id = "impacts-accounted"
+description = "An impact carrying no disposition fails the gate naming the unmet record."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "impacts_accounted"}]

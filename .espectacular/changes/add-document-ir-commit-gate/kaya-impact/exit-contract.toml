@@ -1,0 +1,9 @@
+id = "exit-contract"
+description = "The gate exits zero on a green state and nonzero exactly on fail."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "exit_contract"}]

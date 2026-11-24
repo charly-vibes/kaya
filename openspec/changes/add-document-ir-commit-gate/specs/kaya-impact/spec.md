@@ -108,7 +108,7 @@ nonzero exactly on `fail`, and advisory findings SHALL NOT block.
 - **THEN** the result is `review`, the report names each finding, and the
   exit code is zero
 
-#### Scenario: Report deterministic
+#### Scenario: Byte-identical reruns
 
 - **WHEN** the gate runs twice on the same change set and ledger state
 - **THEN** the two reports are byte-identical

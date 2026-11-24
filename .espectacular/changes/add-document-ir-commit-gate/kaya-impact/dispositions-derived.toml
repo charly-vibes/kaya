@@ -1,0 +1,9 @@
+id = "dispositions-derived"
+description = "Green checks and regenerated changed bytes establish validated and updated without recorded events."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "dispositions_derived"}]

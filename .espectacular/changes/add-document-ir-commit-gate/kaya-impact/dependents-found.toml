@@ -1,0 +1,9 @@
+id = "dependents-found"
+description = "A change touching a source path a record's edge names yields the record and its transitive dependents, each naming the identifying edge or rule."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "dependents_found"}]

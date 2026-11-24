@@ -1,0 +1,9 @@
+id = "failed-doctest-blocks"
+description = "A doctest record in the impact set whose run fails produces a fail result naming the record and the failure, with a nonzero exit."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "failed_doctest_blocks"}]

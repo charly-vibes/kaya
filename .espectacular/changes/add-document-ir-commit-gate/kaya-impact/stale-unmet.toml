@@ -1,0 +1,9 @@
+id = "stale-unmet"
+description = "A stale authored block in the impact set without its scoped acknowledgment is an unmet obligation regardless of other dispositions."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "stale_unmet"}]

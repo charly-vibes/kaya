@@ -1,0 +1,9 @@
+id = "dependent-records-identified"
+description = "A staged source path a record's edge names pulls that record and its dependents into the impact set, each naming the edge or rule that identified it."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "dependents_found"}]

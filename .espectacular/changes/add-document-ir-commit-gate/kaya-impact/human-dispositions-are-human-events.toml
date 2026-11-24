@@ -1,0 +1,9 @@
+id = "human-dispositions-are-human-events"
+description = "A waived disposition recorded with a tool actor is refused with a labeled error appending no event."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "human_actor_required"}]

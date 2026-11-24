@@ -1,0 +1,9 @@
+id = "structure-read-from-the-ir-not-from-rendered-markdown"
+description = "Impact mapping walks document-IR dependency and containment edges; records without intersecting edges are never named."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "structure_read_from_the_ir_not_from_rendered_markdown"}]

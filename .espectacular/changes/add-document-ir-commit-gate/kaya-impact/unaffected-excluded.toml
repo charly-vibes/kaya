@@ -1,0 +1,9 @@
+id = "unaffected-excluded"
+description = "A change on an orphan path leaves the impact set empty and the report says so."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "unaffected_excluded"}]
