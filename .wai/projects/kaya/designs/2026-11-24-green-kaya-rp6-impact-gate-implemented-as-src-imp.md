@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-rp6-impact-gate, pipeline-step:green]
+---
+
+GREEN kaya-rp6: impact gate implemented as src/impact.rs library module (map_impacts/dependency_digest/evaluate/Policy) plus CLI wiring (kaya impact --staged|--range, kaya disposition). The IR walk was extracted from cmd_ir into collect_document_ir so the gate reads the same record build ships; dispositions append verification.record.reviewed/waived events (ledger grammar requires three dotted segments; spec pins the verification family, not exact names). Staleness naming seam: report layer names authored regions authored-1.., IR names the first span authored — bridged in one place (ir_block_name) for the gate only. Verdict precedence per impact: stale_block > lapsed_waiver > reviewed > updated > validated > missing_disposition; failed checks are unmet failed_check regardless of disposition; stale obligations are ledger state and block even a ledger-only change set. Exit contract: 0 pass/review, 2 fail, refusals are error envelopes.

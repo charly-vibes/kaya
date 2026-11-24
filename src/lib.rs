@@ -9,6 +9,7 @@ pub mod adapters;
 pub mod doctest;
 pub mod envelope;
 pub mod event;
+pub mod impact;
 pub mod ledger;
 pub mod model;
 pub mod projection;

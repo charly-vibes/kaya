@@ -314,6 +314,28 @@ fn authored_name(kind: &BlockKind, count: &mut usize) -> Option<String> {
     })
 }
 
+/// Every managed block of `document`, named as materialization names it:
+/// authored blocks by their IR ordinal name, generated blocks by their
+/// closed-vocabulary name.
+///
+/// The projection validates grammar before planning, so a document that
+/// breaks the grammar is a caller bug here, not a refusal path.
+pub fn named_blocks(document: &str) -> Vec<(String, String)> {
+    let blocks = scan(document).unwrap_or_else(|error| {
+        panic!(
+            "named_blocks requires grammar-valid documents; the document broke the grammar: {error}"
+        )
+    });
+    let mut authored_count = 0usize;
+    blocks
+        .into_iter()
+        .filter_map(|block| {
+            let name = authored_name(&block.kind, &mut authored_count)?;
+            Some((name, block.body))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -389,9 +411,7 @@ mod tests {
     fn doctest_label_is_stable() {
         let sources = vec![SourceDocument {
             path: "docs/research/index.md".to_string(),
-            bytes: authored_document(
-                "```doctest shell #build-check\n$ echo hello\nhello\n```\n",
-            ),
+            bytes: authored_document("```doctest shell #build-check\n$ echo hello\nhello\n```\n"),
         }];
         let materialized = materialize(&sources, &[], &BTreeMap::new());
         assert!(
@@ -411,10 +431,7 @@ mod tests {
         }];
         let materialized = materialize(&sources, &[], &BTreeMap::new());
         assert!(
-            !materialized
-                .records
-                .keys()
-                .any(|id| id.contains("doctest")),
+            !materialized.records.keys().any(|id| id.contains("doctest")),
             "no doctest record for an undeclared fence: {:?}",
             materialized.records.keys().collect::<Vec<_>>()
         );

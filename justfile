@@ -86,8 +86,12 @@ spec-validate:
 # === CI ===
 
 # Full CI pipeline — the same command ci.yml runs
-ci: test lint docs validate spec-lint spec-validate
+ci: test lint docs validate spec-lint spec-validate impact-gate
 	@echo "✅ CI pipeline passed"
+
+# Full impact pass: gate the committed change against origin/main
+impact-gate:
+	cargo run --quiet -- impact --range origin/main
 
 # === Session ===
 

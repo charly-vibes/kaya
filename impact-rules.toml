@@ -1,0 +1,10 @@
+# kaya's impact policy: the rules beyond the IR dependency edges.
+# `match` globs the change set; `targets` globs the documents whose records
+# the change impacts. `mandatory` makes the gate block until each impacted
+# record carries a disposition; `advisory` reports without blocking.
+
+[[rule]]
+id = "record-sources" # the attribution the report names
+match = "docs/research/**" # edits to the record's sources
+targets = "docs/research/**" # impact every record under them
+severity = "mandatory"

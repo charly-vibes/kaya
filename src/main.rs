@@ -25,6 +25,7 @@ use kaya::adapters::{AdapterError, git, testrunner, turu, wai};
 use kaya::doctest;
 use kaya::envelope::Envelope;
 use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, new_id, parse_line};
+use kaya::impact::{self, ChangeSet};
 use kaya::model::{self, EntityType, ModelError};
 use kaya::projection::{
     BlockKind, ProjectionError, StaleBlock, Summary, index, ir, report, reuse, scan,
@@ -186,6 +187,40 @@ enum Command {
         #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
         actor_type: String,
     },
+    /// Gate a change set: the records it impacts and their obligations
+    Impact {
+        /// Gate the staged change set against HEAD
+        #[arg(long)]
+        staged: bool,
+        /// Gate the change set between this base rev and HEAD, e.g. `main` or `main..`
+        #[arg(long, value_name = "REV")]
+        range: Option<String>,
+        /// Research projection directory holding the document sources
+        #[arg(long, default_value = "docs/research", value_name = "DIR")]
+        out: PathBuf,
+        /// Wall-clock budget for one doctest run, in seconds
+        #[arg(long, default_value_t = 10, value_name = "SECS")]
+        timeout: u64,
+    },
+    /// Record a human disposition for one impacted record
+    Disposition {
+        /// Impacted record id, e.g. `docs/research/index.md#doctest-1`
+        record: String,
+        /// Disposition kind: `reviewed` or `waived`
+        kind: String,
+        /// Why the record is waived; required for `waived`
+        #[arg(long, value_name = "TEXT")]
+        rationale: Option<String>,
+        /// Name of the deciding human
+        #[arg(long, value_name = "NAME")]
+        actor: String,
+        /// Actor kind; only `human` may record dispositions
+        #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
+        actor_type: String,
+        /// Research projection directory holding the document sources
+        #[arg(long, default_value = "docs/research", value_name = "DIR")]
+        out: PathBuf,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -258,6 +293,13 @@ fn main() -> ExitCode {
                     err.to_string(),
                 ));
             }
+            _ if invoked("impact") || invoked("disposition") => {
+                return emit(Envelope::error(
+                    "error",
+                    "kaya.impact.usage",
+                    err.to_string(),
+                ));
+            }
             _ => return emit(Envelope::error("error", "usage", err.to_string())),
         },
     };
@@ -316,6 +358,32 @@ fn main() -> ExitCode {
             actor,
             actor_type,
         } => cmd_acknowledge(&document, &block, &events, &actor, &actor_type),
+        Command::Impact {
+            staged,
+            range,
+            out,
+            timeout,
+        } => {
+            return match cmd_impact(staged, range.as_deref(), &out, timeout) {
+                Ok((envelope, code)) => emit_code(envelope, code),
+                Err((label, message)) => emit(Envelope::error("error", &label, message)),
+            };
+        }
+        Command::Disposition {
+            record,
+            kind,
+            rationale,
+            actor,
+            actor_type,
+            out,
+        } => cmd_disposition(
+            &record,
+            &kind,
+            rationale.as_deref(),
+            &actor,
+            &actor_type,
+            &out,
+        ),
         Command::Doctest {
             out,
             project,
@@ -863,8 +931,27 @@ fn cmd_ir(
     allow_uncommitted: bool,
 ) -> Result<Envelope, Failure> {
     let (events, _) = read_build_ledger(expect_digest, allow_uncommitted)?;
-    let graph = model::build(&events).map_err(model_failure)?;
-    let state = PromotionState::from_events(&events).map_err(promotion_failure)?;
+    let (document_ir, _) = collect_document_ir(out, &events)?;
+    let payload = serde_json::to_value(&document_ir).map_err(|error| {
+        failure(
+            "ir-serialize",
+            format!("failed to serialize the document IR: {error}"),
+        )
+    })?;
+    Ok(Envelope::ok("ir", payload))
+}
+
+/// Materialize the document IR from the research sources, using the same
+/// projection plans build uses.
+///
+/// The gate reads the record build ships, never a parallel one, so the gate
+/// and the compiled record cannot disagree about record ids or edges.
+fn collect_document_ir(
+    out: &Path,
+    events: &[Event],
+) -> Result<(ir::DocumentIr, IrCollector), Failure> {
+    let graph = model::build(events).map_err(model_failure)?;
+    let state = PromotionState::from_events(events).map_err(promotion_failure)?;
 
     let mut collector = IrCollector::default();
 
@@ -874,7 +961,7 @@ fn cmd_ir(
         &graph,
         &index_path,
         existing.as_deref(),
-        report::recorded_event_count(&events),
+        report::recorded_event_count(events),
     )
     .map_err(projection_failure)?;
     collector.collect(&index_path, &document, summary)?;
@@ -922,14 +1009,10 @@ fn cmd_ir(
         }
     }
 
-    let document_ir = ir::materialize(&collector.sources, &collector.rendered, &BTreeMap::new());
-    let payload = serde_json::to_value(&document_ir).map_err(|error| {
-        failure(
-            "ir-serialize",
-            format!("failed to serialize the document IR: {error}"),
-        )
-    })?;
-    Ok(Envelope::ok("ir", payload))
+    Ok((
+        ir::materialize(&collector.sources, &collector.rendered, &BTreeMap::new()),
+        collector,
+    ))
 }
 
 /// Read a document source, treating absence as no document.
@@ -1724,15 +1807,18 @@ fn cmd_supersede_doctest(
             format!("{}: {error}", document.display()),
         )
     })?;
-    let contract = contracts.iter().find(|contract| contract.label == label).ok_or_else(|| {
-        failure(
-            "kaya.supersede.unknown_doctest",
-            format!(
-                "document {} declares no doctest labeled \"{label}\"",
-                document.display()
-            ),
-        )
-    })?;
+    let contract = contracts
+        .iter()
+        .find(|contract| contract.label == label)
+        .ok_or_else(|| {
+            failure(
+                "kaya.supersede.unknown_doctest",
+                format!(
+                    "document {} declares no doctest labeled \"{label}\"",
+                    document.display()
+                ),
+            )
+        })?;
     let record_id = format!("{}#{label}", document.display());
     let to_hash = doctest::contract_hash(&contract.body);
     let previous = latest_supersede(&record_id)?;
@@ -1802,4 +1888,281 @@ fn latest_supersede(record_id: &str) -> Result<Option<(String, String)>, Failure
         }
     }
     Ok(latest)
+}
+
+/// Gate a change set: map it over the document IR, derive the disposition
+/// of every impacted record, run the mandatory mechanical checks, and
+/// report `pass`, `review`, or `fail`.
+///
+/// The gate reads the same verified ledger path build reads: appended
+/// corrections and observations are visible, rewritten history is refused.
+/// Exit codes carry the verdict — 0 for pass and review, 2 for fail — while
+/// the envelope always carries the full report.
+fn cmd_impact(
+    staged: bool,
+    range: Option<&str>,
+    out: &Path,
+    timeout_secs: u64,
+) -> Result<(Envelope, u8), Failure> {
+    if staged && range.is_some() {
+        return Err(failure(
+            "kaya.impact.usage",
+            "--staged and --range are exclusive; name exactly one change source",
+        ));
+    }
+    if !staged && range.is_none() {
+        return Err(failure(
+            "kaya.impact.usage",
+            "name exactly one change source: --staged or --range <revset>",
+        ));
+    }
+    let policy = impact::Policy::load(Path::new(impact::IMPACT_RULES))
+        .map_err(|error| failure(error.label, error.message))?;
+
+    let (events, _) = read_build_ledger(None, false)?;
+    let (document_ir, collector) = collect_document_ir(out, &events)?;
+    let sources: Vec<(String, String)> = collector
+        .sources
+        .iter()
+        .map(|source| (source.path.clone(), source.bytes.clone()))
+        .collect();
+
+    let base_ref = if staged {
+        "HEAD".to_owned()
+    } else {
+        impact_base_rev(range.unwrap_or_default())?
+    };
+    let change_set = ChangeSet {
+        paths: git_changed_paths(staged, &base_ref)?,
+        event_ids: git_ledger_event_ids(staged, &base_ref)?,
+    };
+    let base_docs = base_documents(&sources, &base_ref)?;
+
+    let input = impact::GateInput {
+        ir: &document_ir,
+        sources: &sources,
+        base_docs: &base_docs,
+        events: &events,
+        changes: &change_set,
+        policy: &policy,
+        timeout: std::time::Duration::from_secs(timeout_secs),
+    };
+    let report = impact::evaluate(&input);
+    let code = if report.result == "fail" { 2 } else { 0 };
+    let payload = serde_json::to_value(&report).map_err(|error| {
+        failure(
+            "kaya.impact.serialize",
+            format!("failed to serialize the impact report: {error}"),
+        )
+    })?;
+    Ok((Envelope::ok("impact", payload), code))
+}
+
+/// Record one human disposition — a review or a waiver — for one impacted
+/// record.
+///
+/// The record must exist in the current IR; the event names it with the
+/// subject typed Document, carries the actor and, for a waiver, the
+/// rationale and the dependency digest the waiver binds. Refusals happen
+/// before any append, so a refused decision appends nothing.
+#[allow(clippy::too_many_arguments)]
+fn cmd_disposition(
+    record_id: &str,
+    kind: &str,
+    rationale: Option<&str>,
+    actor_name: &str,
+    actor_type: &str,
+    out: &Path,
+) -> Result<Envelope, Failure> {
+    if actor_type != "human" {
+        return Err(failure(
+            impact::LABEL_HUMAN_ACTOR,
+            format!(
+                "actor type \"{actor_type}\" may not record dispositions; \
+                 only a human can review or waive an impact"
+            ),
+        ));
+    }
+    let (event_type, waived) = match kind {
+        "reviewed" => (impact::REVIEWED_EVENT, false),
+        "waived" => (impact::WAIVED_EVENT, true),
+        other => {
+            return Err(failure(
+                "kaya.impact.unknown_disposition",
+                format!("unknown disposition \"{other}\": name `reviewed` or `waived`"),
+            ));
+        }
+    };
+    if waived && rationale.is_none() {
+        return Err(failure(
+            "kaya.impact.rationale_required",
+            "a waived disposition carries a rationale",
+        ));
+    }
+
+    let mut ledger = open_ledger()?;
+    let (events, _recovery) = ledger.read_recovered().map_err(ledger_failure)?;
+    let (document_ir, _collector) = collect_document_ir(out, &events)?;
+    let record = document_ir.records.get(record_id).ok_or_else(|| {
+        failure(
+            "kaya.impact.unknown_record",
+            format!(
+                "unknown record \"{record_id}\": a disposition names a record the \
+                 document IR materializes"
+            ),
+        )
+    })?;
+    let digest = impact::dependency_digest(record);
+
+    let mut data = json!({ "record": record_id, "disposition": kind });
+    if let Some(rationale) = rationale {
+        data["rationale"] = json!(rationale);
+    }
+    if waived {
+        data["digest"] = json!(digest);
+    }
+
+    let existing = events.iter().find(|event| {
+        event.r#type == event_type
+            && event.subject.r#type == report::DOCUMENT_SUBJECT
+            && event.subject.id == record_id
+            && event.data == data
+    });
+    if let Some(existing) = existing {
+        return Ok(Envelope::ok(
+            "disposition",
+            json!({ "event": existing, "appended": false }),
+        ));
+    }
+
+    let event = Event {
+        id: new_id(),
+        schema: SCHEMA_V0.to_owned(),
+        r#type: event_type.to_owned(),
+        timestamp: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        actor: human_actor(actor_name),
+        subject: Subject {
+            r#type: report::DOCUMENT_SUBJECT.to_owned(),
+            id: record_id.to_owned(),
+        },
+        data,
+        provenance: Provenance {
+            tool: "kaya".to_owned(),
+            version: env!("CARGO_PKG_VERSION").to_owned(),
+            reference: record_id.to_owned(),
+        },
+        artifacts: Vec::new(),
+    };
+    let appended = matches!(
+        ledger.append(&event).map_err(ledger_failure)?,
+        AppendOutcome::Appended
+    );
+    Ok(Envelope::ok(
+        "disposition",
+        json!({ "event": event, "appended": appended }),
+    ))
+}
+
+/// The base rev named by a `--range` value: `main..` names `main`; a bare
+/// rev names itself. A full range with two revs is refused — the gate
+/// always diffs the base against HEAD, never an arbitrary pair.
+fn impact_base_rev(range: &str) -> Result<String, Failure> {
+    let base = range.strip_suffix("..").unwrap_or(range);
+    if base.is_empty() || base.contains("..") {
+        return Err(failure(
+            "kaya.impact.usage",
+            "--range names the base of the comparison, e.g. `main` or `main..`; \
+             the gate diffs it against HEAD",
+        ));
+    }
+    Ok(base.to_owned())
+}
+
+/// The change set's repository paths from git: the staged diff against
+/// HEAD, or the diff between the base rev and HEAD.
+fn git_changed_paths(staged: bool, base: &str) -> Result<BTreeSet<String>, Failure> {
+    let text = if staged {
+        git_output(["diff", "--cached", "--name-only", "-z"])?
+    } else {
+        git_output(["diff", "--name-only", "-z", &format!("{base}..HEAD")])?
+    };
+    Ok(text
+        .split('\0')
+        .filter(|path| !path.is_empty())
+        .map(str::to_owned)
+        .collect())
+}
+
+/// The change set's introduced ledger event ids, read from the patch git
+/// reports for the ledger itself: every added line is one event.
+fn git_ledger_event_ids(staged: bool, base: &str) -> Result<BTreeSet<String>, Failure> {
+    let text = if staged {
+        git_output(["diff", "--cached", "--", LEDGER_PATH])?
+    } else {
+        git_output(["diff", &format!("{base}..HEAD"), "--", LEDGER_PATH])?
+    };
+    let mut ids = BTreeSet::new();
+    for line in text.lines() {
+        let Some(added) = line.strip_prefix('+') else {
+            continue;
+        };
+        if added.starts_with("++") || added.trim().is_empty() {
+            continue;
+        }
+        let Ok(event) = parse_line(added) else {
+            return Err(failure(
+                "kaya.impact.ledger_diff",
+                format!("the ledger diff carries a line that is not an event: {added}"),
+            ));
+        };
+        ids.insert(event.id);
+    }
+    Ok(ids)
+}
+
+/// The document sources at the change-set base, for regenerated-different
+/// comparisons.
+///
+/// The base's tracked paths are read once from `git ls-tree`, so a source
+/// absent at the base is absent from the map while a broken base rev — or
+/// any other git failure — is a labeled refusal, never silence.
+fn base_documents(
+    sources: &[(String, String)],
+    base: &str,
+) -> Result<BTreeMap<String, String>, Failure> {
+    let listing = git_output(["ls-tree", "-r", "--name-only", base])?;
+    let tracked: BTreeSet<&str> = listing.lines().collect();
+    let mut base_docs = BTreeMap::new();
+    for (path, _) in sources {
+        if !tracked.contains(path.as_str()) {
+            continue;
+        }
+        let bytes = git_output(["show", &format!("{base}:{path}")])?;
+        base_docs.insert(path.clone(), bytes);
+    }
+    Ok(base_docs)
+}
+
+/// Run git, returning stdout; a failed git invocation is a labeled refusal.
+fn git_output<const N: usize>(args: [&str; N]) -> Result<String, Failure> {
+    let output = ProcessCommand::new("git")
+        .args(args)
+        .output()
+        .map_err(|error| {
+            failure(
+                "kaya.impact.git_io",
+                format!("git {} could not run: {error}", args.join(" ")),
+            )
+        })?;
+    if !output.status.success() {
+        return Err(failure(
+            "kaya.impact.git_io",
+            format!(
+                "git {} failed: {}",
+                args.join(" "),
+                String::from_utf8_lossy(&output.stderr).trim()
+            ),
+        ));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }

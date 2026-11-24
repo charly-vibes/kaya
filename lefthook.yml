@@ -15,6 +15,8 @@ pre-commit:
     # ddl:managed:end (pre-commit)
     record-verify-staged:
       run: cargo run --quiet -- check --index --fail-on-stale-authored
+    impact-gate-staged:
+      run: cargo run --quiet -- impact --staged
 
 pre-push:
   commands:
