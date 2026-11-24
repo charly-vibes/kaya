@@ -174,6 +174,16 @@ pub(crate) fn package(name: &str, members: &[&str]) -> Decl {
     }
 }
 
+/// A collection declaration: collections take no fields, so only the name.
+pub(crate) fn collection(name: &str) -> Decl {
+    Decl {
+        tier: Tier::Collection,
+        name: name.to_owned(),
+        includes: Vec::new(),
+        members: Vec::new(),
+    }
+}
+
 /// Every regular file under `root`, keyed by its relative path.
 pub(crate) fn read_tree(root: &Path) -> BTreeMap<String, Vec<u8>> {
     fn walk(root: &Path, dir: &Path, files: &mut BTreeMap<String, Vec<u8>>) {

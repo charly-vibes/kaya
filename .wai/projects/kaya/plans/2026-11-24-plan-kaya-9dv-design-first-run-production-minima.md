@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-9dv-collections-bulk-add-design-proposal, pipeline-step:plan]
+---
+
+PLAN kaya-9dv: design-first run; production minimal-change path: (1) author openspec/changes/add-collection-kinds/ — proposal with per-kind decision table (render-now vs producer-backed vs justified refusal), design.md arguing the ledger-free compile-at-build boundary (publish never opens the ledger; per-ledger rows compile into docs/research blocks at kaya build, research-map precedent) + honesty rule (no stub renderers; justified refusal deltas for kinds with no source), tasks.md one section per scenario, spec deltas ADDED per-kind composition contracts + MODIFIED glossary-only clause. (2) openspec validate --strict green both forms. (3) Implementation (follow-up tickets, not this run): topic-map + example-gallery + api-catalogue renderers once rows exist; knowledge-index census block; gate plan.rs:191-193 -> per-kind dispatch; DEFAULT_COLLECTIONS growth per spec deltas. No src/tests changes in THIS run (design half per ticket).

@@ -249,18 +249,13 @@ fn glossary_declaration_renders_a_collection_page() {
     );
 }
 
-// 17. kaya.publications.tier_unimplemented — non-glossary collections still refused
+// 17. kaya.publications.tier_unimplemented — refused kinds name what exists
 #[test]
-fn non_glossary_collection_still_refused_as_unimplemented() {
+fn refused_collection_names_the_declared_kind_and_the_implemented_kinds() {
     let tmp = TempDir::new().expect("temp dir");
     let out = tmp.path().join("out");
     fs::create_dir(&out).expect("output directory");
-    let decls = [Decl {
-        tier: Tier::Collection,
-        name: "topic-map".to_owned(),
-        includes: Vec::new(),
-        members: Vec::new(),
-    }];
+    let decls = [collection("feature-index")];
 
     let error = build(&decls, &Documents::default(), &out)
         .expect_err("a collection declaration must not be silently dropped");
@@ -270,16 +265,336 @@ fn non_glossary_collection_still_refused_as_unimplemented() {
         error.message
     );
     assert!(
-        error.message.contains("topic-map"),
-        "the refusal names the collection: {}",
+        error.message.contains("feature-index"),
+        "the refusal names the declared collection: {}",
         error.message
+    );
+    for implemented in [
+        "api-catalogue",
+        "example-gallery",
+        "glossary",
+        "knowledge-index",
+        "topic-map",
+    ] {
+        assert!(
+            error.message.contains(implemented),
+            "the refusal names the implemented collection ({implemented}): {}",
+            error.message
+        );
+    }
+    assert_no_writes(&out);
+}
+
+// 17. kaya.publications.tier_fields — a collection carries no fields
+#[test]
+fn collection_declaring_fields_refused() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+
+    let mut collection_with_includes = collection("topic-map");
+    collection_with_includes.includes = strings(&[MAP_KIND]);
+    let error = build(&[collection_with_includes], &Documents::default(), &out)
+        .expect_err("a collection does not compose document kinds");
+    assert_eq!(
+        error.label, "kaya.publications.tier_fields",
+        "a stray field on a collection is a labeled refusal: {}",
+        error.message
+    );
+    for needle in ["topic-map", "collection", "include"] {
+        assert!(
+            error.message.contains(needle),
+            "the refusal names the collection, tier and stray field ({needle}): {}",
+            error.message
+        );
+    }
+
+    let mut collection_with_members = collection("glossary");
+    collection_with_members.members = strings(&["overview"]);
+    let error = build(&[collection_with_members], &Documents::default(), &out)
+        .expect_err("a collection does not list package members");
+    assert_eq!(
+        error.label, "kaya.publications.tier_fields",
+        "a stray field on a collection is a labeled refusal: {}",
+        error.message
+    );
+    for needle in ["glossary", "collection", "member"] {
+        assert!(
+            error.message.contains(needle),
+            "the refusal names the collection, tier and stray field ({needle}): {}",
+            error.message
+        );
+    }
+    assert_no_writes(&out);
+}
+
+// Collection composition contracts — topic-map composes the research map
+#[test]
+fn topic_map_renders_one_row_per_topic_with_type_and_relationship_types() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+    let map_body = "### Relationships\n\n\
+                    - kaya/Question/why -[cites]-> kaya/Source/docs-src-index.md@43b606f\n\
+                    - kaya/Question/why -[investigates]-> kaya/Model/cache\n\n\
+                    ### Isolated\n\n\
+                    - kaya/Decision/keep — Decision — keep the gate\n";
+    let docs = documents(&[(MAP_KIND, map_body, &[])]);
+    let decls = [collection("topic-map")];
+
+    let built = build(&decls, &docs, &out).expect("the topic-map must build from the map");
+    assert!(
+        built.pages.iter().any(|page| page.name == "topic-map"),
+        "the topic-map collection is emitted as a page: {:?}",
+        built.pages
+    );
+    let page = fs::read_to_string(out.join("topic-map.md")).expect("the topic-map page is written");
+    let body = block_body(&page, "publication.collection.topic-map");
+    for row in [
+        "- kaya/Question/why — Question — cites, investigates",
+        "- kaya/Model/cache — Model — investigates",
+        "- kaya/Source/docs-src-index.md@43b606f — Source — cites",
+        "- kaya/Decision/keep — Decision",
+    ] {
+        assert!(
+            body.contains(row),
+            "one row per distinct topic id with its type and relationship types ({row}): {body}"
+        );
+    }
+}
+
+#[test]
+fn topic_map_cross_references_the_page_that_embeds_the_research_map() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+    let map_body = "### Relationships\n\n\
+                    - kaya/Question/why -[investigates]-> kaya/Model/cache\n";
+    let docs = documents(&[(MAP_KIND, map_body, &[])]);
+    let decls = [
+        product("architecture-design", &[MAP_KIND]),
+        collection("topic-map"),
+    ];
+
+    build(&decls, &docs, &out).expect("the tree must build");
+    let page = fs::read_to_string(out.join("topic-map.md")).expect("the topic-map page is written");
+    let body = block_body(&page, "publication.collection.topic-map");
+    assert!(
+        body.contains("See [architecture-design](architecture-design.md#orientationresearch-map)"),
+        "the topic-map references the page embedding the research-map body: {body}"
     );
     assert!(
-        error.message.contains("implemented"),
-        "the refusal states only the glossary collection is implemented: {}",
-        error.message
+        !body.contains("-[investigates]->"),
+        "cross-referenced edges are never embedded: {body}"
     );
-    assert_no_writes(&out);
+}
+
+#[test]
+fn topic_map_embeds_the_edge_statements_when_no_page_composes_the_research_map() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+    let map_body = "### Relationships\n\n\
+                    - kaya/Question/why -[investigates]-> kaya/Model/cache\n";
+    let docs = documents(&[(MAP_KIND, map_body, &[])]);
+    let decls = [collection("topic-map")];
+
+    build(&decls, &docs, &out).expect("the tree must build");
+    let page = fs::read_to_string(out.join("topic-map.md")).expect("the topic-map page is written");
+    let body = block_body(&page, "publication.collection.topic-map");
+    assert!(
+        body.contains("- kaya/Question/why -[investigates]-> kaya/Model/cache"),
+        "with no owner the topic-map embeds the statements as their only rendering: {body}"
+    );
+}
+
+// Collection composition contracts — knowledge-index composes the census
+#[test]
+fn knowledge_index_renders_the_per_type_census_of_the_named_node_ids() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+    let docs = documents(&[
+        (
+            OVERVIEW_KIND,
+            OVERVIEW_BODY,
+            &["kaya/Question/why", "kaya/Model/cache"],
+        ),
+        (
+            MAP_KIND,
+            MAP_BODY,
+            &["kaya/Model/cache", "kaya/Widget/x", "kaya/Run/r1"],
+        ),
+    ]);
+    let decls = [collection("knowledge-index")];
+
+    let built = build(&decls, &docs, &out).expect("the knowledge-index must build");
+    assert!(
+        built
+            .pages
+            .iter()
+            .any(|page| page.name == "knowledge-index"),
+        "the knowledge-index collection is emitted as a page: {:?}",
+        built.pages
+    );
+    let page =
+        fs::read_to_string(out.join("knowledge-index.md")).expect("the index page is written");
+    let body = block_body(&page, "publication.collection.knowledge-index");
+    assert!(
+        body.contains("- kaya/Question/why"),
+        "each named id is listed once under its type: {body}"
+    );
+    assert!(
+        !body.contains("kaya/Widget/x"),
+        "ids whose type segment is outside the closed set are not census rows: {body}"
+    );
+    for counted in ["Question", "Model", "Run"] {
+        assert!(
+            body.contains(counted),
+            "the census carries a section per closed entity type ({counted}): {body}"
+        );
+    }
+    assert!(
+        body.contains("_(none)_"),
+        "types with no rows report none: {body}"
+    );
+}
+
+// Collection composition contracts — producer-backed, omission-tolerant
+#[test]
+fn example_gallery_renders_a_row_from_an_experiment_record() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+    let record_body = "### Runs\n\n\
+                       - kaya/Run/r1 — passed 2, failed 0, ignored 0\n\n\
+                       ### Artifacts\n\n\
+                       - kaya/Artifact/kaya-src-lib-rs — src/lib.rs\n\n\
+                       ### Observations\n\n\
+                       - kaya/Observation/o1 — cache hit rate doubled\n";
+    let docs = documents(&[("exploration.experiment-record", record_body, &[])]);
+    let decls = [collection("example-gallery")];
+
+    let built = build(&decls, &docs, &out).expect("the gallery must build from the record");
+    assert!(
+        built
+            .pages
+            .iter()
+            .any(|page| page.name == "example-gallery"),
+        "a recorded experiment emits the gallery: {:?}",
+        built.pages
+    );
+    let page =
+        fs::read_to_string(out.join("example-gallery.md")).expect("the gallery page is written");
+    let body = block_body(&page, "publication.collection.example-gallery");
+    for named in [
+        "kaya/Run/r1",
+        "kaya/Artifact/kaya-src-lib-rs",
+        "kaya/Observation/o1",
+    ] {
+        assert!(
+            body.contains(named),
+            "the gallery row carries the references the record names ({named}): {body}"
+        );
+    }
+}
+
+#[test]
+fn gallery_sections_match_at_line_starts() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+    // The prose paragraph mentions the heading texts mid-line; only the real
+    // headings open the sections the gallery reads.
+    let record_body = "# Experiment\n\n\
+                       The ### Runs section lists run ids; ### Artifacts names artifacts.\n\n\
+                       ### Observations\n\n\
+                       - kaya/Observation/o1 — cache hit rate doubled\n\n\
+                       ### Runs\n\n\
+                       - kaya/Run/r1 — passed 2, failed 0, ignored 0\n";
+    let docs = documents(&[("exploration.experiment-record", record_body, &[])]);
+    let decls = [collection("example-gallery")];
+
+    let built = build(&decls, &docs, &out).expect("the gallery must build");
+    assert!(
+        built
+            .pages
+            .iter()
+            .any(|page| page.name == "example-gallery"),
+        "the real sections back the row: {:?}",
+        built.pages
+    );
+    let page =
+        fs::read_to_string(out.join("example-gallery.md")).expect("the gallery page is written");
+    let body = block_body(&page, "publication.collection.example-gallery");
+    assert!(
+        body.contains("runs kaya/Run/r1"),
+        "a mid-line heading mention must not shadow the real section: {body}"
+    );
+    assert!(
+        body.contains("observations kaya/Observation/o1"),
+        "the real observations section still feeds the row: {body}"
+    );
+}
+
+#[test]
+fn gallery_and_catalogue_without_producer_rows_are_omitted() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+    let docs = documents(&[(OVERVIEW_KIND, OVERVIEW_BODY, &["evt-1"])]);
+    let decls = [collection("example-gallery"), collection("api-catalogue")];
+
+    let built = build(&decls, &docs, &out).expect("the omissions must build");
+    for name in ["example-gallery", "api-catalogue"] {
+        assert!(
+            !built.pages.iter().any(|page| page.name == name),
+            "an unbacked collection writes no page: {name} in {:?}",
+            built.pages
+        );
+        let omitted = built
+            .omitted
+            .iter()
+            .find(|entry| entry.name == name)
+            .expect("the collection omission is reported");
+        assert_eq!(omitted.reason, "no-backing-document");
+        assert_eq!(omitted.tier, "collection");
+        assert!(
+            !out.join(format!("{name}.md")).exists(),
+            "no page of empty sections is written: {name}"
+        );
+    }
+}
+
+#[test]
+fn api_catalogue_renders_one_row_per_spec_id_from_the_technical_reference() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+    let tech_body = "### Specs\n\n\
+                     - kaya/Model/cache — SPEC-1\n\
+                     - kaya/Source/docs-src-index.md@43b606f — SPEC-2\n";
+    let docs = documents(&[(TECH_KIND, tech_body, &[])]);
+    let decls = [collection("api-catalogue")];
+
+    let built = build(&decls, &docs, &out).expect("the catalogue must build from the reference");
+    assert!(
+        built.pages.iter().any(|page| page.name == "api-catalogue"),
+        "spec rows emit the catalogue: {:?}",
+        built.pages
+    );
+    let page =
+        fs::read_to_string(out.join("api-catalogue.md")).expect("the catalogue page is written");
+    let body = block_body(&page, "publication.collection.api-catalogue");
+    for row in [
+        "- SPEC-1 — kaya/Model/cache",
+        "- SPEC-2 — kaya/Source/docs-src-index.md@43b606f",
+    ] {
+        assert!(
+            body.contains(row),
+            "one row per spec id with its resolvable reference ({row}): {body}"
+        );
+    }
 }
 
 // 18. kaya.publications.package_members — members are declared products

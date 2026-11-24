@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-24-kaya-w9t-capture-commands-implementation
+pipeline: tdd-ro5u
+topic: kaya-w9t capture commands implementation
+created_at: '2026-11-24T20:54:47.240691819+00:00'
+current_step: 8
+approvals:
+  fix-review: '2026-11-24T21:17:38.796660212+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

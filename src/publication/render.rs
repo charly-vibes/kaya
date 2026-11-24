@@ -15,6 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::json;
 
 use super::build::Omitted;
+use super::collection::collection_page;
 use super::decls::Decl;
 use super::source::Documents;
 use super::vocabulary::{REASON_NO_BACKING_DOCUMENT, Tier, reader_question};
@@ -56,6 +57,39 @@ pub(super) struct Ownership {
     pub(super) emitted: BTreeSet<String>,
 }
 
+/// Compose the collections: render the implemented ones whose rows come out
+/// populated, and report the rest as omissions with the standard reason.
+///
+/// Rendering and emission share one call into [`collection_page`], so the
+/// page list and the export can never disagree about whether a collection
+/// emitted.
+pub(super) fn compose_collections(
+    collections: &[&Decl],
+    docs: &Documents,
+    ownership: &Ownership,
+) -> (Vec<(String, String)>, Vec<Omitted>) {
+    let mut pages: Vec<(String, String)> = Vec::new();
+    let mut omitted: Vec<Omitted> = Vec::new();
+    for collection in collections {
+        match collection_page(
+            &collection.name,
+            docs,
+            ownership
+                .owners
+                .get("orientation.research-map")
+                .map(|owner| owner.as_str()),
+        ) {
+            Some(page) => pages.push((collection.name.clone(), page)),
+            None => omitted.push(Omitted {
+                tier: Tier::Collection.as_str(),
+                name: collection.name.clone(),
+                reason: REASON_NO_BACKING_DOCUMENT,
+            }),
+        }
+    }
+    (pages, omitted)
+}
+
 /// Assign each kind to the first emitted product that composes it, and
 /// collect the emitted names for package member availability.
 pub(super) fn assign_owners(composed: &BTreeMap<String, Vec<String>>) -> Ownership {
@@ -71,10 +105,14 @@ pub(super) fn assign_owners(composed: &BTreeMap<String, Vec<String>>) -> Ownersh
 }
 
 /// Render every page document: products first, then packages, sorted by name.
+///
+/// `collections` arrives already composed — `compose_collections` rendered
+/// the backed ones and reported the empty ones as omissions — so this loop
+/// never re-derives emission.
 pub(super) fn render_pages(
     products: &[&Decl],
     packages: &[&Decl],
-    collections: &[&Decl],
+    collections: &[(String, String)],
     composed: &BTreeMap<String, Vec<String>>,
     ownership: &Ownership,
     docs: &Documents,
@@ -91,39 +129,11 @@ pub(super) fn render_pages(
         let page = render_package_page(package, &ownership.emitted);
         rendered.push((package.name.clone(), Tier::Package, page));
     }
-    for collection in collections {
-        let page = render_collection_page(collection);
-        rendered.push((collection.name.clone(), Tier::Collection, page));
+    for (name, page) in collections {
+        rendered.push((name.clone(), Tier::Collection, page.clone()));
     }
     rendered.sort_by(|left, right| left.0.cmp(&right.0));
     rendered
-}
-
-/// Render one collection page: the glossary composes its body from the
-/// compile-time closed vocabularies only — the entity types, the relationship
-/// grammar, and the document kinds — so the page needs no ledger read and is
-/// byte-identical from build to build.
-fn render_collection_page(collection: &Decl) -> String {
-    debug_assert_eq!(collection.name, "glossary", "only glossary renders");
-    let mut page = String::from("## Glossary\n\n");
-    page.push_str("The closed vocabulary this build's research graph and publications use.\n\n");
-    page.push_str("### Entities\n\n");
-    for entity in crate::model::EntityType::ALL {
-        page.push_str(&format!("- {}\n", entity.as_str()));
-    }
-    page.push_str("\n### Relationships\n\n");
-    page.push_str(&format!(
-        "A relationship links two entities from the closed set {set}:\n\n",
-        set = crate::model::ENTITY_TYPE_SET,
-    ));
-    for relationship in crate::model::Relationship::ALL {
-        page.push_str(&format!("- {}\n", relationship.as_str()));
-    }
-    page.push_str("\n### Document kinds\n\n");
-    for kind in super::source::DOCUMENT_KINDS {
-        page.push_str(&format!("- {kind}\n"));
-    }
-    page
 }
 
 /// Render one product page: each composed kind's body, or a cross-reference
@@ -179,6 +189,7 @@ pub(super) fn export_json(
     collections: &[&Decl],
     composed: &BTreeMap<String, Vec<String>>,
     emitted: &BTreeSet<String>,
+    omitted: &[Omitted],
     docs: &Documents,
 ) -> serde_json::Value {
     let mut product_rows: Vec<(String, serde_json::Value)> = products
@@ -191,16 +202,32 @@ pub(super) fn export_json(
         .map(|package| export_package_row(package, emitted))
         .collect();
     package_rows.sort_by(|left, right| left.0.cmp(&right.0));
+    // The omission summary is the single source of collection emission: a
+    // declared collection absent from it emitted, one present in it carries
+    // its reason into the export row.
+    let omissions: BTreeMap<&str, &str> = omitted
+        .iter()
+        .filter(|entry| entry.tier == Tier::Collection.as_str())
+        .map(|entry| (entry.name.as_str(), entry.reason))
+        .collect();
     let mut collection_rows: Vec<(String, serde_json::Value)> = collections
         .iter()
-        .map(|collection| {
-            (
+        .map(|collection| match omissions.get(collection.name.as_str()) {
+            Some(reason) => (
+                collection.name.clone(),
+                json!({
+                    "emitted": false,
+                    "name": collection.name,
+                    "reason": reason,
+                }),
+            ),
+            None => (
                 collection.name.clone(),
                 json!({
                     "emitted": true,
                     "name": collection.name,
                 }),
-            )
+            ),
         })
         .collect();
     collection_rows.sort_by(|left, right| left.0.cmp(&right.0));
@@ -287,7 +314,7 @@ fn display_name(name: &str) -> String {
 /// alphanumerics, hyphens and underscores — turning each space into a hyphen
 /// and dropping every other character — so `orientation.project-overview`
 /// anchors as `orientationproject-overview`.
-fn heading_anchor(kind: &str) -> String {
+pub(super) fn heading_anchor(kind: &str) -> String {
     let mut anchor = String::with_capacity(kind.len());
     for character in kind.chars() {
         if character == ' ' {

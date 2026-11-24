@@ -8,7 +8,7 @@ use std::time::SystemTime;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use kaya::publication::{Decl, Documents, Tier, build};
+use kaya::publication::{Decl, Documents, build};
 
 use crate::common::*;
 
@@ -342,14 +342,13 @@ fn export_and_page_attribution_agree_after_one_document_changes() {
 fn export_lists_collection_rows() {
     let tmp = TempDir::new().expect("temp dir");
     let out = tmp.path().join("out");
-    let decls = [Decl {
-        tier: Tier::Collection,
-        name: "glossary".to_owned(),
-        includes: Vec::new(),
-        members: Vec::new(),
-    }];
+    let decls = [
+        collection("glossary"),
+        collection("example-gallery"),
+        collection("api-catalogue"),
+    ];
     let docs = documents(&[(OVERVIEW_KIND, OVERVIEW_BODY, &["evt-1"])]);
-    build(&decls, &docs, &out).expect("the glossary collection must build");
+    build(&decls, &docs, &out).expect("the collections must build");
 
     let export: Value = serde_json::from_str(
         &fs::read_to_string(out.join("publication.json")).expect("the export is written"),
@@ -360,18 +359,40 @@ fn export_lists_collection_rows() {
         .expect("the export lists collections");
     assert_eq!(
         collections.len(),
-        1,
+        3,
         "only declared collections are exported: {export}"
     );
     assert_eq!(
         object_keys(&collections[0]),
-        ["emitted", "name"],
-        "a collection row carries exactly its name and emitted flag: {}",
+        ["emitted", "name", "reason"],
+        "an omitted collection row carries the omission reason: {}",
         collections[0]
     );
-    assert_eq!(collections[0]["name"], json!("glossary"));
+    assert_eq!(collections[0]["name"], json!("api-catalogue"));
     assert_eq!(
         collections[0]["emitted"],
+        json!(false),
+        "an omitted collection is exported with emitted=false"
+    );
+    assert_eq!(
+        collections[0]["reason"],
+        json!("no-backing-document"),
+        "the omission reason mirrors the summary"
+    );
+    assert_eq!(
+        collections[1]["name"],
+        json!("example-gallery"),
+        "rows sort by name: {collections:?}"
+    );
+    assert_eq!(
+        object_keys(&collections[2]),
+        ["emitted", "name"],
+        "an emitted collection row carries exactly its name and emitted flag: {}",
+        collections[2]
+    );
+    assert_eq!(collections[2]["name"], json!("glossary"));
+    assert_eq!(
+        collections[2]["emitted"],
         json!(true),
         "an emitted collection is exported with emitted=true"
     );

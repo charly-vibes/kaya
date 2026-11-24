@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-w9t-capture-commands-implementation, pipeline-step:refactor]
+---
+
+RO5U-REVIEW kaya-w9t (reviewer, NEEDS_REVISION -> fixed): 25/25 spec scenarios tested (default_actor via assert_first_capture_shape omits --actor-type). Findings all fixed in src/capture.rs: P2 entropy_run now admits the spec's hex family (>=32 chars with hex letter AND a digit — digit required so letter-only fillers survive; the spec-pinned redaction-before-bound test relies on 'a'x1980 surviving); P3 private_key_armor generalized to -----BEGIN [A-Z ]*PRIVATE KEY----- (+ PGP BLOCK spelling), DSA covered; P3 stored_events propagates parse failures (refuse-not-serve, matches Ledger::load_held); P3 correction race on kaya.ledger.id_reuse re-resolves stored state -> duplicate when the racing twin stored equal text. 3 regression tests added (hex_digest_run_redacted, dsa_private_key_armour_redacted, corrupt_ledger_line_refuses_capture). Verified: capture 30/30, full 481/0, clippy -D warnings 0.

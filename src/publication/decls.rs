@@ -61,20 +61,28 @@ const DEFAULT_PACKAGES: [(&str, &[&str]); 2] = [
     ),
 ];
 
-/// The collections `kaya publish` declares: the glossary, the only collection
-/// with a renderer.
-const DEFAULT_COLLECTIONS: [&str; 1] = ["glossary"];
+/// The collections `kaya publish` declares: every collection this release
+/// implements. Each renders when its rows are populated and is omitted with
+/// the standard reason when they are not.
+const DEFAULT_COLLECTIONS: [&str; 5] = [
+    "glossary",
+    "topic-map",
+    "knowledge-index",
+    "example-gallery",
+    "api-catalogue",
+];
 
 /// The declarations `kaya publish` composes, and the ones `kaya check`
-/// expects: twelve products, two packages, and the glossary collection over
-/// the compiled research documents.
+/// expects: twelve products, two packages, and the five implemented
+/// collections over the compiled research documents.
 ///
 /// The products are `overview`, `reference`, `getting-started`, `tutorial`,
 /// `how-to`, `concept`, `example`, `troubleshooting`, `faq`,
 /// `status-compatibility`, `release-migration`, and `architecture-design`. The packages are
 /// `project-site` (over `overview` and `reference`) and `developer-guide`
-/// (over the six `getting-started` through `faq` products). The collection is
-/// `glossary`, rendered from the compile-time vocabularies.
+/// (over the six `getting-started` through `faq` products). The collections
+/// are `glossary`, `topic-map`, `knowledge-index`, `example-gallery`, and
+/// `api-catalogue`.
 pub fn default_declarations() -> Vec<Decl> {
     DEFAULT_PRODUCTS
         .iter()

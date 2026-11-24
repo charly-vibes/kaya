@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-w9t-capture-commands]
+---
+
+PLAN kaya-w9t (minimal TDD, spec-faithful): RED (tests/cli_pipeline.rs + unit tests): (a) each subcommand appends a model.entity.created event with exact subject/data/provenance and envelope {appended|duplicate|corrected, event id}; (b) byte-identical replay -> duplicate (no second event); (c) edited text on same --key -> correction event superseding prior, never id_reuse; (d) redaction: each spec.md:105-144 pattern class -> [redacted] in stored bytes + id stable across redaction; benign text survives; (e) bounds refusals (2001 chars; key 65 chars / uppercase; empty text); (f) tool actor refused; (g) missing ledger. GREEN: new src/capture.rs (redaction patterns + high-entropy rule, deterministic, runs FIRST), four thin Command variants sharing one handler (map subcommand->EntityType, text, flags), duplicate-vs-correction decision pre-append comparing stored effective text for the key, deterministic id per spec join, envelope. No model/adapter changes (proposal mandates none). Meter: new tests + full suite green; openspec validate --strict stays green (no spec edits).

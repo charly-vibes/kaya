@@ -114,8 +114,9 @@ impl PublicationError {
         Self::new(
             LABEL_TIER_UNIMPLEMENTED,
             format!(
-                "collection \"{name}\" cannot be declared: only the glossary collection is \
-                 implemented, so this release refuses every other collection"
+                "collection \"{name}\" cannot be declared: implemented collections are \
+                 api-catalogue, example-gallery, glossary, knowledge-index, topic-map, so \
+                 this release refuses every other collection"
             ),
         )
     }

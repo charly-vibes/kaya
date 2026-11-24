@@ -2032,8 +2032,10 @@ fn build_writes_overview_and_publish_uses_it() {
     assert_eq!(
         published["data"]["omitted"],
         json!([
+            { "tier": "collection", "name": "api-catalogue", "reason": "no-backing-document" },
             { "tier": "product", "name": "concept", "reason": "no-backing-document" },
             { "tier": "product", "name": "example", "reason": "no-backing-document" },
+            { "tier": "collection", "name": "example-gallery", "reason": "no-backing-document" },
             { "tier": "product", "name": "faq", "reason": "no-backing-document" },
             { "tier": "product", "name": "how-to", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
@@ -2049,13 +2051,15 @@ fn build_writes_overview_and_publish_uses_it() {
             "developer-guide",
             "getting-started",
             "glossary",
+            "knowledge-index",
             "overview",
             "project-site",
             "reference",
             "release-migration",
             "status-compatibility",
+            "topic-map",
         ],
-        "the declared packages and every backed product get a page, sorted by name: {pages:?}"
+        "the declared packages, every backed product, and the render-now collections get a page, sorted by name: {pages:?}"
     );
 
     let overview_page = fs::read_to_string(dir.path().join("docs/public/overview.md"))
@@ -2156,8 +2160,14 @@ fn build_writes_overview_and_publish_uses_it() {
         .expect("the export lists collections");
     assert_eq!(
         collections,
-        &[json!({ "emitted": true, "name": "glossary" })],
-        "the glossary collection is exported with emitted=true: {export}"
+        &[
+            json!({ "emitted": false, "name": "api-catalogue", "reason": "no-backing-document" }),
+            json!({ "emitted": false, "name": "example-gallery", "reason": "no-backing-document" }),
+            json!({ "emitted": true, "name": "glossary" }),
+            json!({ "emitted": true, "name": "knowledge-index" }),
+            json!({ "emitted": true, "name": "topic-map" }),
+        ],
+        "the export mirrors the pages: producer-backed collections without rows are omitted with the reason, the rest emitted: {export}"
     );
     let products = export["products"]
         .as_array()
@@ -2249,6 +2259,8 @@ fn build_writes_overview_and_publish_uses_it() {
         "publication.package.developer-guide",
         "publication.package.project-site",
         "publication.collection.glossary",
+        "publication.collection.knowledge-index",
+        "publication.collection.topic-map",
         "publication.json",
     ] {
         assert!(
@@ -2331,6 +2343,8 @@ fn build_writes_overview_and_publish_uses_it() {
         "publication.package.developer-guide",
         "publication.package.project-site",
         "publication.collection.glossary",
+        "publication.collection.knowledge-index",
+        "publication.collection.topic-map",
         "publication.json",
     ] {
         assert!(
@@ -2429,11 +2443,13 @@ fn publish_renders_glossary_collection_page() {
             "developer-guide",
             "getting-started",
             "glossary",
+            "knowledge-index",
             "overview",
             "project-site",
             "reference",
             "release-migration",
             "status-compatibility",
+            "topic-map",
         ],
         "the glossary collection gets a page among the sorted published pages: {pages:?}"
     );
@@ -2496,11 +2512,13 @@ fn publish_declares_every_product_and_reports_justified_omissions() {
             "getting-started",
             "glossary",
             "how-to",
+            "knowledge-index",
             "overview",
             "project-site",
             "reference",
             "release-migration",
             "status-compatibility",
+            "topic-map",
         ],
         "the declared packages and every backed product get a page, sorted by name: {pages:?}"
     );
@@ -2508,8 +2526,10 @@ fn publish_declares_every_product_and_reports_justified_omissions() {
     assert_eq!(
         published["data"]["omitted"],
         json!([
+            { "tier": "collection", "name": "api-catalogue", "reason": "no-backing-document" },
             { "tier": "product", "name": "concept", "reason": "no-backing-document" },
             { "tier": "product", "name": "example", "reason": "no-backing-document" },
+            { "tier": "collection", "name": "example-gallery", "reason": "no-backing-document" },
             { "tier": "product", "name": "faq", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
             { "tier": "product", "name": "tutorial", "reason": "no-backing-document" },
@@ -2612,6 +2632,57 @@ fn publish_declares_every_product_and_reports_justified_omissions() {
     );
 }
 
+/// A Source carrying a spec attribute compiles the technical-reference block;
+/// publish un-omits the api-catalogue. The check side reads the same document
+/// list and is verified against the committed dogfood tree in the gates.
+#[test]
+fn technical_reference_document_feeds_the_api_catalogue() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_ledger(
+        &dir,
+        &[
+            event_line(&node_event(
+                "event-question",
+                "Question",
+                "kaya/Question/q-one",
+                "Q One",
+            )),
+            event_line(&json!({
+                "id": "event-spec-source",
+                "schema": "kaya.event/v0",
+                "type": "model.entity.created",
+                "timestamp": "2026-11-16T10:00:00Z",
+                "actor": { "type": "human", "name": "alice" },
+                "subject": { "type": "Source", "id": "kaya/Source/spec-cache" },
+                "data": { "attributes": { "spec": "SPEC-1" } },
+                "provenance": { "tool": "kaya", "version": "0.1.0", "reference": "event-spec-source" },
+                "artifacts": [],
+            })),
+        ],
+    );
+    assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    let tech = fs::read_to_string(dir.path().join("docs/research/technical-reference.md"))
+        .expect("build compiles the technical reference document");
+    assert!(
+        tech.contains("- kaya/Source/spec-cache — SPEC-1"),
+        "the technical reference carries the spec row: {tech}"
+    );
+
+    let published = assert_success(&run(&dir, &["publish"]));
+    let pages = published_page_names(&published["data"]["pages"]);
+    assert!(
+        pages.contains(&"api-catalogue".to_owned()),
+        "a compiled technical reference un-omits the api-catalogue: {pages:?}"
+    );
+    let catalogue = fs::read_to_string(dir.path().join("docs/public/api-catalogue.md"))
+        .expect("the catalogue page is written");
+    assert!(
+        catalogue.contains("- SPEC-1 — kaya/Source/spec-cache"),
+        "the catalogue block mirrors the technical reference: {catalogue}"
+    );
+}
+
 /// `publish` declares the three remaining reader-question products, and the
 /// structured export attributes every rendered document to the same event ids
 /// its Markdown section cites; a second publish changes no byte.
@@ -2651,19 +2722,23 @@ fn publish_declares_the_remaining_products_and_export_agrees() {
             "getting-started",
             "glossary",
             "how-to",
+            "knowledge-index",
             "overview",
             "project-site",
             "reference",
             "release-migration",
             "status-compatibility",
+            "topic-map",
         ],
         "the remaining products emit beside the already-declared ones, sorted by name: {pages:?}"
     );
     assert_eq!(
         published["data"]["omitted"],
         json!([
+            { "tier": "collection", "name": "api-catalogue", "reason": "no-backing-document" },
             { "tier": "product", "name": "concept", "reason": "no-backing-document" },
             { "tier": "product", "name": "example", "reason": "no-backing-document" },
+            { "tier": "collection", "name": "example-gallery", "reason": "no-backing-document" },
             { "tier": "product", "name": "faq", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
             { "tier": "product", "name": "tutorial", "reason": "no-backing-document" },
@@ -2897,14 +2972,16 @@ fn publish_preserves_authored_pages_at_omitted_product_paths() {
             .as_array()
             .expect("pages is a list")
             .len(),
-        5,
-        "only the packages, the research-map-backed architecture-design and reference, and the always-emitted glossary remain: {second}"
+        7,
+        "only the packages, the research-map-backed architecture-design and reference, and the render-now collections remain beside the glossary: {second}"
     );
     assert_eq!(
         second["data"]["omitted"],
         json!([
+            { "tier": "collection", "name": "api-catalogue", "reason": "no-backing-document" },
             { "tier": "product", "name": "concept", "reason": "no-backing-document" },
             { "tier": "product", "name": "example", "reason": "no-backing-document" },
+            { "tier": "collection", "name": "example-gallery", "reason": "no-backing-document" },
             { "tier": "product", "name": "faq", "reason": "no-backing-document" },
             { "tier": "product", "name": "getting-started", "reason": "no-backing-document" },
             { "tier": "product", "name": "how-to", "reason": "no-backing-document" },

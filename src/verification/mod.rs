@@ -61,12 +61,13 @@ const LABEL_UNCOMMITTED: &str = "kaya.ledger.uncommitted_history";
 const LABEL_DIGEST: &str = "kaya.verification.digest_mismatch";
 
 /// The compiled research documents the publication layer reads, in its order.
-const RESEARCH_READ_ORDER: [&str; 5] = [
+const RESEARCH_READ_ORDER: [&str; 6] = [
     "index.md",
     "overview.md",
     "understanding.md",
     "reproduction-package.md",
     "handoff.md",
+    "technical-reference.md",
 ];
 
 /// A labeled refusal produced by verification.

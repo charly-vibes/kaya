@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-24-kaya-g41-pretender-role-thresholds
+pipeline: tdd-ro5u
+topic: kaya-g41 pretender role thresholds
+created_at: '2026-11-24T20:36:14.153723915+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-24T20:54:22.466350469+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

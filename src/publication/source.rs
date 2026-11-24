@@ -53,7 +53,8 @@ pub struct Documents(pub BTreeMap<String, DocumentRef>);
 /// Read the compiled documents under `research_dir`.
 ///
 /// Files are read in a fixed order — `index.md`, `overview.md`,
-/// `understanding.md`, `reproduction-package.md`, `handoff.md`, then the
+/// `understanding.md`, `reproduction-package.md`, `handoff.md`,
+/// `technical-reference.md`, then the
 /// experiment dossiers sorted by name — and only generated blocks whose
 /// names are in the document vocabulary are kept. A repeated block name
 /// inside one file is refused, because the file's grammar then admits two
@@ -69,6 +70,7 @@ pub fn read_documents(research_dir: &Path) -> Result<Documents, PublicationError
         "understanding.md",
         "reproduction-package.md",
         "handoff.md",
+        "technical-reference.md",
     ]
     .iter()
     .map(|name| research_dir.join(name))

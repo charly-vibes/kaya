@@ -2,7 +2,7 @@
 //! vocabulary product is declared with its spec admission row, so a new
 //! generator's records surface in publish without a declarations edit.
 
-use kaya::publication::{PRODUCTS, Tier, admission, default_declarations};
+use kaya::publication::{Decl, PRODUCTS, Tier, admission, default_declarations};
 
 #[test]
 fn default_declarations_cover_the_whole_product_vocabulary() {
@@ -60,4 +60,33 @@ fn tutorial_is_declared_with_its_spec_admission_row() {
         ],
         "tutorial admits its spec exploration rows"
     );
+}
+
+#[test]
+fn default_collections_are_exactly_the_implemented_kinds() {
+    let all = default_declarations();
+    let collections: Vec<&Decl> = all
+        .iter()
+        .filter(|decl| decl.tier == Tier::Collection)
+        .collect();
+    let names: Vec<&str> = collections.iter().map(|decl| decl.name.as_str()).collect();
+
+    assert_eq!(
+        names,
+        [
+            "glossary",
+            "topic-map",
+            "knowledge-index",
+            "example-gallery",
+            "api-catalogue"
+        ],
+        "the default tree declares exactly the implemented collections, in order: {names:?}"
+    );
+    for decl in &collections {
+        assert!(
+            decl.includes.is_empty() && decl.members.is_empty(),
+            "collection declarations carry no fields: {}",
+            decl.name
+        );
+    }
 }

@@ -1,8 +1,26 @@
 {
   "collections": [
     {
+      "emitted": false,
+      "name": "api-catalogue",
+      "reason": "no-backing-document"
+    },
+    {
+      "emitted": false,
+      "name": "example-gallery",
+      "reason": "no-backing-document"
+    },
+    {
       "emitted": true,
       "name": "glossary"
+    },
+    {
+      "emitted": true,
+      "name": "knowledge-index"
+    },
+    {
+      "emitted": true,
+      "name": "topic-map"
     }
   ],
   "packages": [

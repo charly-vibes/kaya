@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Collections tier end to end: `kaya publish` declares and renders all five
+  implemented collections — `glossary`, `topic-map` (per-topic rows from the
+  research map, cross-referencing the page that embeds it), `knowledge-index`
+  (per-type census of the named node ids), `example-gallery` (rows from
+  experiment records), and `api-catalogue` (rows from technical references).
+  A collection whose producer rows are empty omits with
+  `no-backing-document` instead of writing a page of empty sections; the
+  export mirrors pages with `emitted` plus the omission reason; declaring any
+  other collection kind refuses naming the implemented set
+  (`src/publication/collection.rs`).
+- Read-list parity: `technical-reference.md` joins both fixed document lists
+  — publish's read order (`src/publication/source.rs`) and check's
+  `RESEARCH_READ_ORDER` (`src/verification/mod.rs`) — in the same change.
+
 ## [0.3.0] - 2026-11-24
 
 ### Added

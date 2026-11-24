@@ -21,7 +21,9 @@ use super::build::{Omitted, Page};
 use super::decls::Decl;
 use super::error::PublicationError;
 use super::io::compose_error;
-use super::render::{assign_owners, compose_products, export_json, render_pages};
+use super::render::{
+    assign_owners, compose_collections, compose_products, export_json, render_pages,
+};
 use super::source::Documents;
 use super::vocabulary::{LABEL_IO, PRODUCTS, Tier, reader_question, resolve_name, tier_for_name};
 
@@ -94,13 +96,19 @@ pub fn plan(
     let (products, packages, collections) = partition_declarations(decls)?;
     check_admission(&products)?;
     check_package_members(&packages, &products)?;
-    let (composed, omitted) = compose_products(&products, docs);
+    let (composed, mut omitted) = compose_products(&products, docs);
     let ownership = assign_owners(&composed);
+    let (collection_pages, collection_omissions) =
+        compose_collections(&collections, docs, &ownership);
+    omitted.extend(collection_omissions);
+    // One summary sorted by name across tiers, so a reader scans omissions
+    // without caring which tier produced them.
+    omitted.sort_by(|left, right| left.name.cmp(&right.name));
     // One rendering per fact: later products cross-reference the first holder.
     let rendered = render_pages(
         &products,
         &packages,
-        &collections,
+        &collection_pages,
         &composed,
         &ownership,
         docs,
@@ -114,6 +122,7 @@ pub fn plan(
         &collections,
         &composed,
         &ownership.emitted,
+        &omitted,
         docs,
     );
     let (export, export_path, export_previous) = plan_export(export, out, &mut read_bytes)?;
@@ -176,11 +185,11 @@ fn partition_declarations(decls: &[Decl]) -> Result<Partition<'_>, PublicationEr
             }
             // A collection carries no fields: stray includes/members refuse
             // before the tier check, so no field of a refused collection is
-            // ever silently ignored. The glossary collection is implemented
-            // and renders from the compile-time vocabularies; the other eight
-            // collections have no renderer yet and are refused rather than
-            // silently dropped, because a dropped declaration reads exactly
-            // like an emitted one.
+            // ever silently ignored. The five implemented collections render
+            // from the source map (the glossary from the compile-time
+            // vocabularies); every other declared name is refused rather
+            // than silently dropped, because a dropped declaration reads
+            // exactly like an emitted one.
             Tier::Collection => {
                 if !decl.includes.is_empty() {
                     return Err(PublicationError::tier_fields(&decl.name, tier, "includes"));
@@ -188,7 +197,7 @@ fn partition_declarations(decls: &[Decl]) -> Result<Partition<'_>, PublicationEr
                 if !decl.members.is_empty() {
                     return Err(PublicationError::tier_fields(&decl.name, tier, "members"));
                 }
-                if decl.name != "glossary" {
+                if !super::collection::IMPLEMENTED.contains(&decl.name.as_str()) {
                     return Err(PublicationError::tier_unimplemented(&decl.name));
                 }
                 collections.push(decl);
@@ -287,7 +296,7 @@ fn plan_export(
     Ok((bytes, export_path, export_previous))
 }
 
-/// Phase two: plan the removal of every omitted product's page.
+/// Phase two: plan the removal of every omitted publication's page.
 fn plan_removals(
     omitted: &[Omitted],
     out: &Path,
@@ -295,7 +304,9 @@ fn plan_removals(
 ) -> Result<Vec<PlannedRemoval>, PublicationError> {
     let mut removals = Vec::new();
     for entry in omitted {
-        removals.push(plan_removal(out, Tier::Product, &entry.name, read_text)?);
+        let tier = super::vocabulary::tier_for_name(entry.tier)
+            .expect("omission tiers come from the closed tier vocabulary");
+        removals.push(plan_removal(out, tier, &entry.name, read_text)?);
     }
     Ok(removals)
 }

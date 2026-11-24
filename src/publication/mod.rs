@@ -16,6 +16,7 @@
 //! than stubbed, and every exported attribution is the page's own event ids.
 
 mod build;
+mod collection;
 mod decls;
 mod error;
 mod io;
