@@ -899,7 +899,10 @@ fn redaction_filter_covers_the_inherited_pattern_list() {
         // Assembled via concat!: no single source literal matches the Slack
         // token shape (GitHub push protection), while the runtime value is
         // still exactly the string the family's pattern matches.
-        ("Slack token", concat!("xoxb-", "123456789012-abcdefghijklmnop")),
+        (
+            "Slack token",
+            concat!("xoxb-", "123456789012-abcdefghijklmnop"),
+        ),
         (
             "JWT",
             "eyJhbGciOiJIUzI1NiJ9.payloadpart123456.signaturepart654321",
