@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────────────
+# pretender.toml — kaya project configuration (kaya-g41)
+# ─────────────────────────────────────────────────────────────────────
+# Defaults flagged ~900 test-side units plus every large dispatch/
+# projection function, so each commit forced a `--adopt` baseline churn.
+# Thresholds below are set from measured per-role maxima with slim
+# headroom (see kaya-g41 ledger): today's worst units pass, genuine
+# escalation still gates.
+#
+# file_lines_max on the app role is deliberately above src/main.rs
+# (2383 lines): that file is accumulated dispatch debt and capping it
+# here would only re-create per-commit churn. Splitting main.rs into
+# command modules is its own future ticket (bd kaya-g9u) — tighten then.
+
+[pretender]
+mode = "gate"
+languages = ["auto"]
+exclude = [
+    "vendor/**",
+    "node_modules/**",
+    "**/*_generated.*",
+    "target/**",
+    ".wai/**",
+    "docs/book/**",
+]
+
+[roles]
+test = { paths = ["tests/**", "**/*_test.*"], classname_root = "tests" }
+script = { paths = ["scripts/**", "examples/**"] }
+
+# ── Thresholds — app role (src/, incl. #[cfg(test)] units) ──────────
+
+[thresholds]
+cyclomatic_max     = 25    # measured max 23 (evaluate, src/impact.rs)
+cognitive_max      = 42    # measured max 37
+abc_max            = 150   # measured maxima: app 122.9 (cmd_build), test 146.75 (build_writes_overview test). Per-role abc overrides are not honored by pretender 0.10 — one global ceiling.
+function_lines_max = 280   # measured max 262 (cmd_build)
+nesting_max        = 4     # measured max 4
+file_lines_max     = 3500  # deliberate, see header note
+
+# ── Thresholds — test role (tests/) ─────────────────────────────────
+
+[thresholds.test]
+cyclomatic_max     = 12    # measured max 11
+cognitive_max      = 14    # measured max 12
+function_lines_max = 460   # measured max 451
+nesting_max        = 3     # measured max 3
+min_assertions     = 1     # every test asserts something
+# (no per-role file_lines: pretender 0.10 ignores it here; tests are
+# governed by [thresholds].file_lines_max, which covers cli_pipeline.rs)
+
+# ── Thresholds — script role (scripts/) ─────────────────────────────
+
+[thresholds.script]
+# pretender 0.10 silently ignores cyclomatic/abc/file_lines in role
+# sections (verified empirically in the kaya-g41 review); scripts are
+# governed by the global [thresholds] ceilings for those metrics:
+# cyclomatic 25, abc 150, file_lines 3500.
+cognitive_max      = 12    # measured max 11
+function_lines_max = 45    # measured max 41
+nesting_max        = 3     # measured max 3
