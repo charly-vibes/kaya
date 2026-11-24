@@ -31,7 +31,7 @@ _(none)_
 
 - kaya/Run/cargo-test-results
 
-### Artifact — 752
+### Artifact — 754
 
 - kaya/Artifact/0291837
 - kaya/Artifact/03fb233
@@ -44,6 +44,7 @@ _(none)_
 - kaya/Artifact/1bdef7b
 - kaya/Artifact/1c2b3d3
 - kaya/Artifact/1cfa1a1
+- kaya/Artifact/1ddee00
 - kaya/Artifact/1e0c0d7
 - kaya/Artifact/1fa5b50
 - kaya/Artifact/21c5fdd
@@ -309,6 +310,7 @@ _(none)_
 - kaya/Artifact/designs-2026-11-24-refactor-step-kaya-18o-recorded-on-refactor-step
 - kaya/Artifact/designs-2026-11-24-refactor-step-kaya-y5v-refactor-pass-recorded-sa
 - kaya/Artifact/df81656
+- kaya/Artifact/dfe6d6c
 - kaya/Artifact/e0685ac
 - kaya/Artifact/e178048
 - kaya/Artifact/e21ae25
