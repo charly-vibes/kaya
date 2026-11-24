@@ -38,6 +38,8 @@ use kaya::projection::{
 };
 use kaya::promotion::{self, PROPOSAL_BUDGET, PromotionError, PromotionState, cap_proposals};
 use kaya::publication;
+
+mod capture;
 use kaya::verification;
 
 /// Project-local directory holding kaya state.
@@ -230,6 +232,74 @@ enum Command {
         #[arg(long, default_value = "docs/research", value_name = "DIR")]
         out: PathBuf,
     },
+    /// Capture an authored observation as one model event
+    Note {
+        /// The observation text, stored after secret redaction
+        text: String,
+        /// Name of the author
+        #[arg(long, value_name = "NAME")]
+        actor: String,
+        /// Actor kind: `human` (the default) or `agent`
+        #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
+        actor_type: String,
+        /// Node key; defaults to `<UTC date>-<sha256(text)[:8]>`
+        #[arg(long, value_name = "SLUG")]
+        key: Option<String>,
+        /// Project namespace recorded in the subject id
+        #[arg(long, default_value = "kaya", value_name = "NAME")]
+        project: String,
+    },
+    /// Capture an authored question as one model event
+    Question {
+        /// The question text, stored after secret redaction
+        text: String,
+        /// Name of the author
+        #[arg(long, value_name = "NAME")]
+        actor: String,
+        /// Actor kind: `human` (the default) or `agent`
+        #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
+        actor_type: String,
+        /// Node key; defaults to `<UTC date>-<sha256(text)[:8]>`
+        #[arg(long, value_name = "SLUG")]
+        key: Option<String>,
+        /// Project namespace recorded in the subject id
+        #[arg(long, default_value = "kaya", value_name = "NAME")]
+        project: String,
+    },
+    /// Capture an authored decision as one model event
+    Decision {
+        /// The decision text, stored after secret redaction
+        text: String,
+        /// Name of the author
+        #[arg(long, value_name = "NAME")]
+        actor: String,
+        /// Actor kind: `human` (the default) or `agent`
+        #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
+        actor_type: String,
+        /// Node key; defaults to `<UTC date>-<sha256(text)[:8]>`
+        #[arg(long, value_name = "SLUG")]
+        key: Option<String>,
+        /// Project namespace recorded in the subject id
+        #[arg(long, default_value = "kaya", value_name = "NAME")]
+        project: String,
+    },
+    /// Capture an authored finding as one model event
+    Finding {
+        /// The finding text, stored after secret redaction
+        text: String,
+        /// Name of the author
+        #[arg(long, value_name = "NAME")]
+        actor: String,
+        /// Actor kind: `human` (the default) or `agent`
+        #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
+        actor_type: String,
+        /// Node key; defaults to `<UTC date>-<sha256(text)[:8]>`
+        #[arg(long, value_name = "SLUG")]
+        key: Option<String>,
+        /// Project namespace recorded in the subject id
+        #[arg(long, default_value = "kaya", value_name = "NAME")]
+        project: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -410,6 +480,62 @@ fn main() -> ExitCode {
             actor,
             actor_type,
         } => cmd_supersede_doctest(&document, &label, &actor, &actor_type),
+        Command::Note {
+            text,
+            actor,
+            actor_type,
+            key,
+            project,
+        } => cmd_capture(
+            capture::Kind::Note,
+            &text,
+            &actor,
+            &actor_type,
+            key.as_deref(),
+            &project,
+        ),
+        Command::Question {
+            text,
+            actor,
+            actor_type,
+            key,
+            project,
+        } => cmd_capture(
+            capture::Kind::Question,
+            &text,
+            &actor,
+            &actor_type,
+            key.as_deref(),
+            &project,
+        ),
+        Command::Decision {
+            text,
+            actor,
+            actor_type,
+            key,
+            project,
+        } => cmd_capture(
+            capture::Kind::Decision,
+            &text,
+            &actor,
+            &actor_type,
+            key.as_deref(),
+            &project,
+        ),
+        Command::Finding {
+            text,
+            actor,
+            actor_type,
+            key,
+            project,
+        } => cmd_capture(
+            capture::Kind::Finding,
+            &text,
+            &actor,
+            &actor_type,
+            key.as_deref(),
+            &project,
+        ),
     };
     emit(outcome.unwrap_or_else(|(label, message)| Envelope::error("error", &label, message)))
 }
@@ -522,6 +648,19 @@ fn ledger_failure(err: LedgerError) -> Failure {
 
 fn adapter_failure(err: AdapterError) -> Failure {
     (err.label, err.message)
+}
+
+/// Capture one authored text as a `model.entity.created` event.
+fn cmd_capture(
+    kind: capture::Kind,
+    text: &str,
+    actor: &str,
+    actor_type: &str,
+    key: Option<&str>,
+    project: &str,
+) -> Result<Envelope, Failure> {
+    let mut ledger = open_ledger()?;
+    capture::run(&mut ledger, kind, text, actor, actor_type, key, project)
 }
 
 fn model_failure(err: ModelError) -> Failure {
