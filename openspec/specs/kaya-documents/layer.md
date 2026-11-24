@@ -21,14 +21,14 @@ knowledge store.
 
 ## Constraints
 
-| id                       | kind      | expr                                                                                                                                                                                                                          | traces_to |
-|--------------------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|
-| vocabulary_closed        | invariant | `every projected document carries exactly one family and one kind from the closed vocabulary; an unlisted value is a labeled refusal naming the value, never a fallback kind`                                                   | [[kaya.documents.layer]] |
-| intent_record_separated  | invariant | `experiment-specification sources only intent records (Experiment, Hypothesis, intent relationships); experiment-record sources only observed records (Run, Artifact, observation events); neither block derives content from the other` | [[kaya.documents.layer]] |
-| block_family_scoped      | invariant | `each generated block is named <family>.<kind> and contains only records admissible for that kind; a block name outside the closed block vocabulary is refused before writing`                                                     | [[kaya.documents.layer]] |
-| empty_kind_omitted       | invariant | `a kind with no source records emits no section, no placeholder row and no empty-value line; the build summary reports it once with family, kind and reason`                                                                     | [[kaya.documents.layer]] |
-| reuse_by_reference       | invariant | `technical-reference, reproduction-package, knowledge-brief and handoff render references to authoritative sources only — no ledger entity and no payload copy is created for referenced content`                                 | [[kaya.documents.layer]] |
-| relationship_rendered    | invariant | `research-map renders every declared relationship as a typed edge naming both endpoints and lists admitted entities that carry no edges`                                                                                         | [[kaya.documents.layer]] |
+| id                         | kind      | expr                                                                                                                                                                                                                                                                                  | traces_to                |
+|----------------------------|-----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|
+| vocabulary_closed          | invariant | `every projected document carries exactly one family and one kind from the closed vocabulary; an unlisted value is a labeled refusal naming the value, never a fallback kind`                                                                                                         | [[kaya.documents.layer]] |
+| intent_record_separated    | invariant | `experiment-specification sources only intent records (Experiment, Hypothesis, intent relationships); experiment-record sources only observed records (Run, Artifact, observation events); neither block derives content from the other`                                              | [[kaya.documents.layer]] |
+| block_family_scoped        | invariant | `each generated block is named <family>.<kind> and contains only records admissible for that kind; a block name outside the closed block vocabulary is refused before writing`                                                                                                        | [[kaya.documents.layer]] |
+| empty_kind_omitted         | invariant | `a kind with no source records emits no section, no placeholder row and no empty-value line; the build summary reports it once with family, kind and reason`                                                                                                                          | [[kaya.documents.layer]] |
+| reuse_by_reference         | invariant | `technical-reference, reproduction-package, knowledge-brief and handoff render references to authoritative sources only — no ledger entity and no payload copy is created for referenced content`                                                                                     | [[kaya.documents.layer]] |
+| relationship_rendered      | invariant | `research-map renders every declared relationship as a typed edge naming both endpoints and lists admitted entities that carry no edges`                                                                                                                                              | [[kaya.documents.layer]] |
 | doctest_contracts_declared | invariant | `only a fenced block declaring a doctest execution contract becomes a first-class IR record with a stable id and a content hash; undeclared code stays prose; a contract's expected output changes only through a human-recorded supersede event, and no run result ever rewrites it` | [[kaya.documents.layer]] |
 
 ## Model
@@ -49,19 +49,19 @@ knowledge store.
 
 ## Properties
 
-| id                       | kind | derives_from                                     | generator                                  | predicate                                                    |
-|--------------------------|------|--------------------------------------------------|--------------------------------------------|---------------------------------------------------------------|
-| unknown_kind_refused     | unit | [[kaya.documents.layer.vocabulary_closed]]        | `projection_with_unlisted_kind()`          | `labeled refusal naming the value ∧ no document written`       |
-| intent_record_split      | unit | [[kaya.documents.layer.intent_record_separated]]  | `experiment_with_intent_and_run()`         | `spec rows ⊆ intent ∧ record rows ⊆ observed`                  |
-| legacy_block_refused     | unit | [[kaya.documents.layer.block_family_scoped]]      | `document_with_legacy_block_name()`        | `build refuses ∧ names block ∧ no write`                       |
-| empty_kind_silent        | unit | [[kaya.documents.layer.empty_kind_omitted]]       | `experiment_without_runs()`                | `no section ∧ summary reports kind once`                       |
-| reuse_reference_only     | unit | [[kaya.documents.layer.reuse_by_reference]]       | `knowledge_brief_from_turu_entries()`      | `∀ item: source reference ∧ entity count unchanged`            |
-| edges_rendered           | unit | [[kaya.documents.layer.relationship_rendered]]    | `graph_with_typed_edges()`                  | `∀ edge: rendered with type ∧ both endpoints`                  |
-| doctest_record_is_first_class | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `document_with_declared_doctest()`   | `IR record with stable id ∧ content hash ∧ authored form preserved` |
-| undeclared_stays_prose   | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `document_with_plain_fence()`               | `no doctest record ∧ no runner invoked`                        |
-| failing_run_records_fact | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `doctest_run_fails()`                       | `failed fact ∧ expected output unchanged`                      |
-| doctest_facts_count_test_runner | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `doctest_run_recorded()`          | `test-runner count +1 ∧ kind doctest ∧ no other source`        |
-| supersede_human_only     | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `supersede_by_tool_actor()`                 | `labeled refusal ∧ human event names record ∧ to_hash ∧ chain` |
+| id                              | kind | derives_from                                        | generator                             | predicate                                                           |
+|---------------------------------|------|-----------------------------------------------------|---------------------------------------|---------------------------------------------------------------------|
+| unknown_kind_refused            | unit | [[kaya.documents.layer.vocabulary_closed]]          | `projection_with_unlisted_kind()`     | `labeled refusal naming the value ∧ no document written`            |
+| intent_record_split             | unit | [[kaya.documents.layer.intent_record_separated]]    | `experiment_with_intent_and_run()`    | `spec rows ⊆ intent ∧ record rows ⊆ observed`                       |
+| legacy_block_refused            | unit | [[kaya.documents.layer.block_family_scoped]]        | `document_with_legacy_block_name()`   | `build refuses ∧ names block ∧ no write`                            |
+| empty_kind_silent               | unit | [[kaya.documents.layer.empty_kind_omitted]]         | `experiment_without_runs()`           | `no section ∧ summary reports kind once`                            |
+| reuse_reference_only            | unit | [[kaya.documents.layer.reuse_by_reference]]         | `knowledge_brief_from_turu_entries()` | `∀ item: source reference ∧ entity count unchanged`                 |
+| edges_rendered                  | unit | [[kaya.documents.layer.relationship_rendered]]      | `graph_with_typed_edges()`            | `∀ edge: rendered with type ∧ both endpoints`                       |
+| doctest_record_is_first_class   | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `document_with_declared_doctest()`    | `IR record with stable id ∧ content hash ∧ authored form preserved` |
+| undeclared_stays_prose          | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `document_with_plain_fence()`         | `no doctest record ∧ no runner invoked`                             |
+| failing_run_records_fact        | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `doctest_run_fails()`                 | `failed fact ∧ expected output unchanged`                           |
+| doctest_facts_count_test_runner | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `doctest_run_recorded()`              | `test-runner count +1 ∧ kind doctest ∧ no other source`             |
+| supersede_human_only            | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `supersede_by_tool_actor()`           | `labeled refusal ∧ human event names record ∧ to_hash ∧ chain`      |
 
 ## Requirements
 ### Requirement: Layer sidecar contract

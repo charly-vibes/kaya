@@ -1604,6 +1604,7 @@ fn cmd_doctest(out: &Path, project: &str, timeout: u64) -> Result<Envelope, Fail
     let mut passed = 0usize;
     let mut failed = 0usize;
     let mut failures: Vec<String> = Vec::new();
+    let mut labels: Vec<String> = Vec::new();
     let mut report_lines = String::new();
     for path in &documents {
         let text = fs::read_to_string(path).map_err(|err| {
@@ -1620,6 +1621,7 @@ fn cmd_doctest(out: &Path, project: &str, timeout: u64) -> Result<Envelope, Fail
         })?;
         for contract in &contracts {
             declared += 1;
+            labels.push(format!("{}#{}", path.display(), contract.label));
             match doctest::run(contract, std::time::Duration::from_secs(timeout)) {
                 doctest::Outcome::Passed => {
                     passed += 1;
@@ -1672,6 +1674,7 @@ fn cmd_doctest(out: &Path, project: &str, timeout: u64) -> Result<Envelope, Fail
             "passed": passed,
             "failed": failed,
             "failures": failures,
+            "labels": labels,
             "appended": appended,
             "duplicates": duplicates,
             "ledger": LEDGER_PATH,
@@ -1733,8 +1736,24 @@ fn cmd_supersede_doctest(
     let record_id = format!("{}#{label}", document.display());
     let to_hash = doctest::contract_hash(&contract.body);
     let previous = latest_supersede(&record_id)?;
-    let event = doctest::supersede_event(&record_id, &to_hash, previous.as_deref(), &human_actor(actor_name))
-        .map_err(|error| failure(error.label, error.message))?;
+    if let Some((_, previous_hash)) = &previous
+        && *previous_hash == to_hash
+    {
+        return Err(failure(
+            "kaya.supersede.unchanged",
+            format!(
+                "the expected output of \"{record_id}\" already carries hash {to_hash}; \
+                 edit the document first, then record the supersede"
+            ),
+        ));
+    }
+    let event = doctest::supersede_event(
+        &record_id,
+        &to_hash,
+        previous.as_ref().map(|(id, _)| id.as_str()),
+        &human_actor(actor_name),
+    )
+    .map_err(|error| failure(error.label, error.message))?;
     let mut ledger = open_ledger()?;
     let appended = match ledger.append(&event).map_err(ledger_failure)? {
         AppendOutcome::Appended => true,
@@ -1745,7 +1764,7 @@ fn cmd_supersede_doctest(
         json!({
             "record": record_id,
             "to_hash": to_hash,
-            "supersedes": previous,
+            "supersedes": previous.as_ref().map(|(id, _)| id),
             "event": event.id,
             "appended": appended,
             "ledger": LEDGER_PATH,
@@ -1753,15 +1772,16 @@ fn cmd_supersede_doctest(
     ))
 }
 
-/// The id of the newest supersede event naming `record_id`, if one exists.
-fn latest_supersede(record_id: &str) -> Result<Option<String>, Failure> {
+/// The id and recorded hash of the newest supersede event naming
+/// `record_id`, if one exists.
+fn latest_supersede(record_id: &str) -> Result<Option<(String, String)>, Failure> {
     let text = fs::read_to_string(LEDGER_PATH).map_err(|err| {
         failure(
             "kaya.supersede.ledger_io",
             format!("cannot read the ledger {LEDGER_PATH}: {err}"),
         )
     })?;
-    let mut latest: Option<Event> = None;
+    let mut latest: Option<(String, String)> = None;
     for line in text.lines() {
         if line.trim().is_empty() {
             continue;
@@ -1772,8 +1792,14 @@ fn latest_supersede(record_id: &str) -> Result<Option<String>, Failure> {
         if event.r#type == "verification.doctest.superseded"
             && event.data.get("record").and_then(|value| value.as_str()) == Some(record_id)
         {
-            latest = Some(event);
+            let to_hash = event
+                .data
+                .get("to_hash")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default()
+                .to_owned();
+            latest = Some((event.id, to_hash));
         }
     }
-    Ok(latest.map(|event| event.id))
+    Ok(latest)
 }

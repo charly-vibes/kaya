@@ -382,13 +382,19 @@ fn normalize(output: &str) -> String {
 ///
 /// The compiled research tree nests experiment reports beside the top-level
 /// documents, and a contract can be declared at either depth, so the walk
-/// covers the whole tree rather than one directory level.
+/// covers the whole tree rather than one directory level. Symlinks are
+/// skipped outright: a symlinked directory can cycle the walk, and the
+/// compiled tree has no need for either.
 pub fn collect_documents(root: &Path) -> std::io::Result<Vec<std::path::PathBuf>> {
     let mut documents = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
         for entry in fs::read_dir(&dir)? {
-            let path = entry?.path();
+            let entry = entry?;
+            if entry.file_type()?.is_symlink() {
+                continue;
+            }
+            let path = entry.path();
             if path.is_dir() {
                 stack.push(path);
             } else if path.extension().is_some_and(|extension| extension == "md") {
@@ -710,6 +716,55 @@ mod tests {
             .filter_map(|path| path.file_name().map(|name| name.to_string_lossy().to_string()))
             .collect();
         assert_eq!(names, vec!["b.md", "c.md"], "nested .md found, sorted, no .txt");
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn document_walk_skips_symlinks() {
+        use std::os::unix::fs::symlink;
+        let dir = temp_dir("walk-symlink");
+        fs::write(dir.join("a.md"), "a").unwrap();
+        symlink(&dir, dir.join("cycle")).unwrap();
+        let found = collect_documents(&dir).expect("the walk terminates despite the cycle");
+        assert_eq!(found.len(), 1, "the symlinked directory is skipped");
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn supersede_appends_through_the_ledger() {
+        let dir = temp_dir("supersede-ledger");
+        let actor = Actor {
+            r#type: ActorType::Human,
+            name: "sasha".to_string(),
+        };
+        let hash = contract_hash("$ echo hello\nhello\n");
+        let first =
+            supersede_event("docs/research/index.md#doctest-1", &hash, None, &actor)
+                .expect("a human may supersede");
+        // Ledger::open refuses a nonexistent record, exactly like the CLI does
+        // before `kaya init`; an empty file is an initialized empty ledger.
+        fs::File::create(dir.join("ledger.jsonl")).unwrap();
+        let mut ledger =
+            crate::ledger::Ledger::open(dir.join("ledger.jsonl")).expect("the ledger opens");
+        assert!(matches!(
+            ledger.append(&first).expect("the first supersede appends"),
+            crate::ledger::AppendOutcome::Appended
+        ));
+        let second = supersede_event(
+            "docs/research/index.md#doctest-1",
+            &hash,
+            Some(&first.id),
+            &actor,
+        )
+        .expect("a chained supersede builds");
+        assert!(matches!(
+            ledger.append(&second).expect("the chained supersede appends"),
+            crate::ledger::AppendOutcome::Appended
+        ));
+        drop(ledger);
+        crate::ledger::Ledger::open(dir.join("ledger.jsonl"))
+            .expect("the ledger reloads with both supersede events");
         fs::remove_dir_all(&dir).ok();
     }
 
