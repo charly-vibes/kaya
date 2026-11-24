@@ -237,11 +237,7 @@ impl Policy {
     /// comment, or a bare word ending at a comment. Anything after the
     /// closing quote that is not a comment is refused, so a typo can never
     /// silently become part of a glob.
-    fn assignment_value(
-        number: usize,
-        raw: &str,
-        value: &str,
-    ) -> Result<String, PolicyError> {
+    fn assignment_value(number: usize, raw: &str, value: &str) -> Result<String, PolicyError> {
         let Some(rest) = value.strip_prefix('"') else {
             let bare = value.split('#').next().unwrap_or("").trim();
             if bare.is_empty() {

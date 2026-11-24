@@ -812,17 +812,18 @@ fn range_gate_maps_committed_changes() {
 /// hard blocker, and an inline `#` comment survives parsing.
 #[test]
 fn policy_parse_refusals_and_comments() {
-    Policy::parse(
-        "[[rule]]\nid = \"r\"\nmatch = \"docs/**\"\ntargets = \"docs/**\"\n",
-    )
-    .expect_err("a rule without a severity is refused");
+    Policy::parse("[[rule]]\nid = \"r\"\nmatch = \"docs/**\"\ntargets = \"docs/**\"\n")
+        .expect_err("a rule without a severity is refused");
 
     let policy = Policy::parse(
         "[[rule]]\nid = \"r\" # the only rule\nmatch = \"NOTES.md\"\ntargets = \"docs/**\"\nseverity = \"advisory\"\n",
     )
     .expect("an inline comment parses");
     assert_eq!(policy.rules.len(), 1, "the comment adds no rule");
-    assert_eq!(policy.rules[0].id, "r", "the comment does not corrupt the id");
+    assert_eq!(
+        policy.rules[0].id, "r",
+        "the comment does not corrupt the id"
+    );
     assert_eq!(policy.rules[0].matches, "NOTES.md");
 
     Policy::parse("[[rule]]\nid = \"r\" trailing\nseverity = \"advisory\"\n")

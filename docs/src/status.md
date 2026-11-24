@@ -85,10 +85,11 @@ requires a nightly toolchain and an upstream format that is still unstable.
 
 ## In progress
 
-MVP-2 seams — continuous capture, agent traces, deduplication, relationship
-linking, missing-evidence detection, and incremental regeneration. The
-`dont`, whisper (turu), and specodelic adapters are specified but not
-written.
+The `dont` and specodelic adapters are specified but not written (deferred,
+tracked as kaya-dt2 and kaya-24c); the turu adapter shipped. The MVP-2 seams —
+continuous capture, agent traces, deduplication, missing-evidence detection,
+and incremental regeneration — are named but not yet specified; they start as
+openspec proposals when picked up.
 
 ## Dogfooding
 
