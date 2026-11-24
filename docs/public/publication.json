@@ -1332,6 +1332,12 @@
       "emitted": false,
       "name": "troubleshooting",
       "question": "why is this broken and how do I fix it"
+    },
+    {
+      "documents": [],
+      "emitted": false,
+      "name": "tutorial",
+      "question": "can you teach me through a guided outcome"
     }
   ]
 }

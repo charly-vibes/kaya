@@ -5,6 +5,7 @@
 mod build;
 mod common;
 mod compose;
+mod declarations;
 mod export;
 mod pages;
 mod reader;

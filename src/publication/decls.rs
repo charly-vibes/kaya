@@ -23,14 +23,18 @@ pub struct Decl {
 }
 
 /// Products `kaya publish` declares: the project-site pair, the six
-/// developer-guide products, and the status, release, and architecture
-/// products. Every include is the product's admission row, so a declaration can
-/// never widen a product beyond its contract. `tutorial` stays undeclared until
-/// its backing exploration documents have producers.
-const DEFAULT_PRODUCTS: [&str; 11] = [
+/// developer-guide products, the status and release products, and the
+/// architecture product — now including `tutorial`, whose admission rows
+/// (exploration.experiment-record, exploration.exploration-brief) have
+/// producers in the research projection. Every include is the product's
+/// admission row, so a declaration can never widen a product beyond its
+/// contract. Until exploration documents carry records, tutorial publishes
+/// as the spec-pinned `no-backing-document` omission instead of a page.
+const DEFAULT_PRODUCTS: [&str; 12] = [
     "overview",
     "reference",
     "getting-started",
+    "tutorial",
     "how-to",
     "concept",
     "example",
@@ -62,12 +66,12 @@ const DEFAULT_PACKAGES: [(&str, &[&str]); 2] = [
 const DEFAULT_COLLECTIONS: [&str; 1] = ["glossary"];
 
 /// The declarations `kaya publish` composes, and the ones `kaya check`
-/// expects: eleven products, two packages, and the glossary collection over
+/// expects: twelve products, two packages, and the glossary collection over
 /// the compiled research documents.
 ///
-/// The products are `overview`, `reference`, `getting-started`, `how-to`,
-/// `concept`, `example`, `troubleshooting`, `faq`, `status-compatibility`,
-/// `release-migration`, and `architecture-design`. The packages are
+/// The products are `overview`, `reference`, `getting-started`, `tutorial`,
+/// `how-to`, `concept`, `example`, `troubleshooting`, `faq`,
+/// `status-compatibility`, `release-migration`, and `architecture-design`. The packages are
 /// `project-site` (over `overview` and `reference`) and `developer-guide`
 /// (over the six `getting-started` through `faq` products). The collection is
 /// `glossary`, rendered from the compile-time vocabularies.

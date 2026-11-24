@@ -1296,7 +1296,7 @@ impl IrCollector {
     }
 }
 
-/// Compose the eleven declared products and both declared packages over the
+/// Compose the twelve declared products and both declared packages over the
 /// compiled research documents.
 ///
 /// The declarations are [`publication::default_declarations`], so `kaya

@@ -2037,6 +2037,7 @@ fn build_writes_overview_and_publish_uses_it() {
             { "tier": "product", "name": "faq", "reason": "no-backing-document" },
             { "tier": "product", "name": "how-to", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
+            { "tier": "product", "name": "tutorial", "reason": "no-backing-document" },
         ]),
         "every declared product without an admissible compiled document is omitted, sorted by name: {published}"
     );
@@ -2511,6 +2512,7 @@ fn publish_declares_every_product_and_reports_justified_omissions() {
             { "tier": "product", "name": "example", "reason": "no-backing-document" },
             { "tier": "product", "name": "faq", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
+            { "tier": "product", "name": "tutorial", "reason": "no-backing-document" },
         ]),
         "the omitted products are exactly the declared ones without an admissible document, sorted by name: {published}"
     );
@@ -2664,6 +2666,7 @@ fn publish_declares_the_remaining_products_and_export_agrees() {
             { "tier": "product", "name": "example", "reason": "no-backing-document" },
             { "tier": "product", "name": "faq", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
+            { "tier": "product", "name": "tutorial", "reason": "no-backing-document" },
         ]),
         "every remaining product is backed, so only the unbacked products are omitted: {published}"
     );
@@ -2678,7 +2681,7 @@ fn publish_declares_the_remaining_products_and_export_agrees() {
         .expect("the export lists products");
     assert_eq!(
         products.len(),
-        11,
+        12,
         "the export names every declared product, emitted or not: {export}"
     );
 
@@ -2909,6 +2912,7 @@ fn publish_preserves_authored_pages_at_omitted_product_paths() {
             { "tier": "product", "name": "release-migration", "reason": "no-backing-document" },
             { "tier": "product", "name": "status-compatibility", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
+            { "tier": "product", "name": "tutorial", "reason": "no-backing-document" },
         ]),
         "the products whose backing document disappeared are reported omitted: {second}"
     );

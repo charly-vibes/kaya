@@ -113,9 +113,10 @@ Status today: `kaya publish` reads `index.md`, `overview.md`,
 `understanding.md`, `reproduction-package.md`, `handoff.md`, and the experiment
 dossiers in that fixed order, keeping only generated blocks in the document
 vocabulary — so the overview and understanding kinds can back any product that
-admits them. Today's declarations are the eleven products `overview`,
-`reference`, `getting-started`, `how-to`, `concept`, `example`,
-`troubleshooting`, `faq`, `status-compatibility`, `release-migration`, and
+admits them. Today's declarations are the twelve products `overview`,
+`reference`, `getting-started`, `tutorial`, `how-to`, `concept`,
+`example`, `troubleshooting`, `faq`, `status-compatibility`,
+`release-migration`, and
 `architecture-design` — each including exactly its admission row — plus two
 packages: `project-site` over `overview` and `reference`, and
 `developer-guide` over the six developer products. The committed ledger emits
@@ -136,8 +137,12 @@ stubbed, so `reference` loses `reuse-handoff.technical-reference`,
 `no-backing-document`, because the committed ledger holds no Finding, Claim,
 Observation, Decision, or experiment record, so no `understanding.md` is
 compiled; `developer-guide` lists those members as unavailable and never stubs
-them. `tutorial` stays undeclared until its exploration documents have
-producers.
+them. `tutorial` is declared with its exploration admission rows
+(`exploration.experiment-record`, `exploration.exploration-brief`); until the
+committed ledger holds experiment records or the publication reader is taught
+`brief.md`, it publishes as the `no-backing-document` omission with an
+`emitted: false` export row, and gains a page the moment either producer
+lands.
 
 ## Collections and packages
 
