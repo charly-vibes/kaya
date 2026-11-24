@@ -56,6 +56,7 @@ tests and in real use.
 - kaya/Artifact/1bdef7b — 1bdef7b38389345ac182c452a0ea14419f90de4d
 - kaya/Artifact/1c2b3d3 — 1c2b3d3a9a787e6b8c05e7db9724a0b84e25a8f1
 - kaya/Artifact/1cfa1a1 — 1cfa1a18c3a199ddd0e9d476545d0f21e5e6e532
+- kaya/Artifact/1ddee00 — 1ddee0003bc527c7dd15b568b46c963655d778de
 - kaya/Artifact/1e0c0d7 — 1e0c0d797827152a76043f8dac2bc7a120fda03a
 - kaya/Artifact/1fa5b50 — 1fa5b50e6070c5d62305c1b128f5c6ff26d588fd
 - kaya/Artifact/21c5fdd — 21c5fddb1f559a58367ec81f7e1540aca7696207
@@ -321,6 +322,7 @@ tests and in real use.
 - kaya/Artifact/designs-2026-11-24-refactor-step-kaya-18o-recorded-on-refactor-step — .wai/projects/kaya/designs/2026-11-24-refactor-step-kaya-18o-recorded-on-refactor-step.md
 - kaya/Artifact/designs-2026-11-24-refactor-step-kaya-y5v-refactor-pass-recorded-sa — .wai/projects/kaya/designs/2026-11-24-refactor-step-kaya-y5v-refactor-pass-recorded-sa.md
 - kaya/Artifact/df81656 — df81656005a9c0e10b392db0af2b8b91a8436dc1
+- kaya/Artifact/dfe6d6c — dfe6d6c5772efb5d7e2c4ba97573ca307f0729c1
 - kaya/Artifact/e0685ac — e0685ac367a6a3f700a9034a408caa1845938a6d
 - kaya/Artifact/e178048 — e178048e81017f9667b091311aa7ce912483cd0e
 - kaya/Artifact/e21ae25 — e21ae253a005fcfb4b40532fbaf539115d08a7e1
@@ -809,5 +811,5 @@ tests and in real use.
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_763 nodes from 894 events._
+_765 nodes from 896 events._
 <!-- kaya:end generated:orientation.research-map -->
