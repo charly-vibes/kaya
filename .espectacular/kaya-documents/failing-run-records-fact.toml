@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "failing-run-records-fact"
+description = "A doctest run that exits nonzero or mismatches records a failed test-runner fact and leaves the expected output unchanged."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "failing_run_never_rewrites_expected_output"}]

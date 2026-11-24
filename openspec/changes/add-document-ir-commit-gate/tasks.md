@@ -23,16 +23,16 @@ with this proposal.
 
 ## 2. Doctests (kaya-documents)
 
-- [ ] 2.1 Doctest record type: runner, steps, expected output; extraction
+- [x] 2.1 Doctest record type: runner, steps, expected output; extraction
       from declared contracts only; stable ids and content hashes.
-- [ ] 2.2 Controlled runner: isolated workspace, timeout, expected-output
+- [x] 2.2 Controlled runner: isolated workspace, timeout, expected-output
       comparison under a pinned normalization policy (deterministic
       expectations; volatile output normalized before comparison); results
       recorded as test-runner facts (kind `doctest`) so verification counts
       them under `test-runner`.
-- [ ] 2.3 Supersede path for expected-output changes (human-recorded event;
+- [x] 2.3 Supersede path for expected-output changes (human-recorded event;
       no run result ever rewrites expected output).
-- [ ] 2.4 Deploy the kaya-documents delta with its property rows; bind the
+- [x] 2.4 Deploy the kaya-documents delta with its property rows; bind the
       scenarios.
 
 ## 3. Impact gate (kaya-impact)

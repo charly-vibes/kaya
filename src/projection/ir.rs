@@ -20,6 +20,8 @@ use std::path::Path;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+use crate::doctest;
+
 use super::report;
 use super::{BlockKind, Summary, scan};
 
@@ -66,6 +68,11 @@ pub enum RecordKind {
     },
     /// A human-maintained block, referenced — never copied.
     AuthoredBlock,
+    /// A declared doctest execution contract, extracted from authored prose.
+    Doctest {
+        /// The controlled runner that executes the contract.
+        runner: String,
+    },
     /// A composed record (publication page or collection) over other records.
     Composed,
 }
@@ -172,6 +179,28 @@ pub fn materialize(
                     content_hash: hash(&block.body),
                     provenance: Vec::new(),
                     cites,
+                    artifacts: Vec::new(),
+                    contains: Vec::new(),
+                },
+            );
+        }
+        for contract in doctest::extract(&source.bytes).unwrap_or_else(|error| {
+            panic!(
+                "materialize requires grammar-valid doctest declarations; {} refused: {error}",
+                source.path
+            )
+        }) {
+            let id = format!("{}#{}", source.path, contract.label);
+            records.insert(
+                id.clone(),
+                Record {
+                    id,
+                    kind: RecordKind::Doctest {
+                        runner: contract.runner.as_str().to_owned(),
+                    },
+                    content_hash: doctest::contract_hash(&contract.body),
+                    provenance: Vec::new(),
+                    cites: Vec::new(),
                     artifacts: Vec::new(),
                     contains: Vec::new(),
                 },
@@ -325,5 +354,75 @@ mod tests {
             .expect("the composed record exists");
         assert_eq!(page.contains.len(), 1);
         assert_ne!(page.content_hash, hash(""));
+    }
+
+    #[test]
+    fn declared_doctest_is_a_first_class_record() {
+        let sources = vec![SourceDocument {
+            path: "docs/research/index.md".to_string(),
+            bytes: authored_document("Prose.\n\n```doctest shell\n$ echo hello\nhello\n```\n"),
+        }];
+        let materialized = materialize(&sources, &[], &BTreeMap::new());
+        let record = materialized
+            .records
+            .get("docs/research/index.md#doctest-1")
+            .expect("the doctest record exists");
+        assert_eq!(
+            record.kind,
+            RecordKind::Doctest {
+                runner: "shell".to_string()
+            }
+        );
+        assert_eq!(
+            record.content_hash,
+            crate::doctest::contract_hash("$ echo hello\nhello\n")
+        );
+        assert!(
+            materialized
+                .records
+                .contains_key("docs/research/index.md#authored"),
+            "the authored record keeps its own record beside the doctest"
+        );
+    }
+
+    #[test]
+    fn doctest_label_is_stable() {
+        let sources = vec![SourceDocument {
+            path: "docs/research/index.md".to_string(),
+            bytes: authored_document(
+                "```doctest shell #build-check\n$ echo hello\nhello\n```\n",
+            ),
+        }];
+        let materialized = materialize(&sources, &[], &BTreeMap::new());
+        assert!(
+            materialized
+                .records
+                .contains_key("docs/research/index.md#build-check"),
+            "the declared label names the record: {:?}",
+            materialized.records.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn undeclared_code_stays_prose() {
+        let sources = vec![SourceDocument {
+            path: "docs/research/index.md".to_string(),
+            bytes: authored_document("```bash\n$ echo hello\nhello\n```\n"),
+        }];
+        let materialized = materialize(&sources, &[], &BTreeMap::new());
+        assert!(
+            !materialized
+                .records
+                .keys()
+                .any(|id| id.contains("doctest")),
+            "no doctest record for an undeclared fence: {:?}",
+            materialized.records.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            materialized
+                .records
+                .contains_key("docs/research/index.md#authored"),
+            "the fence stays inside the authored record"
+        );
     }
 }

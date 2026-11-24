@@ -1,0 +1,11 @@
+run_id: tdd-ro5u-2026-11-24-kaya-7es-doctest-execution-contracts
+pipeline: tdd-ro5u
+topic: kaya-7es doctest execution contracts
+created_at: '2026-11-24T14:20:17.696267547+00:00'
+current_step: 8
+approvals: {}
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

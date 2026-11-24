@@ -40,6 +40,17 @@ struct Counts {
 /// The report is only read: its mtime becomes the observation timestamp and
 /// its path becomes the provenance reference.
 pub fn capture(report: &Path, project: &str) -> Result<Event, AdapterError> {
+    capture_with_kind(report, project, None)
+}
+
+/// Like [`capture`], but tags the event's data with an extra closed `kind`
+/// string (the doctest runner records `doctest`). The kind joins the event
+/// identity, so a tagged capture and its untagged replay cannot share an id.
+pub fn capture_with_kind(
+    report: &Path,
+    project: &str,
+    kind: Option<&str>,
+) -> Result<Event, AdapterError> {
     let text = std::fs::read_to_string(report).map_err(|err| {
         failure(&format!(
             "test-runner: cannot read report {}: {err}",
@@ -96,12 +107,15 @@ pub fn capture(report: &Path, project: &str) -> Result<Event, AdapterError> {
     let total = counts.passed + counts.failed + counts.ignored;
     let slug = slug_for(report);
     let reference = report.display().to_string();
-    let data = serde_json::json!({
+    let mut data = serde_json::json!({
         "passed": counts.passed,
         "failed": counts.failed,
         "ignored": counts.ignored,
         "total": total,
     });
+    if let Some(kind) = kind {
+        data["kind"] = serde_json::json!(kind);
+    }
     let identity =
         format!("{SOURCE}\x1f{VERSION}\x1f{project}\x1f{timestamp}\x1f{reference}\x1f{data}");
     let digest = sha256_hex(identity.as_bytes());

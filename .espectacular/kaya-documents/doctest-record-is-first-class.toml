@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "doctest-record-is-first-class"
+description = "A declared example contract yields a doctest IR record with a stable id and a content hash, and the authored bytes stay untouched."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "declared_doctest_is_a_first_class_record"}]

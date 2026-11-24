@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-7es-doctest-execution-contracts, pipeline-step:fix-review]
+---
+
+RO5U-FIXES kaya-7es: CORR-001 HIGH — validate_generated_blocks now runs doctest::extract(doc).map(|_|()) as its final gate (projection/mod.rs), doc comment updated; malformed doctest declarations refuse with labeled ProjectionError at plan time in every planner (report/index/reuse); materialize panic stays as invariant guard. Test: document_gate_refuses_a_malformed_doctest. EDGE-003 MEDIUM — new doctest::collect_documents() recursive sorted .md walk; cmd_doctest uses it so docs/research/experiments/*.md participate. Test: document_walk_is_recursive_and_sorted. CLAR-001 LOW — report -> report_lines. EDGE-001 LOW — grammar limitation pinned in module docs. EDGE-002 LOW — spawn-failure 127 why-comment. EXCL-001 LOW — deferred to beads chore (table realign cosmetic, new open ticket). CORR-002 — no action (unreachable). Verification: cargo test all binaries ok (lib 26), clippy -D warnings clean, ah check --run-tests 205 passed 0 findings, live smoke kaya ir + kaya doctest green.

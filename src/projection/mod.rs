@@ -136,8 +136,10 @@ pub fn scan(doc: &str) -> Result<Vec<Block>, ProjectionError> {
 /// appears more than once in the document.
 ///
 /// Every projection validates its document with this gate before rendering or
-/// writing: a legacy block name and a repeated generated name are both refused
-/// with the document left untouched.
+/// writing: a legacy block name, a repeated generated name, and a malformed
+/// declared doctest contract are all refused with the document left
+/// untouched, so materialization can treat a broken declaration as an
+/// invariant violation rather than a user-facing refusal path.
 pub fn validate_generated_blocks(doc: &str) -> Result<(), ProjectionError> {
     let mut seen = BTreeSet::new();
     for block in scan(doc)? {
@@ -151,7 +153,7 @@ pub fn validate_generated_blocks(doc: &str) -> Result<(), ProjectionError> {
             }
         }
     }
-    Ok(())
+    crate::doctest::extract(doc).map(|_| ())
 }
 
 /// Replace the body of generated block `name` with `body`.

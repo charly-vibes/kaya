@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "undeclared-code-stays-prose"
+description = "A fenced code block with no declared execution contract creates no doctest record and invokes no runner."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "undeclared_code_stays_prose"}]

@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "failing-run-never-rewrites-expected-output"
+description = "A doctest run that exits nonzero or produces different output is recorded as a failed test-runner fact and leaves the expected output unchanged."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "failing_run_never_rewrites_expected_output"}]

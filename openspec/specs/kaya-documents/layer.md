@@ -29,6 +29,7 @@ knowledge store.
 | empty_kind_omitted       | invariant | `a kind with no source records emits no section, no placeholder row and no empty-value line; the build summary reports it once with family, kind and reason`                                                                     | [[kaya.documents.layer]] |
 | reuse_by_reference       | invariant | `technical-reference, reproduction-package, knowledge-brief and handoff render references to authoritative sources only — no ledger entity and no payload copy is created for referenced content`                                 | [[kaya.documents.layer]] |
 | relationship_rendered    | invariant | `research-map renders every declared relationship as a typed edge naming both endpoints and lists admitted entities that carry no edges`                                                                                         | [[kaya.documents.layer]] |
+| doctest_contracts_declared | invariant | `only a fenced block declaring a doctest execution contract becomes a first-class IR record with a stable id and a content hash; undeclared code stays prose; a contract's expected output changes only through a human-recorded supersede event, and no run result ever rewrites it` | [[kaya.documents.layer]] |
 
 ## Model
 
@@ -55,7 +56,12 @@ knowledge store.
 | legacy_block_refused     | unit | [[kaya.documents.layer.block_family_scoped]]      | `document_with_legacy_block_name()`        | `build refuses ∧ names block ∧ no write`                       |
 | empty_kind_silent        | unit | [[kaya.documents.layer.empty_kind_omitted]]       | `experiment_without_runs()`                | `no section ∧ summary reports kind once`                       |
 | reuse_reference_only     | unit | [[kaya.documents.layer.reuse_by_reference]]       | `knowledge_brief_from_turu_entries()`      | `∀ item: source reference ∧ entity count unchanged`            |
-| edges_rendered           | unit | [[kaya.documents.layer.relationship_rendered]]    | `graph_with_typed_edges()`                 | `∀ edge: rendered with type ∧ both endpoints`                  |
+| edges_rendered           | unit | [[kaya.documents.layer.relationship_rendered]]    | `graph_with_typed_edges()`                  | `∀ edge: rendered with type ∧ both endpoints`                  |
+| doctest_record_is_first_class | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `document_with_declared_doctest()`   | `IR record with stable id ∧ content hash ∧ authored form preserved` |
+| undeclared_stays_prose   | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `document_with_plain_fence()`               | `no doctest record ∧ no runner invoked`                        |
+| failing_run_records_fact | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `doctest_run_fails()`                       | `failed fact ∧ expected output unchanged`                      |
+| doctest_facts_count_test_runner | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `doctest_run_recorded()`          | `test-runner count +1 ∧ kind doctest ∧ no other source`        |
+| supersede_human_only     | unit | [[kaya.documents.layer.doctest_contracts_declared]] | `supersede_by_tool_actor()`                 | `labeled refusal ∧ human event names record ∧ to_hash ∧ chain` |
 
 ## Requirements
 ### Requirement: Layer sidecar contract

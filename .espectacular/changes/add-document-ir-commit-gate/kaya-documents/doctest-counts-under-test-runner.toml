@@ -1,0 +1,9 @@
+id = "doctest-counts-under-test-runner"
+description = "A recorded doctest run is counted by the verification report under the test-runner source with kind doctest, and no other source names it."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "doctest_counts_under_test_runner"}]

@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "supersede-human-only"
+description = "A tool or agent actor is refused when superseding expected output; a human supersede names the record, the new hash, and the superseded event."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "supersede_refuses_a_tool_actor"}, {flags = "supersede_refuses_an_agent_actor"}, {flags = "supersede_records_a_human_event"}]

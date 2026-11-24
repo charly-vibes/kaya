@@ -6,6 +6,7 @@
 //! gate.
 
 pub mod adapters;
+pub mod doctest;
 pub mod envelope;
 pub mod event;
 pub mod ledger;

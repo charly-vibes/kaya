@@ -22,6 +22,7 @@ use kaya::ledger::{AppendOutcome, Ledger, LedgerError, changed_event_ids, sha256
 use serde_json::json;
 
 use kaya::adapters::{AdapterError, git, testrunner, turu, wai};
+use kaya::doctest;
 use kaya::envelope::Envelope;
 use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, new_id, parse_line};
 use kaya::model::{self, EntityType, ModelError};
@@ -159,6 +160,32 @@ enum Command {
         #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
         actor_type: String,
     },
+    /// Run every declared doctest contract and record the run as one fact
+    Doctest {
+        /// Research projection directory holding the document sources
+        #[arg(long, default_value = "docs/research", value_name = "DIR")]
+        out: PathBuf,
+        /// Project namespace recorded in the event identity
+        #[arg(long, default_value = "kaya", value_name = "NAME")]
+        project: String,
+        /// Wall-clock budget for the whole run, in seconds
+        #[arg(long, default_value_t = 10, value_name = "SECS")]
+        timeout: u64,
+    },
+    /// Record a human decision that a doctest's expected output changed
+    SupersedeDoctest {
+        /// Document carrying the doctest
+        document: PathBuf,
+        /// Doctest label, e.g. `doctest-1` or a declared label
+        #[arg(long, value_name = "NAME")]
+        label: String,
+        /// Name of the superseding human
+        #[arg(long, value_name = "NAME")]
+        actor: String,
+        /// Actor kind; only `human` may supersede expected output
+        #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
+        actor_type: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -289,6 +316,17 @@ fn main() -> ExitCode {
             actor,
             actor_type,
         } => cmd_acknowledge(&document, &block, &events, &actor, &actor_type),
+        Command::Doctest {
+            out,
+            project,
+            timeout,
+        } => cmd_doctest(&out, &project, timeout),
+        Command::SupersedeDoctest {
+            document,
+            label,
+            actor,
+            actor_type,
+        } => cmd_supersede_doctest(&document, &label, &actor, &actor_type),
     };
     emit(outcome.unwrap_or_else(|(label, message)| Envelope::error("error", &label, message)))
 }
@@ -1545,4 +1583,197 @@ fn acknowledge_ledger_failure(error: LedgerError) -> Failure {
         "kaya.acknowledge.ledger",
         format!("{}: {}", error.label, error.message),
     )
+}
+
+/// Run every declared doctest contract and record the run as one fact.
+///
+/// Documents are read in sorted order, every declared contract runs through
+/// the controlled runner, and one `experiment.run.completed` event of kind
+/// `doctest` records the run's counts. A document that refuses the doctest
+/// grammar fails the whole run before any step executes; a failing step is
+/// recorded as a failed count and the run still records its fact.
+fn cmd_doctest(out: &Path, project: &str, timeout: u64) -> Result<Envelope, Failure> {
+    let documents = doctest::collect_documents(out).map_err(|err| {
+        failure(
+            "kaya.doctest.unknown_dir",
+            format!("cannot read document directory {}: {err}", out.display()),
+        )
+    })?;
+
+    let mut declared = 0usize;
+    let mut passed = 0usize;
+    let mut failed = 0usize;
+    let mut failures: Vec<String> = Vec::new();
+    let mut report_lines = String::new();
+    for path in &documents {
+        let text = fs::read_to_string(path).map_err(|err| {
+            failure(
+                "kaya.doctest.document_io",
+                format!("cannot read {}: {err}", path.display()),
+            )
+        })?;
+        let contracts = doctest::extract(&text).map_err(|error| {
+            failure(
+                "kaya.doctest.grammar",
+                format!("{}: {error}", path.display()),
+            )
+        })?;
+        for contract in &contracts {
+            declared += 1;
+            match doctest::run(contract, std::time::Duration::from_secs(timeout)) {
+                doctest::Outcome::Passed => {
+                    passed += 1;
+                    report_lines.push_str("{\"type\":\"test\",\"event\":\"ok\"}\n");
+                }
+                doctest::Outcome::Failed { step, reason } => {
+                    failed += 1;
+                    failures.push(format!(
+                        "{}#{} step {}: {}",
+                        path.display(),
+                        contract.label,
+                        step,
+                        describe_failure(&reason),
+                    ));
+                    report_lines.push_str("{\"type\":\"test\",\"event\":\"failed\"}\n");
+                }
+            }
+        }
+    }
+
+    let mut appended = 0usize;
+    let mut duplicates = 0usize;
+    if declared > 0 {
+        let report_path = Path::new(".kaya/doctest-run.jsonl");
+        fs::create_dir_all(KAYA_DIR).map_err(|err| {
+            failure(
+                "kaya.doctest.report_io",
+                format!("cannot create {KAYA_DIR}: {err}"),
+            )
+        })?;
+        fs::write(report_path, &report_lines).map_err(|err| {
+            failure(
+                "kaya.doctest.report_io",
+                format!("cannot write {}: {err}", report_path.display()),
+            )
+        })?;
+        let event = doctest::capture_with_kind(report_path, project, Some("doctest"))
+            .map_err(adapter_failure)?;
+        let mut ledger = open_ledger()?;
+        match ledger.append(&event).map_err(ledger_failure)? {
+            AppendOutcome::Appended => appended += 1,
+            AppendOutcome::Duplicate => duplicates += 1,
+        }
+    }
+
+    Ok(Envelope::ok(
+        "doctest",
+        json!({
+            "declared": declared,
+            "passed": passed,
+            "failed": failed,
+            "failures": failures,
+            "appended": appended,
+            "duplicates": duplicates,
+            "ledger": LEDGER_PATH,
+        }),
+    ))
+}
+
+/// Human-readable phrasing of one failed step.
+fn describe_failure(reason: &doctest::Failure) -> String {
+    match reason {
+        doctest::Failure::Exit(code) => format!("exited with {code}"),
+        doctest::Failure::Mismatch => "output did not match".to_owned(),
+        doctest::Failure::Timeout => "timed out".to_owned(),
+    }
+}
+
+/// Record a human decision that a doctest's expected output changed.
+///
+/// The human edits the document first; this command records the event
+/// naming the new expected-output hash, so the ledger shows who changed a
+/// contract and when. A tool or agent actor is refused here exactly as the
+/// library refuses it: expected output answers to humans only.
+fn cmd_supersede_doctest(
+    document: &Path,
+    label: &str,
+    actor_name: &str,
+    actor_type: &str,
+) -> Result<Envelope, Failure> {
+    if actor_type != "human" {
+        return Err(failure(
+            "kaya.supersede.tool_actor",
+            format!(
+                "actor type \"{actor_type}\" may not supersede doctest expected output; \
+                 only a human can declare what a human verified"
+            ),
+        ));
+    }
+    let text = fs::read_to_string(document).map_err(|err| {
+        failure(
+            "kaya.supersede.document_io",
+            format!("cannot read {}: {err}", document.display()),
+        )
+    })?;
+    let contracts = doctest::extract(&text).map_err(|error| {
+        failure(
+            "kaya.doctest.grammar",
+            format!("{}: {error}", document.display()),
+        )
+    })?;
+    let contract = contracts.iter().find(|contract| contract.label == label).ok_or_else(|| {
+        failure(
+            "kaya.supersede.unknown_doctest",
+            format!(
+                "document {} declares no doctest labeled \"{label}\"",
+                document.display()
+            ),
+        )
+    })?;
+    let record_id = format!("{}#{label}", document.display());
+    let to_hash = doctest::contract_hash(&contract.body);
+    let previous = latest_supersede(&record_id)?;
+    let event = doctest::supersede_event(&record_id, &to_hash, previous.as_deref(), &human_actor(actor_name))
+        .map_err(|error| failure(error.label, error.message))?;
+    let mut ledger = open_ledger()?;
+    let appended = match ledger.append(&event).map_err(ledger_failure)? {
+        AppendOutcome::Appended => true,
+        AppendOutcome::Duplicate => false,
+    };
+    Ok(Envelope::ok(
+        "supersede-doctest",
+        json!({
+            "record": record_id,
+            "to_hash": to_hash,
+            "supersedes": previous,
+            "event": event.id,
+            "appended": appended,
+            "ledger": LEDGER_PATH,
+        }),
+    ))
+}
+
+/// The id of the newest supersede event naming `record_id`, if one exists.
+fn latest_supersede(record_id: &str) -> Result<Option<String>, Failure> {
+    let text = fs::read_to_string(LEDGER_PATH).map_err(|err| {
+        failure(
+            "kaya.supersede.ledger_io",
+            format!("cannot read the ledger {LEDGER_PATH}: {err}"),
+        )
+    })?;
+    let mut latest: Option<Event> = None;
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let Ok(event) = parse_line(line) else {
+            continue;
+        };
+        if event.r#type == "verification.doctest.superseded"
+            && event.data.get("record").and_then(|value| value.as_str()) == Some(record_id)
+        {
+            latest = Some(event);
+        }
+    }
+    Ok(latest.map(|event| event.id))
 }

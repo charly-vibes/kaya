@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "declared-doctest-is-a-first-class-record"
+description = "A declared example yields a doctest IR record with a stable id and a content hash, and the rendered block keeps the example's authored form."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "declared_doctest_is_a_first_class_record"}]

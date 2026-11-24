@@ -1,0 +1,11 @@
+tool_version = "0.12.3"
+
+id = "doctest-facts-count-test-runner"
+description = "The facts count a recorded doctest run under the test-runner source with kind doctest, and no other source names it."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "doctest_counts_under_test_runner"}]
