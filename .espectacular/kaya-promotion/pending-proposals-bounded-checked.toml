@@ -8,4 +8,4 @@ superseded_by = ""
 authored_with = "0.12.2"
 
 [tests]
-cargo = [{flags = "cap_proposals_ranks_then_caps_at_budget"}]
+cargo = [{flags = "cap_proposals_ranks_then_caps_at_budget"}, {flags = "status_caps_pending_proposals_at_the_budget"}]

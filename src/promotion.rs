@@ -462,6 +462,10 @@ pub fn challenge(
     })
 }
 
+/// One session-close's approval budget, per `pending_proposals_bounded`:
+/// over-cap generation is ranked and capped, never surfaced whole.
+pub const PROPOSAL_BUDGET: usize = 16;
+
 /// Rank pending proposals and keep at most `budget` of them.
 ///
 /// Ranking is deterministic: more cited events first, then assertion id

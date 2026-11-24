@@ -32,7 +32,7 @@ use kaya::model::{self, EntityType, ModelError};
 use kaya::projection::{
     BlockKind, ProjectionError, StaleBlock, Summary, index, ir, report, reuse, scan,
 };
-use kaya::promotion::{self, PromotionError, PromotionState};
+use kaya::promotion::{self, PROPOSAL_BUDGET, PromotionError, PromotionState, cap_proposals};
 use kaya::publication;
 use kaya::verification;
 
@@ -641,7 +641,8 @@ fn is_event_record(line: &[u8]) -> bool {
     map.get("schema").and_then(serde_json::Value::as_str) == Some(SCHEMA_V0)
 }
 
-/// Count assertions awaiting human approval.
+/// Count assertions awaiting human approval, capped at `PROPOSAL_BUDGET`
+/// (ranked and capped per `pending_proposals_bounded`, never surfaced whole).
 ///
 /// Status stays a cheap, non-failing read: lines that do not parse as
 /// `kaya.event/v0` records are skipped here and reported by the commands
@@ -668,7 +669,7 @@ fn pending_proposals() -> Result<usize, Failure> {
         }
     }
     PromotionState::from_events(&events)
-        .map(|state| state.pending_count())
+        .map(|state| cap_proposals(&state.assertions, PROPOSAL_BUDGET).len())
         .map_err(promotion_failure)
 }
 

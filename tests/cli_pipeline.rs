@@ -1719,6 +1719,35 @@ fn status_counts_pending_proposals() {
     );
 }
 
+/// Over-budget generation is ranked/capped at the point of use, never surfaced
+/// whole (pending_proposals_bounded).
+#[test]
+fn status_caps_pending_proposals_at_the_budget() {
+    let budget = kaya::promotion::PROPOSAL_BUDGET;
+
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    // write_ledger replaces the file, so all assertion lines are written in
+    // one batch instead of one overwriting call at a time.
+    let lines: Vec<String> = (1..=(budget + 1))
+        .map(|i| {
+            event_line(&assertion_event(
+                &format!("assertion-{i}"),
+                "the model holds",
+                &["evt"],
+            ))
+        })
+        .collect();
+    write_ledger(&dir, &lines);
+
+    let status = assert_success(&run(&dir, &["status"]));
+    assert_eq!(
+        status["data"]["pending_proposals"],
+        json!(budget),
+        "status surfaces at most the proposal budget, not every proposal"
+    );
+}
+
 #[test]
 fn promote_then_challenge_records_human_events() {
     let dir = tempfile::tempdir().unwrap();
