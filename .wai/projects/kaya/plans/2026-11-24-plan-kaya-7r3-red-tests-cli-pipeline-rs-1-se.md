@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-7r3-incremental-regeneration, pipeline-step:plan]
+---
+
+PLAN kaya-7r3: red — tests/cli_pipeline.rs: (1) second_identical_build_performs_zero_render_invocations: seed -> build -> snapshot sorted (path, sha256) of docs/research tree -> build --instrument -> assert data.render_invocations == 0, tree byte-identical, recomputed empty; (2) new_event_recomputes_affected_projections: append one event -> build --instrument -> render_invocations > 0 and the affected document in recomputed. (Unknown flag = red today.) Green — src/projection/state.rs (BuildState load/store/verify + inline unit tests); cmd_build loads state, applies skip predicate per document, restores bookkeeping on skip, updates per-document state post-build, atomic write at end; RENDER_CALLS AtomicUsize + helper bumped at the 11 render constructors; --instrument flag surfaces count; .gitignore + CHANGELOG + status.md notes. Refactor: none planned beyond extraction if cmd_build grows. Review: RO5U. Ledger/ship per gates. Tier 2 signatures -> follow-up ticket at ship.

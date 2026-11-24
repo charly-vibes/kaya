@@ -13,8 +13,8 @@ pub mod testrunner;
 pub mod turu;
 pub mod wai;
 
-pub use crate::ledger::sha256_hex;
 use crate::event::Event;
+pub use crate::ledger::sha256_hex;
 
 /// Digest characters retained in a correction id, mirroring the adapters' id length.
 const CORRECTION_ID_LEN: usize = 26;
@@ -46,8 +46,7 @@ pub fn reobservation_correction(event: &Event, generation: usize) -> Event {
 /// used to decide whether a `Duplicate` replay must re-correct.
 pub fn stored_correction_for(stored: &[Event], event: &Event) -> bool {
     stored.iter().any(|stored_event| {
-        stored_event.data.get("supersedes")
-            == Some(&serde_json::Value::String(event.id.clone()))
+        stored_event.data.get("supersedes") == Some(&serde_json::Value::String(event.id.clone()))
     })
 }
 
@@ -72,7 +71,7 @@ pub fn correction_generation(stored: &[Event], event: &Event) -> usize {
                 .as_object_mut()
                 .expect("event data is a JSON object")
                 .remove("supersedes");
-            &payload != &event.data
+            payload != event.data
         })
         .count()
 }

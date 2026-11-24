@@ -1,0 +1,13 @@
+run_id: tdd-ro5u-2026-11-24-kaya-7r3-incremental-regeneration
+pipeline: tdd-ro5u
+topic: kaya-7r3 incremental regeneration
+created_at: '2026-11-24T19:55:34.644254601+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-24T20:25:47.404332461+00:00'
+  refactor: '2026-11-24T20:14:52.360636120+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

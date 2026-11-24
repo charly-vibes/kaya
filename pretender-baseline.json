@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "adopted_at": "2026-11-24T20:25:14Z",
+  "adopted_at": "2026-11-24T20:28:10Z",
   "finding_ids": [
     "src/ledger.rs::::file_lines",
     "src/ledger.rs::append::function_lines_max",
@@ -37,6 +37,15 @@
     "src/model.rs::check_acyclic::function_lines_max",
     "src/model.rs::check_acyclic::nesting_max",
     "src/model.rs::relationship_from_event::function_lines_max",
+    "src/projection/index.rs::render::abc_max",
+    "src/projection/index.rs::render::function_lines_max",
+    "src/projection/mod.rs::::file_lines",
+    "src/projection/mod.rs::remove_generated::function_lines_max",
+    "src/projection/mod.rs::replace_generated::abc_max",
+    "src/projection/mod.rs::replace_generated::function_lines_max",
+    "src/projection/mod.rs::scan_spans::abc_max",
+    "src/projection/mod.rs::scan_spans::cognitive_max",
+    "src/projection/mod.rs::scan_spans::function_lines_max",
     "src/projection/report.rs::::file_lines",
     "src/projection/report.rs::acknowledged::abc_max",
     "src/projection/report.rs::acknowledged::function_lines_max",
@@ -52,6 +61,12 @@
     "src/projection/report.rs::render_record::function_lines_max",
     "src/projection/report.rs::stale_authored::function_lines_max",
     "src/projection/report.rs::validate_citations::nesting_max",
+    "src/projection/reuse.rs::::file_lines",
+    "src/projection/reuse.rs::build::function_lines_max",
+    "src/projection/reuse.rs::inputs::abc_max",
+    "src/projection/reuse.rs::inputs::function_lines_max",
+    "src/projection/reuse.rs::plan::function_lines_max",
+    "src/projection/reuse.rs::plan_document::function_lines_max",
     "src/promotion.rs::::file_lines",
     "src/promotion.rs::challenge::function_lines_max",
     "src/promotion.rs::establish::function_lines_max",
@@ -104,6 +119,14 @@
     "tests/cli_pipeline.rs::publish_declares_the_remaining_products_and_export_agrees::function_lines_max",
     "tests/cli_pipeline.rs::publish_declares_the_remaining_products_and_export_agrees::nesting_max",
     "tests/cli_pipeline.rs::publish_preserves_authored_pages_at_omitted_product_paths::function_lines_max",
-    "tests/cli_pipeline.rs::revert_to_original_heading_mints_correction::abc_max"
+    "tests/cli_pipeline.rs::revert_to_original_heading_mints_correction::abc_max",
+    "tests/status_build_properties.rs::::file_lines",
+    "tests/status_build_properties.rs::build_accepts::cognitive_max",
+    "tests/status_build_properties.rs::build_accepts::cyclomatic_max",
+    "tests/status_build_properties.rs::build_accepts::nesting_max",
+    "tests/status_build_properties.rs::run_cell::abc_max",
+    "tests/status_build_properties.rs::run_cell::cyclomatic_max",
+    "tests/status_build_properties.rs::run_cell::function_lines_max",
+    "tests/status_build_properties.rs::status_build_envelope_parity::min_assertions"
   ]
 }

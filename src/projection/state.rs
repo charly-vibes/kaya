@@ -122,32 +122,19 @@ impl BuildState {
     }
 
     /// Attach the recorded document contributions.
-    pub fn with_documents(
-        mut self,
-        documents: BTreeMap<String, DocumentState>,
-    ) -> Self {
+    pub fn with_documents(mut self, documents: BTreeMap<String, DocumentState>) -> Self {
         self.documents = documents;
         self
     }
 
     /// The loaded state, when it matches this build's generator and ledger.
-    pub fn current(
-        saved: Option<Self>,
-        ledger_digest: &str,
-    ) -> Option<Self> {
-        saved.filter(|state| {
-            state.generator == GENERATOR
-                && state.ledger_digest == ledger_digest
-        })
+    pub fn current(saved: Option<Self>, ledger_digest: &str) -> Option<Self> {
+        saved.filter(|state| state.generator == GENERATOR && state.ledger_digest == ledger_digest)
     }
 
     /// The skip predicate: the recorded fingerprint still equals the current
     /// on-disk bytes for `paths`.
-    pub fn skippable(
-        &self,
-        key: &str,
-        paths: &[(String, PathBuf)],
-    ) -> Option<&DocumentState> {
+    pub fn skippable(&self, key: &str, paths: &[(String, PathBuf)]) -> Option<&DocumentState> {
         let entry = self.documents.get(key)?;
         (entry.content_hash == fingerprint(paths)).then_some(entry)
     }
@@ -166,9 +153,8 @@ impl BuildState {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let bytes = serde_json::to_vec_pretty(self).map_err(|error| {
-            io::Error::new(io::ErrorKind::InvalidData, error.to_string())
-        })?;
+        let bytes = serde_json::to_vec_pretty(self)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
         let temp = path.with_extension("json.tmp");
         if let Err(error) = fs::write(&temp, bytes).and_then(|()| fs::rename(&temp, path)) {
             let _ = fs::remove_file(&temp);

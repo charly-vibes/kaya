@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-y5v-exploration-brief-generator, pipeline-step:plan]
+---
+
+PLAN kaya-y5v: red first — new CLI tests in tests/cli_pipeline.rs: (1) run-only ledger -> build envelope omits {family:exploration,kind:exploration-brief,reason:no-records}; (2) ledger seeded with Question+Idea+Hypothesis node events -> build emits brief.md (exploration.exploration-brief) with ## Question/## Idea/## Hypothesis id sections and no exploration-brief omission; (3) stale brief.md without records is removed by build (empty-doc deletion semantics). Green: render_brief (entity_rows over [Question, Idea, Hypothesis], None when all empty), plan_brief + build_brief via plan_project_document/commit_project_document, BRIEF_BLOCK const, cmd_build + collect_document_ir wiring. Then update broken contract tests (verification emitted_kinds/sources/required exact lists; any omission-list fixtures). Refactor: only if duplication with plan_overview emerges. Review: RO5U on the diff. Ledger/ship per gates.

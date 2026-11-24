@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-ism-capture-commands-openspec-proposal, pipeline-step:orient]
+---
+
+ORIENT kaya-ism: design ticket authored by subagent per scout brief (docs promise index.md:96-98; status.md:93-96; entity/relationship closed sets; event schema frozen 9 fields; interpretation keys refused; ledger byte-exact dedup + supersedes corrections; redaction commitment proposal.md:94-105; actor rules tool_refusal/approval_refusal). Change add-capture-commands: proposal.md (4 subcommands, --actor/--actor-type convention, 5 inherited commitments, kaya-w9t unblock), specs/kaya-capture/spec.md (new capability, 7 ADDED requirements, 23 scenarios), design.md (D1 note->Observation, no kaya-model delta; D2 reuse model.entity.created over new capture kinds; D3 wai-style identity ids + generation-salted corrections from shipped kaya-msh seam; D4 redact-first before bound so stored bytes stay hash-consistent; D5 human default/agent opt-in/tool refused), tasks.md 1.1-1.24 one per scenario, .openspec.yaml spec-driven. openspec validate --strict: [PENDING-RECHECK].

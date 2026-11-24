@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-w66-cap-proposals-production-caller, pipeline-step:quality-ledger]
+---
+
+QUALITY LEDGER kaya-w66 — Changed: src/promotion.rs (PROPOSAL_BUDGET const + doc restoration), src/main.rs (pending_proposals caps via cap_proposals; doc updated), tests/cli_pipeline.rs (status_caps_pending_proposals_at_the_budget), .espectacular/kaya-promotion/pending-proposals-bounded-checked.toml (+binding). Verified: cargo test 435/0; contract tests cap_proposals_ranks_then_caps_at_budget and proposals_never_expire_or_settle_silently untouched and green; ah check pending final gates. Review: RO5U READY, 0 C/H; MEDIUM+LOW doc findings fixed in-step. Risks: dossier (cmd_build) surface still reports uncapped pending_count — pre-existing, recorded as deliberate scope; cost note: cap clones+sorts pending assertions per status call (negligible at session scale, reviewer-accepted). Next: none in-ticket; invariant-symmetry for dossier surfaces is a candidate future ticket.

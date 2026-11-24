@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-24-kaya-18o-collections-tier-tracer
+pipeline: tdd-ro5u
+topic: kaya-18o collections tier tracer
+created_at: '2026-11-24T19:51:00.962334391+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-24T20:17:20.377117500+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

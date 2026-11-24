@@ -1,0 +1,5 @@
+RO5U kaya-4gv review (reviewer, CONVERGED stage 4, verdict NEEDS_REVISION): C:0 H:1 M:1 L:1 — all mechanically evidenced; TypeSafe pass failed at API layer (banner: self-reported validation in effect).
+[CORR-002][HIGH] tasks/proposal lacked the repo bindings convention (.espectacular overlay+deployed tomls for 7 new scenarios, ah check --changes verify task, header phrase, proposal What Changes bullet). FIXED by authoring agent.
+[CORR-001][MEDIUM] false acyclicity premise ("a Source admits no outgoing grammar edge" — wrong: investigates/predicts/supports/challenges undirected) replaced with exact-pair fact. FIXED.
+[CLAR-001][LOW] tasks 2.1 extended to amend Relationship enum doc comment (cites+grounds). FIXED.
+Verified-consistent: MODIFIED delta byte-identical to deployed except claimed additions; layer sidecar mirror clean (20 rows <-> 20 scenarios 1:1); all src/model.rs claims verified (enum :145-158, ALL :160-172, fixed_direction :195-212, requires_exact_pair five :214-221); no hidden test-update scope (closed-set test uses contains-checks). Note for archive time: openspec/specs/kaya-model/layer.md does not exist in deployment (predecessor same).

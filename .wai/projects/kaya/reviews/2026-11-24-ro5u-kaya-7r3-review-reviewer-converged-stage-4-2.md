@@ -1,0 +1,13 @@
+---
+reviews: 2026-11-24-quality-ledger-kaya-7r3-changed-src-projection.md
+verdict: pass
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-7r3-incremental-regeneration, pipeline-step:ro5u-review]
+---
+
+RO5U kaya-7r3 review (reviewer, CONVERGED stage 4, verdict NEEDS_REVISION): C:0 H:1 M:1 L:1; TypeSafe unavailable (banner) — self-reported validation; CORR-001 verified empirically via a real 3-build CLI run.
+[CORR-001][HIGH] Skip arms dropped matched DocumentState; persisted state empty after an all-skipped run, so the gate fired only once per real build (measured 0 -> 14 -> alternating). FIXED: documents init from saved.documents.clone() (main.rs:844-851).
+[CORR-002][MEDIUM] Metered tests never observed the third build. FIXED: third instrumented build asserts 0; post-recompute steady-state build asserts 0.
+[EXCL-001][LOW] Orphaned .kaya/build-state.json.tmp on crash between write and rename. FIXED: store() removes temp on failure.
+Verified-clean: skip predicate sound (digest+generator+absence-aware fingerprint); restore mirrors merge_summary field-for-field (measured byte-identical trees); check/build separation holds (state:: only in cmd_build); atomic store success-only; default envelope byte-identical; exemption scoped (temp deliberately not exempted).
+Stage quality: 1 draft GOOD, 2 correctness FAIR->fixed, 3 clarity EXCELLENT, 4 edge GOOD, 5 excellence GOOD. Converged stage 4.
+

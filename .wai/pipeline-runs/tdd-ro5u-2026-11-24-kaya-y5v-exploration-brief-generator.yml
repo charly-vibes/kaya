@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-24-kaya-y5v-exploration-brief-generator
+pipeline: tdd-ro5u
+topic: kaya-y5v exploration-brief generator
+created_at: '2026-11-24T19:45:43.322205651+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-24T20:06:37.545739877+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

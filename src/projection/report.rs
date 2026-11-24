@@ -487,7 +487,10 @@ pub fn build_overview(graph: &Graph, path: &Path) -> Result<Built, ProjectionErr
 
 /// The bytes and bookkeeping `build_overview` would commit.
 pub fn plan_overview(graph: &Graph, existing: Option<&str>) -> Result<Planned, ProjectionError> {
-    plan_project_document(existing, vec![(Kind::ProjectOverview, render_overview(graph))])
+    plan_project_document(
+        existing,
+        vec![(Kind::ProjectOverview, render_overview(graph))],
+    )
 }
 
 /// Compile the exploration brief for the whole project.
@@ -507,7 +510,10 @@ pub fn build_brief(graph: &Graph, path: &Path) -> Result<Built, ProjectionError>
 
 /// The bytes and bookkeeping `build_brief` would commit.
 pub fn plan_brief(graph: &Graph, existing: Option<&str>) -> Result<Planned, ProjectionError> {
-    plan_project_document(existing, vec![(Kind::ExplorationBrief, render_brief(graph))])
+    plan_project_document(
+        existing,
+        vec![(Kind::ExplorationBrief, render_brief(graph))],
+    )
 }
 
 /// The pure project-level commit policy shared by the writer and `kaya check`.

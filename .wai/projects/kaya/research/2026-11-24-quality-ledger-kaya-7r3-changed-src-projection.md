@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-7r3-incremental-regeneration, pipeline-step:ro5u-review]
+---
+
+QUALITY LEDGER kaya-7r3 — Changed: src/projection/state.rs (new), src/projection/{mod,index,report,reuse}.rs, src/main.rs, .gitignore, CHANGELOG.md, docs/src/status.md, pretender-baseline.json, tests/{cli_pipeline,status_build_properties}.rs. Verified: full suite 449/0 incl. both metered tests with third-build + steady-state assertions; report 14/14; verification 36/36; --lib 34/34; reviewer empirically measured skip=0 invocations and byte-identical trees. Review: RO5U CONVERGED; HIGH (state not carried across skips) + MEDIUM (test calibration) + LOW (temp orphan) all fixed and re-verified. Design notes: fingerprint is absence-aware; state written only on success; check path sidecar-free (grep-verified); default envelope byte-identical (instrument-only key). Known scope boundary: manual render-fn additions must bump the counter (GENERATOR const guards drift — documented in state.rs:20-22). Follow-up: none in-ticket; render-side (y5v) incremental reuse already ships separate.

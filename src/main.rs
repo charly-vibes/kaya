@@ -33,8 +33,8 @@ use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, new_i
 use kaya::impact::{self, ChangeSet};
 use kaya::model::{self, EntityType, ModelError};
 use kaya::projection::{
-    BlockKind, ProjectionError, StaleBlock, Summary, index, ir, render_invocations, report,
-    reuse, scan, state,
+    BlockKind, ProjectionError, StaleBlock, Summary, index, ir, render_invocations, report, reuse,
+    scan, state,
 };
 use kaya::promotion::{self, PROPOSAL_BUDGET, PromotionError, PromotionState, cap_proposals};
 use kaya::publication;
@@ -321,7 +321,12 @@ fn main() -> ExitCode {
             expect_digest,
             allow_uncommitted,
             instrument,
-        } => cmd_build(&out, expect_digest.as_deref(), allow_uncommitted, instrument),
+        } => cmd_build(
+            &out,
+            expect_digest.as_deref(),
+            allow_uncommitted,
+            instrument,
+        ),
         Command::Ir {
             out,
             expect_digest,
@@ -837,10 +842,7 @@ fn cmd_build(
     // summary instead, so the envelope stays complete and truthful. Citation
     // validation and staleness flagging below always run, even when skipped.
     let state_path = Path::new(LEDGER_PATH).with_file_name("build-state.json");
-    let saved = state::BuildState::current(
-        state::BuildState::load(&state_path),
-        &ledger_digest,
-    );
+    let saved = state::BuildState::current(state::BuildState::load(&state_path), &ledger_digest);
     // Skipped documents keep their recorded entries: a run that skips every
     // document must persist the same gate it consumed, or the next build
     // would alternate back to a full render. The digest gate above guarantees
@@ -854,16 +856,21 @@ fn cmd_build(
 
     let index_path = out.join("index.md");
     let index_paths = vec![("index.md".to_owned(), index_path.clone())];
-    match saved.as_ref().and_then(|s| s.skippable("index.md", &index_paths)) {
+    match saved
+        .as_ref()
+        .and_then(|s| s.skippable("index.md", &index_paths))
+    {
         Some(entry) => restore_skipped(&mut summary, entry),
         None => {
-            let built = index::build(
-                &graph,
-                &index_path,
-                report::recorded_event_count(&events),
-            )
-            .map_err(projection_failure)?;
-            state::record(&mut documents, "index.md", &index_paths, &built.summary, &[]);
+            let built = index::build(&graph, &index_path, report::recorded_event_count(&events))
+                .map_err(projection_failure)?;
+            state::record(
+                &mut documents,
+                "index.md",
+                &index_paths,
+                &built.summary,
+                &[],
+            );
             merge_summary(&mut summary, built.summary);
         }
     }
@@ -895,16 +902,13 @@ fn cmd_build(
                 None => {
                     let built = report::build(&graph, &experiment_id, &report_path, &state)
                         .map_err(projection_failure)?;
-                    let entry_omitted: Vec<state::OmittedEntry> =
-                        built.omitted.iter().map(state::OmittedEntry::from).collect();
+                    let entry_omitted: Vec<state::OmittedEntry> = built
+                        .omitted
+                        .iter()
+                        .map(state::OmittedEntry::from)
+                        .collect();
                     omitted.extend(entry_omitted.iter().cloned());
-                    state::record(
-                        &mut documents,
-                        &key,
-                        &paths,
-                        &built.summary,
-                        &entry_omitted,
-                    );
+                    state::record(&mut documents, &key, &paths, &built.summary, &entry_omitted);
                     merge_summary(&mut summary, built.summary);
                 }
             }
@@ -982,7 +986,10 @@ fn cmd_build(
         .into_iter()
         .map(|(block, path)| (block.to_owned(), path))
         .collect();
-    match saved.as_ref().and_then(|s| s.skippable("reuse", &reuse_paths)) {
+    match saved
+        .as_ref()
+        .and_then(|s| s.skippable("reuse", &reuse_paths))
+    {
         Some(entry) => {
             restore_skipped(&mut summary, entry);
             omitted.extend(entry.omitted.iter().cloned());
@@ -990,10 +997,19 @@ fn cmd_build(
         None => {
             let reuse_inputs = reuse::inputs(&graph).map_err(projection_failure)?;
             let built = reuse::build(&reuse_inputs, out).map_err(projection_failure)?;
-            let entry_omitted: Vec<state::OmittedEntry> =
-                built.omitted.iter().map(state::OmittedEntry::from).collect();
+            let entry_omitted: Vec<state::OmittedEntry> = built
+                .omitted
+                .iter()
+                .map(state::OmittedEntry::from)
+                .collect();
             omitted.extend(entry_omitted.iter().cloned());
-            state::record(&mut documents, "reuse", &reuse_paths, &built.summary, &entry_omitted);
+            state::record(
+                &mut documents,
+                "reuse",
+                &reuse_paths,
+                &built.summary,
+                &entry_omitted,
+            );
             merge_summary(&mut summary, built.summary);
         }
     }
@@ -1085,8 +1101,11 @@ where
         }
         None => {
             let built = build(path).map_err(projection_failure)?;
-            let entry_omitted: Vec<state::OmittedEntry> =
-                built.omitted.iter().map(state::OmittedEntry::from).collect();
+            let entry_omitted: Vec<state::OmittedEntry> = built
+                .omitted
+                .iter()
+                .map(state::OmittedEntry::from)
+                .collect();
             omitted.extend(entry_omitted.iter().cloned());
             state::record(documents, key, &paths, &built.summary, &entry_omitted);
             merge_summary(summary, built.summary);

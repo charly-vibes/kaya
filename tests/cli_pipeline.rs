@@ -334,7 +334,11 @@ fn reimport_of_unchanged_tree_appends_nothing() {
     let second = assert_success(&import_wai(&dir));
     assert_eq!(second["data"]["appended"], json!(0));
     assert_eq!(second["data"]["duplicates"], json!(1));
-    assert_eq!(ledger_lines(&dir).len(), 1, "unchanged tree appends nothing");
+    assert_eq!(
+        ledger_lines(&dir).len(),
+        1,
+        "unchanged tree appends nothing"
+    );
 }
 
 #[test]
@@ -411,13 +415,19 @@ fn corrected_state_revisit_mints_fresh_correction_and_replays_stable() {
     let first = assert_success(&import_wai(&dir));
     assert_eq!(first["data"]["appended"], json!(1));
     let original: Value = serde_json::from_str(&ledger_lines(&dir)[0]).unwrap();
-    let original_id = original["id"].as_str().expect("event carries an id").to_owned();
+    let original_id = original["id"]
+        .as_str()
+        .expect("event carries an id")
+        .to_owned();
 
     fs::write(&design_path, "# revised heading\n").unwrap();
     let second = assert_success(&import_wai(&dir));
     assert_eq!(second["data"]["appended"], json!(1));
     let revised: Value = serde_json::from_str(&ledger_lines(&dir)[1]).unwrap();
-    let revised_id = revised["id"].as_str().expect("correction carries an id").to_owned();
+    let revised_id = revised["id"]
+        .as_str()
+        .expect("correction carries an id")
+        .to_owned();
     assert_eq!(revised["data"]["supersedes"], original["id"]);
 
     // Back to the original heading: a fresh correction must override the
@@ -430,7 +440,10 @@ fn corrected_state_revisit_mints_fresh_correction_and_replays_stable() {
     let revisit: Value = serde_json::from_str(&before[2]).unwrap();
     let revisit_id = revisit["id"].as_str().expect("correction carries an id");
     assert_ne!(revisit_id, original_id, "never reuses the original id");
-    assert_ne!(revisit_id, revised_id, "a revisit mints a fresh correction id");
+    assert_ne!(
+        revisit_id, revised_id,
+        "a revisit mints a fresh correction id"
+    );
     assert_eq!(revisit["data"]["supersedes"], original["id"]);
     assert_eq!(
         revisit["data"]["title"],
@@ -442,7 +455,8 @@ fn corrected_state_revisit_mints_fresh_correction_and_replays_stable() {
     let fourth = assert_success(&import_wai(&dir));
     assert_eq!(fourth["data"]["appended"], json!(0));
     assert_eq!(
-        fourth["data"]["duplicates"], json!(1),
+        fourth["data"]["duplicates"],
+        json!(1),
         "the replay lands on the stored correction byte-identically"
     );
     assert_eq!(ledger_lines(&dir).len(), 3, "no further lines are appended");
@@ -451,8 +465,7 @@ fn corrected_state_revisit_mints_fresh_correction_and_replays_stable() {
     let correction_ids: Vec<String> = [&lines[1], &lines[2]]
         .iter()
         .map(|line| {
-            serde_json::from_str::<Value>(line)
-                .unwrap()["id"]
+            serde_json::from_str::<Value>(line).unwrap()["id"]
                 .as_str()
                 .expect("correction carries an id")
                 .to_owned()
@@ -501,7 +514,8 @@ fn revert_to_original_heading_mints_correction() {
     let replay = assert_success(&import_wai(&dir));
     assert_eq!(replay["data"]["appended"], json!(0));
     assert_eq!(
-        replay["data"]["duplicates"], json!(1),
+        replay["data"]["duplicates"],
+        json!(1),
         "the replay lands on the stored correction byte-identically"
     );
 }
@@ -2920,7 +2934,10 @@ fn build_omits_exploration_brief_without_question_records() {
     let dir = tempfile::tempdir().unwrap();
     init(&dir);
     // A run alone backs no exploration brief: the kind is reported omitted.
-    write_ledger(&dir, &[event_line(&run_event("run-1", "kaya/Run/run-1", 3))]);
+    write_ledger(
+        &dir,
+        &[event_line(&run_event("run-1", "kaya/Run/run-1", 3))],
+    );
 
     let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
     let omitted = built["data"]["omitted"]
@@ -2928,11 +2945,12 @@ fn build_omits_exploration_brief_without_question_records() {
         .expect("omitted is a list");
     assert!(
         omitted.iter().any(|entry| {
-            entry == &json!({
-                "family": "exploration",
-                "kind": "exploration-brief",
-                "reason": "no-records",
-            })
+            entry
+                == &json!({
+                    "family": "exploration",
+                    "kind": "exploration-brief",
+                    "reason": "no-records",
+                })
         }),
         "a ledger without question records omits the exploration brief: {omitted:?}"
     );
@@ -3021,7 +3039,10 @@ fn stale_brief_without_records_is_removed() {
 
     // write_ledger replaces the file, so the records the brief was built
     // from are gone: the stale brief must be removed, not left behind.
-    write_ledger(&dir, &[event_line(&run_event("run-1", "kaya/Run/run-1", 3))]);
+    write_ledger(
+        &dir,
+        &[event_line(&run_event("run-1", "kaya/Run/run-1", 3))],
+    );
     assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
     assert!(
         !brief_path.exists(),
@@ -3105,7 +3126,12 @@ fn new_event_recomputes_affected_projections() {
     let dir = tempfile::tempdir().unwrap();
     init(&dir);
     let lines = vec![
-        event_line(&node_event("entity-1", "Question", "kaya/Question/q-1", "Q One")),
+        event_line(&node_event(
+            "entity-1",
+            "Question",
+            "kaya/Question/q-1",
+            "Q One",
+        )),
         event_line(&node_event(
             "entity-2",
             "Experiment",

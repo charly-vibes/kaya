@@ -146,9 +146,9 @@ fn check_source_keys(docs: &Documents) -> Result<(), PublicationError> {
 
 /// Resolve every declaration against its closed vocabulary, refusing tier
 /// mismatches, duplicates, stray fields, and unimplemented collections.
-fn partition_declarations(
-    decls: &[Decl],
-) -> Result<(Vec<&Decl>, Vec<&Decl>, Vec<&Decl>), PublicationError> {
+/// Returns `(products, packages, collections)` in declaration order.
+type Partition<'a> = (Vec<&'a Decl>, Vec<&'a Decl>, Vec<&'a Decl>);
+fn partition_declarations(decls: &[Decl]) -> Result<Partition<'_>, PublicationError> {
     let mut products: Vec<&Decl> = Vec::new();
     let mut packages: Vec<&Decl> = Vec::new();
     let mut collections: Vec<&Decl> = Vec::new();

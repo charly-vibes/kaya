@@ -1,0 +1,14 @@
+run_id: tdd-ro5u-2026-11-24-kaya-ism-capture-commands-openspec-proposal
+pipeline: tdd-ro5u
+topic: kaya-ism capture commands openspec proposal
+created_at: '2026-11-24T19:36:33.429619066+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-24T20:07:17.400922764+00:00'
+  fix-review: '2026-11-24T19:58:48.625992256+00:00'
+  quality-ledger: '2026-11-24T20:06:27.300624512+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

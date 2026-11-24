@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-msh-wai-adapter-idempotent-re-import, pipeline-step:green]
+---
+
+GREEN kaya-msh: command=cargo test. Result: full suite green across all targets (unit + every integration suite + doctests); edited_record_yields_correction_never_id_reuse now passes — second import exits 0 appending exactly the correction (data.supersedes = original id, data.title = revised heading, fresh content-derived id, first line byte-identical), third import appends 0 / duplicates 1; reimport_of_unchanged_tree_appends_nothing stays green. Implementation: reobservation_correction() in src/adapters/mod.rs (pub, deterministic evt- id from 'correction' RS <id> RS <data>, declared timestamp preserved) + capture.* collision branch in cmd_import (src/main.rs) routing id-reuse refusals to the correction append via map_err(ledger_failure). Corrective fixes during green: Event import added to adapters/mod.rs; pub visibility + error mapping for the bin crate. Ledger, event schema, wai identity untouched.

@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-18o-collections-tier-tracer, pipeline-step:green]
+---
+
+GREEN kaya-18o: partition_declarations 3-way split (plan.rs:134-176) with refusal narrowed to non-glossary names (label/message byte-identical for the other eight, assert_no_writes); render_collection_page from compile-time vocabularies only (render.rs:73-128); export_json collections rows {emitted,name} (:179-224); DEFAULT_COLLECTIONS [glossary] (decls.rs:59-96); consts widened pub(crate) (model.rs:35-38, source.rs:23). Deviation+correction recorded: an initial cmd_build publication pass (added to satisfy an over-specified red assertion) was REVERTED per orchestrator correction — build stays research-tree-only; publish_renders_glossary_collection_page now asserts publish's envelope; publish-after-build recomputed/unchanged pins restored to pre-deviation truth. Orchestrator-verified: cargo test full suite 441 passed / 0 failed (publications 32/32, publications_export 3/3, cli_pipeline 36/36).
