@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-review-remediation-capture-labels-race-retry-state-hardening, pipeline-step:green]
+---
+
+GREEN remediation batch: implementation restored (stash pop) and verified. Narrow: cargo test --test capture => 31 passed, 0 failed (includes the 4 red tests now green). Full: cargo test => 35 suites all ok (incl. verification parity, projection state, cli pipeline); cargo clippy --all-targets --all-features -- -D warnings clean; cargo fmt --all -- --check clean; kaya check clean (no drift, no stale); ah check clean. Smallest-change notes: race retry is a 2-attempt bounded loop reusing the adapters' correction scheme (no new id derivation); GENERATOR via FNV-1a over sorted src/projection files in build.rs with rerun-if-changed on the directory; label split is one check_slug(field, value) helper replacing check_key; supersedes rides the existing envelope payload; READER_FILES const extracted, parity asserted via pub(crate) module visibility with a scope-limiting comment.

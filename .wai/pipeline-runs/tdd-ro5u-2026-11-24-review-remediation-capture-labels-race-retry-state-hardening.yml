@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-24-review-remediation-capture-labels-race-retry-state-hardening
+pipeline: tdd-ro5u
+topic: review-remediation capture labels race retry state hardening
+created_at: '2026-11-24T23:08:55.317283109+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-24T23:19:26.472339322+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []
