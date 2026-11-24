@@ -48,6 +48,5 @@ Total: 7 issues (7 open, 0 in progress)
 
 Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
 Priority: P0–P4 (label only; not a status icon)
-
 ```
 
