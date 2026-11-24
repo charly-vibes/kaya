@@ -31,7 +31,7 @@ _(none)_
 
 - kaya/Run/cargo-test-results
 
-### Artifact — 826
+### Artifact — 837
 
 - kaya/Artifact/0291837
 - kaya/Artifact/03fb233
@@ -132,7 +132,9 @@ _(none)_
 - kaya/Artifact/a2e2de8
 - kaya/Artifact/a3ecdc2
 - kaya/Artifact/a68206a
+- kaya/Artifact/a6ca73b
 - kaya/Artifact/a80ded8
+- kaya/Artifact/a88da11
 - kaya/Artifact/a93bc64
 - kaya/Artifact/a9f36eb
 - kaya/Artifact/aaaa11e
@@ -154,6 +156,7 @@ _(none)_
 - kaya/Artifact/c5d2745
 - kaya/Artifact/cb8be97
 - kaya/Artifact/cbbea6e
+- kaya/Artifact/cc5114f
 - kaya/Artifact/ccc41d7
 - kaya/Artifact/ccf3881
 - kaya/Artifact/cf2773b
@@ -296,6 +299,7 @@ _(none)_
 - kaya/Artifact/designs-2026-11-24-green-kaya-7es-minimal-production-change-new-src
 - kaya/Artifact/designs-2026-11-24-green-kaya-9r2-all-acceptance-statements-verified
 - kaya/Artifact/designs-2026-11-24-green-kaya-ism-decisions-authored-validated-d
+- kaya/Artifact/designs-2026-11-24-green-kaya-j00-changelog-unreleased-finalized-as
 - kaya/Artifact/designs-2026-11-24-green-kaya-msh-decision-re-observed-captures-corr
 - kaya/Artifact/designs-2026-11-24-green-kaya-rp6-impact-gate-implemented-as-src-imp
 - kaya/Artifact/designs-2026-11-24-green-kaya-w66-decision-budget-is-a-named-shared
@@ -311,6 +315,7 @@ _(none)_
 - kaya/Artifact/designs-2026-11-24-refactor-kaya-bvg-no-op-one-array-entry-truth
 - kaya/Artifact/designs-2026-11-24-refactor-kaya-g41-no-op-config-only-single-fil
 - kaya/Artifact/designs-2026-11-24-refactor-kaya-ism-no-op-single-purpose-spec-doc
+- kaya/Artifact/designs-2026-11-24-refactor-kaya-j00-none-applies-release-chore-n
 - kaya/Artifact/designs-2026-11-24-refactor-kaya-msh-error-label-boundary-tidy-the
 - kaya/Artifact/designs-2026-11-24-refactor-kaya-rp6-tidy-pass-behavior-unchanged
 - kaya/Artifact/designs-2026-11-24-refactor-kaya-w66-no-op-the-change-is-a-named-c
@@ -432,6 +437,7 @@ _(none)_
 - kaya/Artifact/plans-2026-11-24-plan-kaya-bvg-minimal-tdd-red-test-in-tests-p
 - kaya/Artifact/plans-2026-11-24-plan-kaya-g41-pretender-toml-mode-gate-with-mea
 - kaya/Artifact/plans-2026-11-24-plan-kaya-ism-docs-only-design-ticket-deliverabl
+- kaya/Artifact/plans-2026-11-24-plan-kaya-j00-behavior-the-six-acceptance-state
 - kaya/Artifact/plans-2026-11-24-plan-kaya-msh-idempotent-wai-re-import-via-captur
 - kaya/Artifact/plans-2026-11-24-plan-kaya-rp6-impact-gate-kaya-impact-tasks-3-1
 - kaya/Artifact/plans-2026-11-24-plan-kaya-w66-wire-cap-proposals-into-kaya-status
@@ -769,6 +775,7 @@ _(none)_
 - kaya/Artifact/research-2026-11-24-orient-kaya-bvg-scout-verified-vocabulary-alrea
 - kaya/Artifact/research-2026-11-24-orient-kaya-g41-repo-had-no-pretender-toml-defa
 - kaya/Artifact/research-2026-11-24-orient-kaya-ism-design-ticket-authored-by-subagen
+- kaya/Artifact/research-2026-11-24-orient-kaya-j00-release-chore-no-code-path-meta
 - kaya/Artifact/research-2026-11-24-orient-kaya-msh-wai-adapter-re-import-idempotency
 - kaya/Artifact/research-2026-11-24-orient-kaya-rp6-impact-gate-kaya-impact-add-docu
 - kaya/Artifact/research-2026-11-24-orient-kaya-w66-cap-proposals-src-promotion-rs-4
@@ -789,6 +796,7 @@ _(none)_
 - kaya/Artifact/research-2026-11-24-quality-ledger-kaya-g41-changed-pretender-toml
 - kaya/Artifact/research-2026-11-24-quality-ledger-kaya-ism-changed-openspec-change
 - kaya/Artifact/research-2026-11-24-quality-ledger-kaya-ism-recorded-on-ledger-step
+- kaya/Artifact/research-2026-11-24-quality-ledger-kaya-j00-changed-cargo-toml-vers
 - kaya/Artifact/research-2026-11-24-quality-ledger-kaya-msh-changed-src-adapters-mo
 - kaya/Artifact/research-2026-11-24-quality-ledger-kaya-rp6-impact-gate-changed-s
 - kaya/Artifact/research-2026-11-24-quality-ledger-kaya-w66-changed-src-promotion-r
@@ -805,6 +813,7 @@ _(none)_
 - kaya/Artifact/research-2026-11-24-red-kaya-bvg-new-tests-publications-declarations
 - kaya/Artifact/research-2026-11-24-red-kaya-g41-metered-by-the-gate-itself-config-o
 - kaya/Artifact/research-2026-11-24-red-kaya-ism-docs-only-the-red-analog-is-the-pr
+- kaya/Artifact/research-2026-11-24-red-kaya-j00-command-python3-scripts-check-releas
 - kaya/Artifact/research-2026-11-24-red-kaya-msh-command-cargo-test-test-cli-pipeli
 - kaya/Artifact/research-2026-11-24-red-kaya-rp6-command-cargo-test-test-impact-ex
 - kaya/Artifact/research-2026-11-24-red-kaya-w66-command-cargo-test-test-cli-pipeli
@@ -819,6 +828,7 @@ _(none)_
 - kaya/Artifact/research-2026-11-24-ro5u-fixes-kaya-7r3-review-verdict-needs-revision
 - kaya/Artifact/research-2026-11-24-ro5u-fixes-kaya-9r2-corr-001-copied-the-79-line
 - kaya/Artifact/research-2026-11-24-ro5u-fixes-kaya-ism-all-12-findings-fixed-by-auth
+- kaya/Artifact/research-2026-11-24-ro5u-fixes-kaya-j00-none-required-review-return
 - kaya/Artifact/research-2026-11-24-ro5u-fixes-kaya-msh-fixed-the-single-high-finding
 - kaya/Artifact/research-2026-11-24-ro5u-fixes-kaya-rp6-all-high-and-medium-findings
 - kaya/Artifact/research-2026-11-24-ro5u-fixes-kaya-w66-clar-001-fixed-const-fn-docs
@@ -850,6 +860,7 @@ _(none)_
 - kaya/Artifact/research-2026-11-24-ship-kaya-g41-committed-chore-tooling-measured
 - kaya/Artifact/research-2026-11-24-ship-kaya-ism-committed-77b2cb3-docs-specs-cap
 - kaya/Artifact/research-2026-11-24-ship-kaya-ism-recorded-on-ship-step-committed-7
+- kaya/Artifact/research-2026-11-24-ship-kaya-j00-release-commit-4a58d21785-chore-rel
 - kaya/Artifact/research-2026-11-24-ship-kaya-msh-committed-atomically-as-331401a-on
 - kaya/Artifact/research-2026-11-24-ship-kaya-rp6-committed-in-three-commits-on-main
 - kaya/Artifact/research-2026-11-24-ship-kaya-w66-committed-e54cadf-on-main-fix-stat
