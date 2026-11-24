@@ -8,4 +8,4 @@ superseded_by = ""
 authored_with = "0.12.2"
 
 [tests]
-cargo = [{flags = "identical_replay_is_a_byte_identical_no_op"}]
+cargo = [{flags = "identical_replay_is_a_byte_identical_no_op"}, {flags = "reimport_of_unchanged_tree_appends_nothing"}]

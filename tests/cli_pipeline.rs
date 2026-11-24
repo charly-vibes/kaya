@@ -320,6 +320,190 @@ fn import_wai_appends_each_event_once() {
 }
 
 #[test]
+fn reimport_of_unchanged_tree_appends_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_wai_design(&dir, "2026-11-24-design.md");
+
+    let first = assert_success(&import_wai(&dir));
+    assert_eq!(first["data"]["appended"], json!(1));
+
+    let second = assert_success(&import_wai(&dir));
+    assert_eq!(second["data"]["appended"], json!(0));
+    assert_eq!(second["data"]["duplicates"], json!(1));
+    assert_eq!(ledger_lines(&dir).len(), 1, "unchanged tree appends nothing");
+}
+
+#[test]
+fn edited_record_yields_correction_never_id_reuse() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_wai_design(&dir, "2026-11-24-design.md");
+
+    let first = assert_success(&import_wai(&dir));
+    assert_eq!(first["data"]["appended"], json!(1));
+
+    let before = ledger_lines(&dir);
+    assert_eq!(before.len(), 1, "one artifact yields one ledger line");
+    let original: Value = serde_json::from_str(&before[0]).unwrap();
+    let original_id = original["id"].as_str().expect("event carries an id");
+
+    // Same path keeps the declared timestamp; only the content changes.
+    let path = dir
+        .path()
+        .join(".wai")
+        .join("projects")
+        .join("kaya")
+        .join("designs")
+        .join("2026-11-24-design.md");
+    fs::write(&path, "# revised heading\n").unwrap();
+
+    let correction = assert_success(&import_wai(&dir));
+    assert_eq!(correction["data"]["appended"], json!(1));
+
+    let after = ledger_lines(&dir);
+    assert_eq!(after.len(), 2, "the correction appends exactly one line");
+    assert_eq!(
+        after[0], before[0],
+        "the ledger is append-only: the original line is untouched"
+    );
+    let correction_event: Value = serde_json::from_str(&after[1]).unwrap();
+    let correction_id = correction_event["id"]
+        .as_str()
+        .expect("correction carries an id");
+    assert_ne!(
+        correction_id, original_id,
+        "a correction mints a fresh id, never reuses the original"
+    );
+    assert_eq!(
+        correction_event["data"]["supersedes"], original["id"],
+        "the correction points back at the record it replaces"
+    );
+    assert_eq!(
+        correction_event["data"]["title"],
+        json!("revised heading"),
+        "the title is the first # heading, minus its marker"
+    );
+
+    let replay = assert_success(&import_wai(&dir));
+    assert_eq!(replay["data"]["appended"], json!(0));
+    assert_eq!(replay["data"]["duplicates"], json!(1));
+}
+
+#[test]
+fn corrected_state_revisit_mints_fresh_correction_and_replays_stable() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_wai_design(&dir, "2026-11-24-design.md");
+
+    let design_path = dir
+        .path()
+        .join(".wai")
+        .join("projects")
+        .join("kaya")
+        .join("designs")
+        .join("2026-11-24-design.md");
+
+    // "# design" -> "# revised heading" -> "# design" -> no change.
+    let first = assert_success(&import_wai(&dir));
+    assert_eq!(first["data"]["appended"], json!(1));
+    let original: Value = serde_json::from_str(&ledger_lines(&dir)[0]).unwrap();
+    let original_id = original["id"].as_str().expect("event carries an id").to_owned();
+
+    fs::write(&design_path, "# revised heading\n").unwrap();
+    let second = assert_success(&import_wai(&dir));
+    assert_eq!(second["data"]["appended"], json!(1));
+    let revised: Value = serde_json::from_str(&ledger_lines(&dir)[1]).unwrap();
+    let revised_id = revised["id"].as_str().expect("correction carries an id").to_owned();
+    assert_eq!(revised["data"]["supersedes"], original["id"]);
+
+    // Back to the original heading: a fresh correction must override the
+    // stored correction B, not collide with either existing id.
+    fs::write(&design_path, "# design\n").unwrap();
+    let third = assert_success(&import_wai(&dir));
+    assert_eq!(third["data"]["appended"], json!(1));
+    let before = ledger_lines(&dir);
+    assert_eq!(before.len(), 3, "the revisit appends exactly one line");
+    let revisit: Value = serde_json::from_str(&before[2]).unwrap();
+    let revisit_id = revisit["id"].as_str().expect("correction carries an id");
+    assert_ne!(revisit_id, original_id, "never reuses the original id");
+    assert_ne!(revisit_id, revised_id, "a revisit mints a fresh correction id");
+    assert_eq!(revisit["data"]["supersedes"], original["id"]);
+    assert_eq!(
+        revisit["data"]["title"],
+        json!("design"),
+        "the correction restores the original heading"
+    );
+
+    // No change: the whole journey replays byte-identically.
+    let fourth = assert_success(&import_wai(&dir));
+    assert_eq!(fourth["data"]["appended"], json!(0));
+    assert_eq!(
+        fourth["data"]["duplicates"], json!(1),
+        "the replay lands on the stored correction byte-identically"
+    );
+    assert_eq!(ledger_lines(&dir).len(), 3, "no further lines are appended");
+    let lines = ledger_lines(&dir);
+    assert_eq!(lines[0], before[0], "the original line is untouched");
+    let correction_ids: Vec<String> = [&lines[1], &lines[2]]
+        .iter()
+        .map(|line| {
+            serde_json::from_str::<Value>(line)
+                .unwrap()["id"]
+                .as_str()
+                .expect("correction carries an id")
+                .to_owned()
+        })
+        .collect();
+    assert_ne!(correction_ids[0], correction_ids[1]);
+}
+
+#[test]
+fn revert_to_original_heading_mints_correction() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_wai_design(&dir, "2026-11-24-design.md");
+    let design_path = dir
+        .path()
+        .join(".wai")
+        .join("projects")
+        .join("kaya")
+        .join("designs")
+        .join("2026-11-24-design.md");
+
+    assert_success(&import_wai(&dir));
+    let original: Value = serde_json::from_str(&ledger_lines(&dir)[0]).unwrap();
+    let original_id = original["id"].as_str().expect("event carries an id");
+
+    fs::write(&design_path, "# revised heading\n").unwrap();
+    assert_success(&import_wai(&dir));
+    assert_eq!(ledger_lines(&dir).len(), 2);
+
+    // Revert the file to the original heading and import.
+    fs::write(&design_path, "# design\n").unwrap();
+    let revert = assert_success(&import_wai(&dir));
+    assert_eq!(revert["data"]["appended"], json!(1));
+    let lines = ledger_lines(&dir);
+    assert_eq!(lines.len(), 3);
+    let correction: Value = serde_json::from_str(&lines[2]).unwrap();
+    assert_eq!(correction["data"]["supersedes"], original["id"]);
+    assert_eq!(correction["data"]["title"], json!("design"));
+    assert_ne!(
+        correction["id"].as_str().expect("correction carries an id"),
+        original_id,
+        "the revert mints a fresh correction id"
+    );
+
+    // Importing again replays without appending.
+    let replay = assert_success(&import_wai(&dir));
+    assert_eq!(replay["data"]["appended"], json!(0));
+    assert_eq!(
+        replay["data"]["duplicates"], json!(1),
+        "the replay lands on the stored correction byte-identically"
+    );
+}
+
+#[test]
 fn import_without_a_ledger_is_a_missing_ledger_error() {
     let dir = tempfile::tempdir().unwrap();
 

@@ -18,10 +18,12 @@ use std::process::{Command as ProcessCommand, ExitCode};
 
 use clap::error::ErrorKind as ClapErrorKind;
 use clap::{Parser, Subcommand};
-use kaya::ledger::{AppendOutcome, Ledger, LedgerError, changed_event_ids, sha256_hex};
+use kaya::ledger::{
+    AppendOutcome, LABEL_ID_REUSE, Ledger, LedgerError, changed_event_ids, sha256_hex,
+};
 use serde_json::json;
 
-use kaya::adapters::{AdapterError, git, testrunner, turu, wai};
+use kaya::adapters::{AdapterError, correction_generation, git, reobservation_correction, stored_correction_for, testrunner, turu, wai};
 use kaya::doctest;
 use kaya::envelope::Envelope;
 use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, new_id, parse_line};
@@ -700,8 +702,40 @@ fn cmd_import(source: ImportSource) -> Result<Envelope, Failure> {
 
     let mut appended = 0usize;
     let mut duplicates = 0usize;
+    let mut stored = ledger.read_recovered().map_err(ledger_failure)?.0;
     for event in &events {
-        match ledger.append(event).map_err(ledger_failure)? {
+        let outcome = match ledger.append(event) {
+            Ok(outcome @ AppendOutcome::Appended) => outcome,
+            Ok(_outcome @ AppendOutcome::Duplicate)
+                if event.r#type.starts_with("capture.")
+                    && stored_correction_for(&stored, event) =>
+            {
+                // A replay of a previously captured line whose effective
+                // view a later correction overrides (e.g. a revert to an
+                // earlier heading): re-correct so the newest state wins.
+                let generation = correction_generation(&stored, event);
+                let correction = reobservation_correction(event, generation);
+                let outcome = ledger.append(&correction).map_err(ledger_failure)?;
+                stored.push(correction);
+                outcome
+            }
+            Ok(outcome) => outcome,
+            Err(err)
+                if err.label == LABEL_ID_REUSE && event.r#type.starts_with("capture.") =>
+            {
+                // A corrected re-observation: re-derive the correction event
+                // (deterministic per artifact identity, revisit generation,
+                // and data state) and append that instead. Any refusal from
+                // the correction itself still propagates.
+                let generation = correction_generation(&stored, event);
+                let correction = reobservation_correction(event, generation);
+                let outcome = ledger.append(&correction).map_err(ledger_failure)?;
+                stored.push(correction);
+                outcome
+            }
+            Err(err) => return Err(ledger_failure(err)),
+        };
+        match outcome {
             AppendOutcome::Appended => appended += 1,
             AppendOutcome::Duplicate => duplicates += 1,
         }

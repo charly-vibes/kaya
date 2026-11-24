@@ -14,6 +14,68 @@ pub mod turu;
 pub mod wai;
 
 pub use crate::ledger::sha256_hex;
+use crate::event::Event;
+
+/// Digest characters retained in a correction id, mirroring the adapters' id length.
+const CORRECTION_ID_LEN: usize = 26;
+
+/// Derive a deterministic correction for an id-collision refusal.
+///
+/// The correction is deterministic per (artifact identity, generation,
+/// content-derived data state): replays of a corrected tree produce
+/// byte-identical duplicates, so the ledger's id-reuse refusal collapses
+/// into an idempotent re-append. The generation salt is revisit-aware:
+/// returning to an earlier content state mints a fresh correction id
+/// instead of colliding with the correction already stored for it. This
+/// carries the ledger's correction guidance into the import path without
+/// touching stored lines.
+pub fn reobservation_correction(event: &Event, generation: usize) -> Event {
+    let mut correction = event.clone();
+    correction.data["supersedes"] = serde_json::Value::String(event.id.clone());
+    let data = serde_json::to_string(&correction.data)
+        .expect("event data is already valid JSON and serializes losslessly");
+    let digest =
+        sha256_hex(format!("correction\x1f{}\x1f{generation}\x1f{data}", event.id).as_bytes());
+    correction.id = format!("evt-{}", &digest[..CORRECTION_ID_LEN]);
+    correction
+}
+
+/// Whether a stored correction already supersedes `event`'s id.
+///
+/// True when any stored event names `event.id` in its `supersedes` field;
+/// used to decide whether a `Duplicate` replay must re-correct.
+pub fn stored_correction_for(stored: &[Event], event: &Event) -> bool {
+    stored.iter().any(|stored_event| {
+        stored_event.data.get("supersedes")
+            == Some(&serde_json::Value::String(event.id.clone()))
+    })
+}
+
+/// Count stored corrections of `event` whose payload differs from its
+/// current state.
+///
+/// Each differing correction raises the generation salt, so a revisit of an
+/// earlier content state mints exactly one fresh correction id; convergent
+/// replays of the current state count zero and hit the already-stored id
+/// byte-identically.
+pub fn correction_generation(stored: &[Event], event: &Event) -> usize {
+    stored
+        .iter()
+        .filter(|stored_event| {
+            if stored_event.data.get("supersedes")
+                != Some(&serde_json::Value::String(event.id.clone()))
+            {
+                return false;
+            }
+            let mut payload = stored_event.data.clone();
+            payload
+                .as_object_mut()
+                .expect("event data is a JSON object")
+                .remove("supersedes");
+            &payload != &event.data
+        })
+        .count()
+}
 
 /// Failure class for an adapter run that must contribute no events.
 pub(crate) const LABEL_FAILURE_ATOMIC: &str = "kaya.adapters.failure_atomic";

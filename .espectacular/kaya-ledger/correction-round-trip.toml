@@ -8,4 +8,4 @@ superseded_by = ""
 authored_with = "0.12.2"
 
 [tests]
-cargo = [{flags = "corrections_supersede_without_rewriting_the_original_line"}]
+cargo = [{flags = "corrections_supersede_without_rewriting_the_original_line"}, {flags = "edited_record_yields_correction_never_id_reuse"}]

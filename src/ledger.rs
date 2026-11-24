@@ -23,7 +23,8 @@ use crate::event::{self, Event};
 const LABEL_MISSING: &str = "kaya.ledger.missing";
 const LABEL_IO: &str = "kaya.ledger.io";
 const LABEL_RECORD_INVALID: &str = "kaya.ledger.record_invalid";
-const LABEL_ID_REUSE: &str = "kaya.ledger.id_reuse";
+/// Failure class for appending an id that already exists with different bytes.
+pub const LABEL_ID_REUSE: &str = "kaya.ledger.id_reuse";
 const LABEL_DIGEST: &str = "kaya.ledger.digest_mismatch";
 const LABEL_SUPERSEDES_INVALID: &str = "kaya.ledger.supersedes_invalid";
 const LABEL_LOCKED: &str = "kaya.ledger.locked";
