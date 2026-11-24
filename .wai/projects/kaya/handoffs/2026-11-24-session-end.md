@@ -35,7 +35,16 @@ phase: research
 ### open_issues
 
 ```
-No issues found.
+○ kaya-w9t P2 Continuous capture: implement kaya note/question/decision/finding CLI (AFK half)
+○ kaya-2pa P3 Collections tier: render example-gallery, api-catalogue, capability-catalogue, compatibility-matrix, feature-index, knowledge-index, related-projects, topic-map (kaya-18o shipped glossary; render data sources TBD per kind; several need ledger access in publish — design first)
+○ kaya-9dv P3 Collections: bulk-add the remaining eight collection kinds
+○ kaya-bvg P3 tutorial product declaration once exploration documents have producers
+○ kaya-g41 P3 pretender.toml role thresholds: repo has no pretender config; defaults flag 900+ test violations and force --adopt baseline churn per commit
 
+--------------------------------------------------------------------------------
+Total: 5 issues (5 open, 0 in progress)
+
+Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
+Priority: P0–P4 (label only; not a status icon)
 ```
 
