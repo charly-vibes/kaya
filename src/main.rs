@@ -23,7 +23,10 @@ use kaya::ledger::{
 };
 use serde_json::json;
 
-use kaya::adapters::{AdapterError, correction_generation, git, reobservation_correction, stored_correction_for, testrunner, turu, wai};
+use kaya::adapters::{
+    AdapterError, correction_generation, git, reobservation_correction, stored_correction_for,
+    testrunner, turu, wai,
+};
 use kaya::doctest;
 use kaya::envelope::Envelope;
 use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, new_id, parse_line};
@@ -721,9 +724,7 @@ fn cmd_import(source: ImportSource) -> Result<Envelope, Failure> {
                 outcome
             }
             Ok(outcome) => outcome,
-            Err(err)
-                if err.label == LABEL_ID_REUSE && event.r#type.starts_with("capture.") =>
-            {
+            Err(err) if err.label == LABEL_ID_REUSE && event.r#type.starts_with("capture.") => {
                 // A corrected re-observation: re-derive the correction event
                 // (deterministic per artifact identity, revisit generation,
                 // and data state) and append that instead. Any refusal from
@@ -890,6 +891,12 @@ fn cmd_build(
         &events,
     )?;
 
+    let brief_path = out.join("brief.md");
+    let built = report::build_brief(&graph, &brief_path).map_err(projection_failure)?;
+    omitted.extend(built.omitted);
+    merge_summary(&mut summary, built.summary);
+    flag_stale_authored(&mut summary, &brief_path, &changed_ids, &known_ids, &events)?;
+
     // The reuse projection always runs, even when the ledger holds no reuse
     // references: an existing document's stale blocks and legacy names are
     // only visible by validating the documents, and an empty kind is reported
@@ -1025,6 +1032,11 @@ fn collect_document_ir(
     let existing = read_document(&overview_path)?;
     let planned = report::plan_overview(&graph, existing.as_deref()).map_err(projection_failure)?;
     collector.collect(&overview_path, &planned.document, planned.summary)?;
+
+    let brief_path = out.join("brief.md");
+    let existing = read_document(&brief_path)?;
+    let planned = report::plan_brief(&graph, existing.as_deref()).map_err(projection_failure)?;
+    collector.collect(&brief_path, &planned.document, planned.summary)?;
 
     let reuse_inputs = reuse::inputs(&graph).map_err(projection_failure)?;
     let mut existing_map = BTreeMap::new();

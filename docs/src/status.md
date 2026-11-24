@@ -17,7 +17,7 @@ MVP-1 implements those capabilities end to end as a static research compiler.
 | Architecture | implemented (MVP-1) | Four subsystems: capture adapters (`src/adapters`), research ledger (`src/ledger.rs`), research model (`src/model.rs`), documentation projections (`src/projection`) |
 | Event format | [implemented (draft)](https://github.com/charly-vibes/kaya/blob/main/openspec/specs/kaya-event/spec.md) | `kaya.event/v0` — closed 9-field schema, append-only JSONL, provenance-preserving, observation-only |
 | Research vocabulary | [implemented](https://github.com/charly-vibes/kaya/blob/main/openspec/specs/kaya-model/spec.md) | 13 entities, 9 typed direction-fixed relationships; relationships over entity count |
-| CLI | implemented | `kaya init`, `kaya status`, `kaya import` (wai, git, test, turu, model), `kaya build [--out] [--expect-digest] [--allow-uncommitted]`, `kaya ir`, `kaya publish [--out]`, `kaya check [--index --require-kind --require-source --fail-on-stale-authored]`, `kaya acknowledge`, `kaya promote`, `kaya challenge`, `kaya doctest`, `kaya supersede-doctest`, `kaya impact [--staged --range]`, `kaya disposition` |
+| CLI | implemented | `kaya init`, `kaya status`, `kaya import` (wai, git, test, turu, model), `kaya build [--out] [--expect-digest] [--allow-uncommitted]`, `kaya ir`, `kaya publish [--out]`, `kaya check [--index --require-kind --require-source --fail-on-stale-authored]`, `kaya acknowledge`, `kaya promote`, `kaya challenge`, `kaya doctest`, `kaya supersede-doctest`, `kaya impact [--staged --range]`, `kaya disposition` — `build` and `publish` both compose the publication tree, including the `glossary` collection page; the other eight collections still refuse at declaration |
 | Integrations | wai, git, test runner, whisper (turu) implemented; dont, specodelic [specified](https://github.com/charly-vibes/kaya/blob/main/openspec/specs/kaya-adapters/spec.md) (contracts under `.espectacular/kaya-adapters/`), not implemented | Adapters translate tool outputs into `kaya.event/v0`; the remaining sources have encoded specs but no adapter |
 | Document taxonomy | implemented and deployed (eleven record kinds, publications) | [Record layer: four families, eleven kinds; publication layer: twelve products, collections, packages](specs/kaya-documents.md) ([publications](specs/kaya-publications.md)). Implemented: `research-map`, `project-overview`, `experiment-specification`, `experiment-record`, `findings-and-analysis`, `decision-record`, `technical-reference`, `reproduction-package`, `knowledge-brief`, `handoff`; `kaya publish` declares all eleven non-tutorial products (`overview`, `reference`, `getting-started`, `how-to`, `concept`, `example`, `troubleshooting`, `faq`, `status-compatibility`, `release-migration`, `architecture-design`), emits the backed ones and both the `project-site` and `developer-guide` packages, and reports unbacked products as omissions instead of stubbing them. `exploration-brief` remains specified. See [Documentation taxonomy](document-taxonomy.md) |
 | Docs | buildable, deploy workflow present | `book.toml` + `theme/charly.css` at root; `.github/workflows/docs.yml` builds the book and deploys it to GitHub Pages on push to `main` |
@@ -36,7 +36,8 @@ MVP-1 implements those capabilities end to end as a static research compiler.
 - `kaya build [--out DIR] [--expect-digest HEX] [--allow-uncommitted]` —
   compiles `docs/research/index.md`, one
   `docs/research/experiments/<key>.md` per experiment, the project-level
-  `docs/research/overview.md` and `docs/research/understanding.md`, and the
+  `docs/research/overview.md`, `docs/research/brief.md`, and
+  `docs/research/understanding.md`, and the
   reuse-handoff reference documents; only `kaya:`-owned blocks are rewritten,
   a document whose kinds have no records stays absent, the ledger is verified
   against its committed history, and `--expect-digest` refuses to build from
@@ -100,7 +101,8 @@ openspec proposals when picked up.
 
 - kaya's own dossier is compiled by kaya: the ledger at
   `.kaya/ledger.jsonl` and the projections under `docs/research/`
-  (`index.md`, `overview.md`, `experiments/add-core-research-record.md`) are
+  (`index.md`, `overview.md`, `brief.md`,
+  `experiments/add-core-research-record.md`) are
   checked in and rebuilt by `kaya build`.
 - Reverse dogfooding: kaya's own specs are written in specodelic format and
   gate-checked by `spk lint` on every commit, and the change validates under

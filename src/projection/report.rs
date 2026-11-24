@@ -30,6 +30,8 @@ use crate::projection::{
 };
 use crate::promotion::PromotionState;
 
+/// Generated block carrying the exploration brief's open questions and ideas.
+pub const BRIEF_BLOCK: &str = "exploration.exploration-brief";
 /// Generated block carrying an experiment's declared intent.
 pub const SPECIFICATION_BLOCK: &str = "exploration.experiment-specification";
 /// Generated block carrying an experiment's observed execution.
@@ -485,10 +487,27 @@ pub fn build_overview(graph: &Graph, path: &Path) -> Result<Built, ProjectionErr
 
 /// The bytes and bookkeeping `build_overview` would commit.
 pub fn plan_overview(graph: &Graph, existing: Option<&str>) -> Result<Planned, ProjectionError> {
-    plan_project_document(
-        existing,
-        vec![(Kind::ProjectOverview, render_overview(graph))],
-    )
+    plan_project_document(existing, vec![(Kind::ProjectOverview, render_overview(graph))])
+}
+
+/// Compile the exploration brief for the whole project.
+///
+/// The brief renders Question, Idea, and Hypothesis records — each in its own
+/// section, sections with no record omitted — replacing or appending the
+/// block, and validating an existing document against the closed vocabulary
+/// first. When none of the three groups has a record the kind is omitted
+/// once, an existing block is removed, and a document left with only
+/// whitespace is deleted rather than written empty.
+pub fn build_brief(graph: &Graph, path: &Path) -> Result<Built, ProjectionError> {
+    let existing = read_existing(path)?;
+    let planned = plan_brief(graph, existing.as_deref())?;
+    commit_project_document(path, &planned)?;
+    Ok(built(path, planned))
+}
+
+/// The bytes and bookkeeping `build_brief` would commit.
+pub fn plan_brief(graph: &Graph, existing: Option<&str>) -> Result<Planned, ProjectionError> {
+    plan_project_document(existing, vec![(Kind::ExplorationBrief, render_brief(graph))])
 }
 
 /// The pure project-level commit policy shared by the writer and `kaya check`.
@@ -821,6 +840,34 @@ fn render_overview(graph: &Graph) -> Option<RenderedBlock> {
     let mut sources = project_ids;
     sources.extend(question_ids);
     sources.extend(finding_ids);
+
+    Some(RenderedBlock {
+        body,
+        sources: sources.into_iter().collect(),
+    })
+}
+
+/// The exploration slice only: Question, Idea, and Hypothesis records, each
+/// in its own section, id-sorted. A project-level brief with no relationship
+/// walks — the brief's source records are the three kinds; relationships are
+/// the research-map's job.
+fn render_brief(graph: &Graph) -> Option<RenderedBlock> {
+    let (questions, question_ids) = entity_rows(graph, &[EntityType::Question]);
+    let (ideas, idea_ids) = entity_rows(graph, &[EntityType::Idea]);
+    let (hypotheses, hypothesis_ids) = entity_rows(graph, &[EntityType::Hypothesis]);
+
+    if questions.is_empty() && ideas.is_empty() && hypotheses.is_empty() {
+        return None;
+    }
+
+    let mut body = String::new();
+    push_heading(&mut body, 2, "Question", &questions);
+    push_heading(&mut body, 2, "Idea", &ideas);
+    push_heading(&mut body, 2, "Hypothesis", &hypotheses);
+
+    let mut sources = question_ids;
+    sources.extend(idea_ids);
+    sources.extend(hypothesis_ids);
 
     Some(RenderedBlock {
         body,

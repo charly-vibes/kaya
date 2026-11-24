@@ -84,9 +84,13 @@ written empty. The project-level `docs/research/overview.md` implements
 `orientation.project-overview`: Project, Question, and Finding records in three
 sections in a fixed order — Project, Questions, Findings — with the rows of
 each section id-sorted, empty sections omitted, and no document at all when
-none of the three groups has a record. `exploration-brief` is not generated
-yet; `technical-reference`, `knowledge-brief`, `reproduction-package`, and
-`handoff` render reference rows from the ledger.
+none of the three groups has a record. The project-level `docs/research/brief.md`
+implements `exploration.exploration-brief`: Question, Idea, and Hypothesis
+records in three sections in a fixed order — Question, Idea, Hypothesis — with
+the rows of each section id-sorted, empty sections omitted, and no document at
+all when none of the three groups has a record. `technical-reference`,
+`knowledge-brief`, `reproduction-package`, and `handoff` render reference rows
+from the ledger.
 
 ## Publication layer: twelve products
 
@@ -141,6 +145,13 @@ Collections group related information; they are not page types:
 `glossary`, `example-gallery`, `api-catalogue`, `capability-catalogue`,
 `compatibility-matrix`, `feature-index`, `knowledge-index`,
 `related-projects`, `topic-map`.
+
+One collection composes today: `kaya publish` declares `glossary` and renders
+its page from the compile-time closed vocabularies — the thirteen entity
+types, the relationship grammar, and the eleven document kinds — so the page
+is deterministic and never reads the ledger. The other eight collections are
+still refused at declaration (`kaya.publications.tier_unimplemented`) rather
+than silently dropped.
 
 Packages bundle products for one purpose; they list products and never embed
 their content: `project-site`, `developer-guide`, `user-guide`,

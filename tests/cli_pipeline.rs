@@ -11,6 +11,7 @@ use std::fs;
 use std::process::Command as StdCommand;
 use tempfile::TempDir;
 
+use kaya::projection::report::BRIEF_BLOCK;
 use kaya::publication::admission;
 
 const LEDGER: &str = ".kaya/ledger.jsonl";
@@ -1250,6 +1251,11 @@ fn build_tolerates_a_missing_report_when_corrections_exist() {
                 "reason": "no-records",
             },
             {
+                "family": "exploration",
+                "kind": "exploration-brief",
+                "reason": "no-records",
+            },
+            {
                 "family": "orientation",
                 "kind": "project-overview",
                 "reason": "no-records",
@@ -1568,6 +1574,11 @@ fn build_writes_reference_documents_and_leaves_the_ledger_unchanged() {
     assert_eq!(
         built["data"]["omitted"],
         json!([
+            {
+                "family": "exploration",
+                "kind": "exploration-brief",
+                "reason": "no-records",
+            },
             {
                 "family": "orientation",
                 "kind": "project-overview",
@@ -2020,6 +2031,7 @@ fn build_writes_overview_and_publish_uses_it() {
             "architecture-design",
             "developer-guide",
             "getting-started",
+            "glossary",
             "overview",
             "project-site",
             "reference",
@@ -2122,6 +2134,14 @@ fn build_writes_overview_and_publish_uses_it() {
             .expect("the structured export is written"),
     )
     .expect("the export is JSON");
+    let collections = export["collections"]
+        .as_array()
+        .expect("the export lists collections");
+    assert_eq!(
+        collections,
+        &[json!({ "emitted": true, "name": "glossary" })],
+        "the glossary collection is exported with emitted=true: {export}"
+    );
     let products = export["products"]
         .as_array()
         .expect("the export lists products");
@@ -2211,6 +2231,7 @@ fn build_writes_overview_and_publish_uses_it() {
         "publication.product.reference",
         "publication.package.developer-guide",
         "publication.package.project-site",
+        "publication.collection.glossary",
         "publication.json",
     ] {
         assert!(
@@ -2218,9 +2239,11 @@ fn build_writes_overview_and_publish_uses_it() {
             "a fresh publish recomputes {name}: {recomputed:?}"
         );
     }
-    assert_eq!(
-        published["data"]["unchanged"],
-        json!([]),
+    let unchanged = published["data"]["unchanged"]
+        .as_array()
+        .expect("publish reports the unchanged blocks");
+    assert!(
+        unchanged.is_empty(),
         "a fresh publish has nothing already current: {published}"
     );
 
@@ -2290,6 +2313,7 @@ fn build_writes_overview_and_publish_uses_it() {
         "publication.product.reference",
         "publication.package.developer-guide",
         "publication.package.project-site",
+        "publication.collection.glossary",
         "publication.json",
     ] {
         assert!(
@@ -2327,6 +2351,85 @@ fn build_writes_overview_and_publish_uses_it() {
         ledger_lines(&dir).len(),
         lines_before,
         "publishing creates no ledger entity"
+    );
+}
+
+/// The glossary collection ships as a rendered page: the same seed and build
+/// that back the products, then `publish` writes `docs/public/glossary.md`
+/// with its `publication.collection.glossary` managed block and lists the
+/// page among the published pages, sorted by name.
+#[test]
+fn publish_renders_glossary_collection_page() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_ledger(
+        &dir,
+        &[
+            event_line(&node_event(
+                "event-question",
+                "Question",
+                "kaya/Question/q-one",
+                "Q One",
+            )),
+            event_line(&experiment_event(
+                "event-experiment",
+                "kaya/Experiment/exp-one",
+                "Exp One",
+            )),
+            event_line(&relationship_event(
+                "event-relationship",
+                "investigates",
+                "kaya/Question/q-one",
+                "kaya/Experiment/exp-one",
+            )),
+            event_line(&run_event("run-1", "kaya/Run/run-1", 3)),
+            event_line(&artifact_event(
+                "artifact-1",
+                "kaya/Artifact/run-jsonl",
+                "reports",
+                "target/run.jsonl",
+            )),
+        ],
+    );
+
+    assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+
+    let published = assert_success(&run(&dir, &["publish"]));
+    let recomputed = published["data"]["recomputed"]
+        .as_array()
+        .expect("publish reports the recomputed blocks");
+    assert!(
+        recomputed
+            .iter()
+            .any(|candidate| candidate == "publication.collection.glossary"),
+        "publish composes the glossary collection block: {recomputed:?}"
+    );
+    let pages = published_page_names(&published["data"]["pages"]);
+    assert_eq!(
+        pages,
+        [
+            "architecture-design",
+            "developer-guide",
+            "getting-started",
+            "glossary",
+            "overview",
+            "project-site",
+            "reference",
+            "release-migration",
+            "status-compatibility",
+        ],
+        "the glossary collection gets a page among the sorted published pages: {pages:?}"
+    );
+
+    let glossary = fs::read_to_string(dir.path().join("docs/public/glossary.md"))
+        .expect("the glossary page is written");
+    assert!(
+        !glossary.is_empty(),
+        "the glossary page is non-empty: {glossary}"
+    );
+    assert!(
+        glossary.contains("generated:publication.collection.glossary"),
+        "the glossary page carries its generated managed block: {glossary}"
     );
 }
 
@@ -2374,6 +2477,7 @@ fn publish_declares_every_product_and_reports_justified_omissions() {
             "architecture-design",
             "developer-guide",
             "getting-started",
+            "glossary",
             "how-to",
             "overview",
             "project-site",
@@ -2527,6 +2631,7 @@ fn publish_declares_the_remaining_products_and_export_agrees() {
             "architecture-design",
             "developer-guide",
             "getting-started",
+            "glossary",
             "how-to",
             "overview",
             "project-site",
@@ -2773,8 +2878,8 @@ fn publish_preserves_authored_pages_at_omitted_product_paths() {
             .as_array()
             .expect("pages is a list")
             .len(),
-        4,
-        "only the packages, the architecture-design page and the research-map-backed reference remain: {second}"
+        5,
+        "only the packages, the research-map-backed reference and the always-emitted glossary remain: {second}"
     );
     assert_eq!(
         second["data"]["omitted"],
@@ -2805,5 +2910,119 @@ fn unknown_subcommand_returns_the_usage_envelope() {
     assert!(
         message.contains("frobnicate"),
         "usage message must name the offending subcommand: {message}"
+    );
+}
+
+#[test]
+fn build_omits_exploration_brief_without_question_records() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    // A run alone backs no exploration brief: the kind is reported omitted.
+    write_ledger(&dir, &[event_line(&run_event("run-1", "kaya/Run/run-1", 3))]);
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    let omitted = built["data"]["omitted"]
+        .as_array()
+        .expect("omitted is a list");
+    assert!(
+        omitted.iter().any(|entry| {
+            entry == &json!({
+                "family": "exploration",
+                "kind": "exploration-brief",
+                "reason": "no-records",
+            })
+        }),
+        "a ledger without question records omits the exploration brief: {omitted:?}"
+    );
+}
+
+#[test]
+fn build_renders_exploration_brief_from_question_idea_hypothesis() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_ledger(
+        &dir,
+        &[
+            event_line(&node_event(
+                "event-question",
+                "Question",
+                "kaya/Question/q-1",
+                "Q One",
+            )),
+            event_line(&node_event(
+                "event-idea",
+                "Idea",
+                "kaya/Idea/i-1",
+                "Idea One",
+            )),
+            event_line(&node_event(
+                "event-hypothesis",
+                "Hypothesis",
+                "kaya/Hypothesis/h-1",
+                "Hypothesis One",
+            )),
+        ],
+    );
+
+    let built = assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    let brief = fs::read_to_string(dir.path().join("docs/research/brief.md"))
+        .expect("the exploration brief is written next to the project documents");
+    let marker = format!("<!-- kaya:begin generated:{BRIEF_BLOCK} -->");
+    assert!(
+        brief.contains(&marker),
+        "the brief carries the generated exploration block marker: {brief}"
+    );
+    for (section, id) in [
+        ("## Question", "kaya/Question/q-1"),
+        ("## Idea", "kaya/Idea/i-1"),
+        ("## Hypothesis", "kaya/Hypothesis/h-1"),
+    ] {
+        let start = brief
+            .find(section)
+            .unwrap_or_else(|| panic!("the brief carries a {section} section: {brief}"));
+        assert!(
+            brief[start..].contains(id),
+            "the {section} section names {id}: {brief}"
+        );
+    }
+
+    let omitted = built["data"]["omitted"]
+        .as_array()
+        .expect("omitted is a list");
+    assert!(
+        !omitted.iter().any(|entry| {
+            entry["family"] == json!("exploration") && entry["kind"] == json!("exploration-brief")
+        }),
+        "records back the brief, so the kind is never reported omitted: {omitted:?}"
+    );
+}
+
+#[test]
+fn stale_brief_without_records_is_removed() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_ledger(
+        &dir,
+        &[event_line(&node_event(
+            "event-question",
+            "Question",
+            "kaya/Question/q-1",
+            "Q One",
+        ))],
+    );
+    assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    let brief_path = dir.path().join("docs/research/brief.md");
+    assert!(
+        brief_path.exists(),
+        "the first build renders the exploration brief"
+    );
+
+    // write_ledger replaces the file, so the records the brief was built
+    // from are gone: the stale brief must be removed, not left behind.
+    write_ledger(&dir, &[event_line(&run_event("run-1", "kaya/Run/run-1", 3))]);
+    assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    assert!(
+        !brief_path.exists(),
+        "a brief without backing records is removed by the rebuild"
     );
 }

@@ -865,6 +865,14 @@ fn plan_research(
         expected.insert(overview_path, planned.document);
     }
 
+    let brief_path = out.join("brief.md");
+    let existing = source.read_text(&brief_path)?;
+    let planned = report::plan_brief(graph, existing.as_deref())?;
+    omitted.extend(planned.omitted.iter().map(omitted_kind));
+    if !planned.document.trim().is_empty() {
+        expected.insert(brief_path, planned.document);
+    }
+
     let inputs = reuse::inputs(graph)?;
     let mut existing = BTreeMap::new();
     for (_, path) in reuse::documents(out) {
@@ -930,6 +938,7 @@ fn existing_documents(source: &Source, out: &Path) -> Result<Vec<PathBuf>, Verif
     let mut paths = vec![
         out.join("index.md"),
         out.join("overview.md"),
+        out.join("brief.md"),
         out.join("understanding.md"),
     ];
     for (_, path) in reuse::documents(out) {
