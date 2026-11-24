@@ -22,6 +22,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   — publish's read order (`src/publication/source.rs`) and check's
   `RESEARCH_READ_ORDER` (`src/verification/mod.rs`) — in the same change.
 
+### Changed
+- Capture refusals carry per-field labels: `kaya.capture.invalid_key` and
+  `kaya.capture.invalid_project` replace the overloaded
+  `kaya.capture.bound_exceeded`, and `--project` now validates against the
+  same `[a-z0-9-]` slug alphabet as `--key`, so a format violation is
+  distinguishable from an over-bound text payload and a malformed project can
+  no longer reach the subject id (`src/capture.rs`).
+- A corrected capture's envelope names the outcome chain: `data.supersedes`
+  carries the id of the superseded event alongside `data.event`, matching the
+  superseded field the stored correction already records (`src/capture.rs`).
+
+### Fixed
+- A capture racing a twin that mints the same generation-salted correction id
+  now re-resolves against the stored ledger once: matching text settles as a
+  plain duplicate, and one bounded retry supersedes the twin's freshly stored
+  correction under its bumped generation instead of failing outright
+  (`src/capture.rs`).
+- Incremental-build cache invalidation is mechanical: `build.rs` hashes the
+  `src/projection` sources into the generator string
+  (`<version>+render-<fnv1a>`), so a render-affecting edit invalidates stale
+  state without a manual bump to remember; the const documents the scheme.
+- The documents fingerprint distinguishes an unreadable file
+  (`<unreadable>`) from an absent one (`<absent>`): both still only ever
+  force a rebuild, but a permission problem no longer masquerades as a
+  deleted document (`src/projection/state.rs`).
+- The incremental-build temp file is pid-unique
+  (`build-state.json.<pid>.tmp`), so two concurrent builds can no longer
+  share one temp path and rename a torn file into place
+  (`src/projection/state.rs`).
+- Read-list parity is enforced by a unit test binding
+  `publication::source::READER_FILES` to `verification`'s
+  `RESEARCH_READ_ORDER`, so the two fixed orders can no longer drift — the
+  failure class behind the brief.md publication-before-check gap.
+
 ## [0.3.0] - 2026-11-24
 
 ### Added

@@ -671,6 +671,11 @@ fn edited_capture_emits_a_superseding_correction() {
         "the envelope names the correction's id"
     );
     assert_eq!(
+        correction["data"]["supersedes"],
+        json!(first_id),
+        "the corrected envelope names the event it supersedes"
+    );
+    assert_eq!(
         correction_event["type"],
         json!("model.entity.created"),
         "a correction keeps the shipped event kind"
@@ -1012,7 +1017,7 @@ fn capture_key_over_bound_or_off_alphabet_refused() {
         );
         assert_eq!(
             envelope["error"]["label"],
-            json!("kaya.capture.bound_exceeded"),
+            json!("kaya.capture.invalid_key"),
             "key {bad_key:?} is refused"
         );
         let message = envelope["error"]["message"].as_str().expect("message");
@@ -1046,12 +1051,39 @@ fn capture_empty_key_or_empty_text_refused() {
     let envelope = refusal(&dir, &["note", "text", "--actor", "sasha", "--key", ""]);
     assert_eq!(
         envelope["error"]["label"],
-        json!("kaya.capture.bound_exceeded"),
-        "an empty key is refused as a key bound"
+        json!("kaya.capture.invalid_key"),
+        "an empty key is refused as an invalid key"
     );
     let message = envelope["error"]["message"].as_str().expect("message");
     assert!(message.contains("key"), "the refusal names the key field");
 
+    assert_eq!(
+        ledger_lines(&dir).len(),
+        0,
+        "no refused capture appends an event"
+    );
+}
+
+#[test]
+fn capture_project_off_alphabet_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    for bad_project in ["Bad Project", "proj_1", ""] {
+        let envelope = refusal(
+            &dir,
+            &["note", "text", "--actor", "sasha", "--project", bad_project],
+        );
+        assert_eq!(
+            envelope["error"]["label"],
+            json!("kaya.capture.invalid_project"),
+            "project {bad_project:?} is refused"
+        );
+        let message = envelope["error"]["message"].as_str().expect("message");
+        assert!(
+            message.contains("project"),
+            "the refusal names the project field: {message}"
+        );
+    }
     assert_eq!(
         ledger_lines(&dir).len(),
         0,

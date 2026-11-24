@@ -22,7 +22,9 @@ mod error;
 mod io;
 mod plan;
 mod render;
-mod source;
+// Crate-visible only for the read-order parity test in `verification`:
+// `READER_FILES` and check's `RESEARCH_READ_ORDER` are one contract.
+pub(crate) mod source;
 mod vocabulary;
 
 pub use build::{Built, Omitted, Page, build};

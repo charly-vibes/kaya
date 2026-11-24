@@ -1141,3 +1141,22 @@ fn as_publication_error(error: VerificationError) -> PublicationError {
         message: error.message,
     }
 }
+
+#[cfg(test)]
+mod read_order_parity {
+    use super::RESEARCH_READ_ORDER;
+
+    /// The publish reader and the checker walk the same fixed files: the two
+    /// lists are one read-list contract, and drift between them is exactly
+    /// the failure class behind the brief.md gap (bd kaya-w68) — a document
+    /// that reads fine yet publishes before it checks clean.
+    #[test]
+    fn publish_reader_and_check_walk_the_same_files() {
+        assert_eq!(
+            crate::publication::source::READER_FILES,
+            RESEARCH_READ_ORDER,
+            "publication's fixed reader order and verification's \
+             RESEARCH_READ_ORDER are one contract"
+        );
+    }
+}

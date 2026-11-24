@@ -65,6 +65,24 @@ struct Cli {
     command: Command,
 }
 
+/// The argument set shared by every capture subcommand; the text is the
+/// subcommand's positional and `capture::Kind` its only real difference.
+#[derive(Debug, clap::Args)]
+struct CaptureArgs {
+    /// Name of the author
+    #[arg(long, value_name = "NAME")]
+    actor: String,
+    /// Actor kind: `human` (the default) or `agent`
+    #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
+    actor_type: String,
+    /// Node key; defaults to `<UTC date>-<sha256(text)[:8]>`
+    #[arg(long, value_name = "SLUG")]
+    key: Option<String>,
+    /// Project namespace recorded in the subject id
+    #[arg(long, default_value = "kaya", value_name = "NAME")]
+    project: String,
+}
+
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Create the research ledger if it does not exist
@@ -236,69 +254,29 @@ enum Command {
     Note {
         /// The observation text, stored after secret redaction
         text: String,
-        /// Name of the author
-        #[arg(long, value_name = "NAME")]
-        actor: String,
-        /// Actor kind: `human` (the default) or `agent`
-        #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
-        actor_type: String,
-        /// Node key; defaults to `<UTC date>-<sha256(text)[:8]>`
-        #[arg(long, value_name = "SLUG")]
-        key: Option<String>,
-        /// Project namespace recorded in the subject id
-        #[arg(long, default_value = "kaya", value_name = "NAME")]
-        project: String,
+        #[command(flatten)]
+        args: CaptureArgs,
     },
     /// Capture an authored question as one model event
     Question {
         /// The question text, stored after secret redaction
         text: String,
-        /// Name of the author
-        #[arg(long, value_name = "NAME")]
-        actor: String,
-        /// Actor kind: `human` (the default) or `agent`
-        #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
-        actor_type: String,
-        /// Node key; defaults to `<UTC date>-<sha256(text)[:8]>`
-        #[arg(long, value_name = "SLUG")]
-        key: Option<String>,
-        /// Project namespace recorded in the subject id
-        #[arg(long, default_value = "kaya", value_name = "NAME")]
-        project: String,
+        #[command(flatten)]
+        args: CaptureArgs,
     },
     /// Capture an authored decision as one model event
     Decision {
         /// The decision text, stored after secret redaction
         text: String,
-        /// Name of the author
-        #[arg(long, value_name = "NAME")]
-        actor: String,
-        /// Actor kind: `human` (the default) or `agent`
-        #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
-        actor_type: String,
-        /// Node key; defaults to `<UTC date>-<sha256(text)[:8]>`
-        #[arg(long, value_name = "SLUG")]
-        key: Option<String>,
-        /// Project namespace recorded in the subject id
-        #[arg(long, default_value = "kaya", value_name = "NAME")]
-        project: String,
+        #[command(flatten)]
+        args: CaptureArgs,
     },
     /// Capture an authored finding as one model event
     Finding {
         /// The finding text, stored after secret redaction
         text: String,
-        /// Name of the author
-        #[arg(long, value_name = "NAME")]
-        actor: String,
-        /// Actor kind: `human` (the default) or `agent`
-        #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
-        actor_type: String,
-        /// Node key; defaults to `<UTC date>-<sha256(text)[:8]>`
-        #[arg(long, value_name = "SLUG")]
-        key: Option<String>,
-        /// Project namespace recorded in the subject id
-        #[arg(long, default_value = "kaya", value_name = "NAME")]
-        project: String,
+        #[command(flatten)]
+        args: CaptureArgs,
     },
 }
 
@@ -480,62 +458,10 @@ fn main() -> ExitCode {
             actor,
             actor_type,
         } => cmd_supersede_doctest(&document, &label, &actor, &actor_type),
-        Command::Note {
-            text,
-            actor,
-            actor_type,
-            key,
-            project,
-        } => cmd_capture(
-            capture::Kind::Note,
-            &text,
-            &actor,
-            &actor_type,
-            key.as_deref(),
-            &project,
-        ),
-        Command::Question {
-            text,
-            actor,
-            actor_type,
-            key,
-            project,
-        } => cmd_capture(
-            capture::Kind::Question,
-            &text,
-            &actor,
-            &actor_type,
-            key.as_deref(),
-            &project,
-        ),
-        Command::Decision {
-            text,
-            actor,
-            actor_type,
-            key,
-            project,
-        } => cmd_capture(
-            capture::Kind::Decision,
-            &text,
-            &actor,
-            &actor_type,
-            key.as_deref(),
-            &project,
-        ),
-        Command::Finding {
-            text,
-            actor,
-            actor_type,
-            key,
-            project,
-        } => cmd_capture(
-            capture::Kind::Finding,
-            &text,
-            &actor,
-            &actor_type,
-            key.as_deref(),
-            &project,
-        ),
+        Command::Note { text, args } => cmd_capture(capture::Kind::Note, &text, &args),
+        Command::Question { text, args } => cmd_capture(capture::Kind::Question, &text, &args),
+        Command::Decision { text, args } => cmd_capture(capture::Kind::Decision, &text, &args),
+        Command::Finding { text, args } => cmd_capture(capture::Kind::Finding, &text, &args),
     };
     emit(outcome.unwrap_or_else(|(label, message)| Envelope::error("error", &label, message)))
 }
@@ -651,16 +577,17 @@ fn adapter_failure(err: AdapterError) -> Failure {
 }
 
 /// Capture one authored text as a `model.entity.created` event.
-fn cmd_capture(
-    kind: capture::Kind,
-    text: &str,
-    actor: &str,
-    actor_type: &str,
-    key: Option<&str>,
-    project: &str,
-) -> Result<Envelope, Failure> {
+fn cmd_capture(kind: capture::Kind, text: &str, args: &CaptureArgs) -> Result<Envelope, Failure> {
     let mut ledger = open_ledger()?;
-    capture::run(&mut ledger, kind, text, actor, actor_type, key, project)
+    capture::run(
+        &mut ledger,
+        kind,
+        text,
+        &args.actor,
+        &args.actor_type,
+        args.key.as_deref(),
+        &args.project,
+    )
 }
 
 fn model_failure(err: ModelError) -> Failure {

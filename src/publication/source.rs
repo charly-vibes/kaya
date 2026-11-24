@@ -52,6 +52,18 @@ pub struct Documents(pub BTreeMap<String, DocumentRef>);
 
 /// Read the compiled documents under `research_dir`.
 ///
+/// The fixed reader files, in read order; the sorted experiment dossiers
+/// follow them. One contract with `verification`'s `RESEARCH_READ_ORDER` —
+/// a parity test pins the two lists together.
+pub(crate) const READER_FILES: [&str; 6] = [
+    "index.md",
+    "overview.md",
+    "understanding.md",
+    "reproduction-package.md",
+    "handoff.md",
+    "technical-reference.md",
+];
+
 /// Files are read in a fixed order — `index.md`, `overview.md`,
 /// `understanding.md`, `reproduction-package.md`, `handoff.md`,
 /// `technical-reference.md`, then the
@@ -64,17 +76,10 @@ pub struct Documents(pub BTreeMap<String, DocumentRef>);
 /// ledger access is needed.
 pub fn read_documents(research_dir: &Path) -> Result<Documents, PublicationError> {
     let mut documents = BTreeMap::new();
-    let mut files: Vec<PathBuf> = [
-        "index.md",
-        "overview.md",
-        "understanding.md",
-        "reproduction-package.md",
-        "handoff.md",
-        "technical-reference.md",
-    ]
-    .iter()
-    .map(|name| research_dir.join(name))
-    .collect();
+    let mut files: Vec<PathBuf> = READER_FILES
+        .iter()
+        .map(|name| research_dir.join(name))
+        .collect();
     files.extend(experiment_files(research_dir)?);
     for path in files {
         let text = match fs::read_to_string(&path) {

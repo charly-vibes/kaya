@@ -99,7 +99,8 @@ pub fn run(
         Some(key) => key.to_owned(),
         None => default_key(&text),
     };
-    check_key(&key)?;
+    check_slug("key", &key)?;
+    check_slug("project", project)?;
 
     let actor_type = match actor_type {
         "human" => ActorType::Human,
@@ -142,55 +143,73 @@ pub fn run(
 
     // Replay against the key's effective stored text before appending.
     let stored = stored_events()?;
-    let effective = stored
-        .iter()
-        .rev()
-        .find(|stored| stored.subject.id == subject_id && stored.data.get("text").is_some());
-    let (outcome, id) = match effective {
+    let (outcome, id, supersedes) = match effective_text_event(&stored, &subject_id) {
         Some(effective) if effective.data["text"] == data["text"] => {
-            ("duplicate", effective.id.clone())
+            ("duplicate", effective.id.clone(), None)
         }
         Some(effective) => {
             // Reuse the adapters' correction scheme over the prior effective
             // id: the generation salt keeps revisits of an earlier state
             // distinct from the correction already stored for it.
-            let mut target = event.clone();
-            target.id = effective.id.clone();
-            let generation = correction_generation(&stored, &target);
-            let correction = reobservation_correction(&target, generation);
-            match ledger.append(&correction) {
-                Ok(AppendOutcome::Appended | AppendOutcome::Duplicate) => {
-                    ("corrected", correction.id)
-                }
-                Err(err) if err.label == kaya::ledger::LABEL_ID_REUSE => {
-                    // A racing twin minted the same generation-salted id with
-                    // its own timestamp; re-resolve against the stored state.
-                    let stored = stored_events()?;
-                    match stored.iter().rev().find(|stored| {
-                        stored.subject.id == subject_id && stored.data.get("text").is_some()
-                    }) {
-                        Some(effective) if effective.data["text"] == data["text"] => {
-                            ("duplicate", effective.id.clone())
-                        }
-                        _ => return Err(crate::ledger_failure(err)),
+            let mut superseded = effective.id.clone();
+            let mut stored = stored;
+            let mut result = None;
+            for attempt in 0..2 {
+                let mut target = event.clone();
+                target.id = superseded.clone();
+                let generation = correction_generation(&stored, &target);
+                let correction = reobservation_correction(&target, generation);
+                match ledger.append(&correction) {
+                    Ok(AppendOutcome::Appended | AppendOutcome::Duplicate) => {
+                        result = Some(("corrected", correction.id, Some(superseded)));
+                        break;
                     }
+                    Err(err) if err.label == kaya::ledger::LABEL_ID_REUSE => {
+                        // A racing twin minted the same generation-salted id
+                        // with its own timestamp. Re-resolve against the
+                        // stored state: matching text is a plain duplicate,
+                        // and one retry supersedes the twin's freshly stored
+                        // correction under its bumped generation.
+                        stored = stored_events()?;
+                        match effective_text_event(&stored, &subject_id) {
+                            Some(effective) if effective.data["text"] == data["text"] => {
+                                result = Some(("duplicate", effective.id.clone(), None));
+                                break;
+                            }
+                            Some(effective) if attempt == 0 => superseded = effective.id.clone(),
+                            _ => return Err(crate::ledger_failure(err)),
+                        }
+                    }
+                    Err(err) => return Err(crate::ledger_failure(err)),
                 }
-                Err(err) => return Err(crate::ledger_failure(err)),
             }
+            result.expect("the bounded retry always resolves or returns")
         }
         None => match ledger.append(&event).map_err(crate::ledger_failure)? {
-            AppendOutcome::Appended | AppendOutcome::Duplicate => ("appended", event.id.clone()),
+            AppendOutcome::Appended | AppendOutcome::Duplicate => {
+                ("appended", event.id.clone(), None)
+            }
         },
     };
 
-    Ok(Envelope::ok(
-        "capture",
-        json!({
-            "outcome": outcome,
-            "event": id,
-            "ledger": LEDGER_PATH,
-        }),
-    ))
+    let mut payload = json!({
+        "outcome": outcome,
+        "event": id,
+        "ledger": LEDGER_PATH,
+    });
+    if let Some(superseded) = supersedes {
+        payload["supersedes"] = json!(superseded);
+    }
+    Ok(Envelope::ok("capture", payload))
+}
+
+/// The newest stored event (ledger order) for `subject_id` carrying
+/// `data.text`, or `None`.
+fn effective_text_event<'a>(stored: &'a [Event], subject_id: &str) -> Option<&'a Event> {
+    stored
+        .iter()
+        .rev()
+        .find(|stored| stored.subject.id == subject_id && stored.data.get("text").is_some())
 }
 
 /// The stored ledger events, in ledger order.
@@ -227,19 +246,21 @@ fn default_key(text: &str) -> String {
     format!("{date}-{}", &hex[..8])
 }
 
-/// Refuse a key outside `1..=64` characters of `[a-z0-9-]`.
-fn check_key(key: &str) -> Result<(), (String, String)> {
-    let valid = !key.is_empty()
-        && key.len() <= 64
-        && key
+/// Refuse a slug outside `1..=64` characters of `[a-z0-9-]`, naming `field`
+/// in its own refusal label so a format violation is distinguishable from an
+/// over-bound text payload.
+fn check_slug(field: &str, value: &str) -> Result<(), (String, String)> {
+    let valid = !value.is_empty()
+        && value.len() <= 64
+        && value
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-');
     if valid {
         Ok(())
     } else {
         Err((
-            "kaya.capture.bound_exceeded".to_owned(),
-            format!("capture key {key:?} must be 1 to 64 characters of [a-z0-9-]"),
+            format!("kaya.capture.invalid_{field}"),
+            format!("capture {field} {value:?} must be 1 to 64 characters of [a-z0-9-]"),
         ))
     }
 }

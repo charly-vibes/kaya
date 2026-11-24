@@ -20,9 +20,10 @@ use serde::{Deserialize, Serialize};
 use crate::ledger::sha256_hex;
 use crate::projection::{Summary, report};
 
-/// Bumped whenever a code change could alter rendered bytes beyond the crate
-/// version, so stale state cannot skip a document the new code would render.
-pub const GENERATOR: &str = concat!(env!("CARGO_PKG_VERSION"), "+incremental-1");
+/// Derived mechanically by `build.rs`: the crate version plus a hash of the
+/// projection render sources, so any render-affecting edit invalidates the
+/// cache without a human remembering to bump a constant.
+pub const GENERATOR: &str = concat!(env!("CARGO_PKG_VERSION"), "+render-", env!("RENDER_HASH"));
 
 /// The persisted state of the last successful build.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,7 +81,14 @@ pub fn fingerprint(documents: &[(String, PathBuf)]) -> String {
         bytes.push(0);
         match fs::read(path) {
             Ok(content) => bytes.extend_from_slice(&content),
-            Err(_) => bytes.extend_from_slice(b"<absent>"),
+            // Absence and unreadability both fold in — a differing
+            // fingerprint only ever forces a rebuild — but stay
+            // distinguishable: a permission problem must not masquerade as a
+            // deleted document.
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                bytes.extend_from_slice(b"<absent>");
+            }
+            Err(_) => bytes.extend_from_slice(b"<unreadable>"),
         }
         bytes.push(0);
     }
@@ -145,17 +153,21 @@ impl BuildState {
         serde_json::from_slice(&bytes).ok()
     }
 
-    /// Store the state atomically: write a sibling temp file, then rename.
+    /// Store the state atomically: write a pid-unique sibling temp file, then
+    /// rename.
     ///
     /// A failure between write and rename removes the temp file, so a crash
-    /// never leaves an orphaned `build-state.json.tmp` sibling.
+    /// never leaves an orphaned temp sibling, and two concurrent builds never
+    /// share one temp path (a torn rename just loads as `None` and rebuilds).
     pub fn store(&self, path: &Path) -> io::Result<()> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
         let bytes = serde_json::to_vec_pretty(self)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
-        let temp = path.with_extension("json.tmp");
+        let mut name = path.file_name().unwrap_or_default().to_os_string();
+        name.push(format!(".{}.tmp", std::process::id()));
+        let temp = path.with_file_name(name);
         if let Err(error) = fs::write(&temp, bytes).and_then(|()| fs::rename(&temp, path)) {
             let _ = fs::remove_file(&temp);
             return Err(error);
@@ -168,6 +180,7 @@ impl BuildState {
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
+    use std::os::unix::fs::PermissionsExt;
 
     fn sample(digest: &str) -> BuildState {
         let mut documents = BTreeMap::new();
@@ -229,6 +242,38 @@ mod tests {
         fs::write(&path, b"bytes").unwrap();
         assert_ne!(fingerprint(&single), absent);
         assert_eq!(fingerprint(&single), fingerprint(&single));
+    }
+
+    #[test]
+    fn fingerprint_distinguishes_unreadable_from_absent() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("locked.md");
+        let single = vec![("locked.md".to_owned(), path.clone())];
+        let absent = fingerprint(&single);
+        fs::write(&path, b"bytes").unwrap();
+        let present = fingerprint(&single);
+        assert_ne!(absent, present);
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+        let unreadable = fingerprint(&single);
+        let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o644));
+        // Root ignores permission bits; the fold distinction is only
+        // observable where the OS actually refuses the read.
+        if fs::read(&path).is_err() {
+            assert_ne!(unreadable, absent, "unreadable must not fold as deleted");
+            assert_ne!(unreadable, present, "unreadable must not fold as content");
+        }
+    }
+
+    #[test]
+    fn store_leaves_no_temp_sibling() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("build-state.json");
+        sample("digest-1").store(&path).unwrap();
+        let siblings: Vec<_> = fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(siblings, vec!["build-state.json".to_owned()]);
     }
 
     #[test]
