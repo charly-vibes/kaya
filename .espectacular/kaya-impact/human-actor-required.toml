@@ -1,0 +1,9 @@
+id = "human-actor-required"
+description = "A waived disposition with a non-human actor is a labeled refusal appending no event."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "human_actor_required"}]

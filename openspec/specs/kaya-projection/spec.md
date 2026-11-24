@@ -219,6 +219,13 @@ kind), authored blocks, and composed records; edges SHALL link a record to
 the event ids, cited ids, source artifacts, and contained records it depends
 on.
 
+#### Scenario: Containment edges carry transitive impact
+
+- **WHEN** a composed record — a publication page or collection — holds a
+  document record
+- **THEN** the composed record holds an edge to that document record, so a
+  change reaching the document reaches the composed record's impact set
+
 #### Scenario: Identical state yields identical IR
 
 - **WHEN** the document IR is materialized twice from identical ledger,
@@ -244,12 +251,11 @@ on.
   document sources is deleted and the IR is materialized
 - **THEN** the IR is identical to the materialization before the deletion
 
-#### Scenario: Containment edges carry transitive impact
+#### Scenario: Structure read from the IR, not from rendered markdown
 
-- **WHEN** a composed record — a publication page or collection — holds a
-  document record
-- **THEN** the composed record holds an edge to that document record, so a
-  change reaching the document reaches the composed record's impact set
+- **WHEN** a structural consumer needs document structure
+- **THEN** it reads the IR; rendered markdown is never reparsed to recover
+  records or dependencies
 
 ### Requirement: Property coverage mirror
 

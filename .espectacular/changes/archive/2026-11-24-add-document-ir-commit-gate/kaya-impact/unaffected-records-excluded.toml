@@ -1,0 +1,9 @@
+id = "unaffected-records-excluded"
+description = "A change set touching a path no record depends on yields an empty impact set and a passing report."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "unaffected_excluded"}]

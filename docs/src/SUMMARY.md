@@ -8,9 +8,9 @@
 
 # Design specs
 
-Deployed capability specs live in `openspec/specs/`. Three capabilities keep a
+Deployed capability specs live in `openspec/specs/`. Four capabilities keep a
 specodelic layer beside each as `layer.md` — the two document-taxonomy
-capabilities and kaya-adapters; the research
+capabilities, kaya-adapters, and kaya-impact; the research
 record capabilities carry their layer inline (frontmatter plus
 Constraints/Model/Properties tables inside `spec.md`). `just specs-docs`
 copies each capability into this book, and `just docs` runs it before
@@ -22,6 +22,7 @@ copies each capability into this book, and `just docs` runs it before
 - [kaya.ledger](specs/kaya-ledger.md)
 - [kaya.model](specs/kaya-model.md)
 - [kaya.projection](specs/kaya-projection.md)
+- [kaya.impact](specs/kaya-impact.md)
 - [kaya.promotion](specs/kaya-promotion.md)
 - [kaya.verification](specs/kaya-verification.md)
 - [kaya.adapters](specs/kaya-adapters.md)

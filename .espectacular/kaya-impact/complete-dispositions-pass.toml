@@ -1,0 +1,9 @@
+id = "complete-dispositions-pass"
+description = "Every impact carrying a valid disposition and every mandatory check green passes the gate with exit zero."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "complete_dispositions_pass"}]

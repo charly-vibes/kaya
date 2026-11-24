@@ -1,0 +1,9 @@
+id = "green-checks-establish-validated"
+description = "An impacted record whose mandatory checks run green holds validated with no recorded event."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "dispositions_derived"}]

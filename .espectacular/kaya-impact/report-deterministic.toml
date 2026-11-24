@@ -1,0 +1,9 @@
+id = "report-deterministic"
+description = "Two gate runs on the same state print byte-identical reports."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "report_deterministic"}]

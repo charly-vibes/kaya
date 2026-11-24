@@ -176,13 +176,17 @@ and copies `docs/public` into `book/public`; the Docs workflow uploads
 
 ## Deferred
 
-The same conversation went further than a document list: structured DocIR as
-kaya's central artifact, doctests as first-class objects with runners and
-expected output, documentation impact analysis as a commit gate
-(change → impact set → required dispositions → validation → gate), and Org as
-an authoring frontend with `KAYA_*` properties. Those change kaya's central
-artifact rather than its document list, so they are parked as one design
-ticket (kaya-aaz) until the taxonomy lands.
+**Org authoring frontend with `KAYA_*` properties — rejected for now.** No Org
+authoring user exists; markdown with managed markers is the deployed authoring
+surface; a parser frontend before the IR interchange has a stable form would be
+speculative surface area — the origin conversation's own warning against
+building a new DITA applies. Revisit when (a) the IR serialization has a
+stable, versioned form and (b) a real Org authoring need appears. The origin's
+Babel lesson stands: authoring conveniences must not become the execution
+engine; doctests run through the controlled harness.
 
-Also deferred, and load-bearing for the reuse families: the `dont` (kaya-dt2),
-turu/whisper (kaya-syx), and specodelic (kaya-24c) adapters.
+The rest of that conversation has shipped: structured DocIR as the central
+artifact (`kaya-projection`), doctests as first-class objects with runners and
+expected output (`kaya-documents`), and documentation impact analysis as a
+commit gate (`kaya-impact`). The deployed specs are authoritative; this page
+no longer tracks them as parked work.

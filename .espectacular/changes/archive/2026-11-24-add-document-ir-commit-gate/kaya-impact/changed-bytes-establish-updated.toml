@@ -1,0 +1,9 @@
+id = "changed-bytes-establish-updated"
+description = "An impacted document whose block regenerates with bytes differing from its pre-change state holds updated with no recorded event."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "dispositions_derived"}]

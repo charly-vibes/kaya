@@ -53,13 +53,13 @@ with this proposal.
 - [x] 4.1 Lefthook wiring policy: staged local pass where cheap, full pass in
       `just ci`; via the global `~/.git-hooks` shim — never
       `lefthook install` locally.
-- [ ] 4.2 `docs/src/document-taxonomy.md`: the Deferred section shrinks to
+- [x] 4.2 `docs/src/document-taxonomy.md`: the Deferred section shrinks to
       the Org rejection with its revisit conditions, pointing at the
       deployed specs; book regenerated via `just docs`.
 
 ## 5. Verify (orchestrator)
 
-- [ ] 5.1 `openspec validate --strict` and `ah check --run-tests` green;
+- [x] 5.1 `openspec validate --strict` and `ah check --run-tests` green;
       mutation check on kaya itself: change a documented command's output
       fixture and observe the gate fail, then add a disposition and observe
       it pass.
