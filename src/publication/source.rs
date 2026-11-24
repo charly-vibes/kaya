@@ -18,8 +18,9 @@ use crate::projection::{BlockKind, scan};
 
 use super::error::PublicationError;
 
-/// The closed document vocabulary an admission row may name.
-const DOCUMENT_KINDS: [&str; 11] = [
+/// The closed document vocabulary an admission row may name, and the list
+/// the glossary collection page renders.
+pub(crate) const DOCUMENT_KINDS: [&str; 11] = [
     "orientation.project-overview",
     "orientation.research-map",
     "exploration.exploration-brief",

@@ -8,7 +8,7 @@ use std::time::SystemTime;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use kaya::publication::{Decl, Documents, build};
+use kaya::publication::{Decl, Documents, Tier, build};
 
 use crate::common::*;
 
@@ -335,5 +335,44 @@ fn export_and_page_attribution_agree_after_one_document_changes() {
         map.1,
         vec!["kaya/Evidence/m-two".to_owned()],
         "the rebuilt attribution carries the changed document's new ids"
+    );
+}
+
+#[test]
+fn export_lists_collection_rows() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    let decls = [Decl {
+        tier: Tier::Collection,
+        name: "glossary".to_owned(),
+        includes: Vec::new(),
+        members: Vec::new(),
+    }];
+    let docs = documents(&[(OVERVIEW_KIND, OVERVIEW_BODY, &["evt-1"])]);
+    build(&decls, &docs, &out).expect("the glossary collection must build");
+
+    let export: Value = serde_json::from_str(
+        &fs::read_to_string(out.join("publication.json")).expect("the export is written"),
+    )
+    .expect("the export is JSON");
+    let collections = export["collections"]
+        .as_array()
+        .expect("the export lists collections");
+    assert_eq!(
+        collections.len(),
+        1,
+        "only declared collections are exported: {export}"
+    );
+    assert_eq!(
+        object_keys(&collections[0]),
+        ["emitted", "name"],
+        "a collection row carries exactly its name and emitted flag: {}",
+        collections[0]
+    );
+    assert_eq!(collections[0]["name"], json!("glossary"));
+    assert_eq!(
+        collections[0]["emitted"],
+        json!(true),
+        "an emitted collection is exported with emitted=true"
     );
 }

@@ -3,7 +3,8 @@
 //! Purpose: turn the validated declarations and the source map into page
 //! documents and export rows. Responsibilities: compose each product's
 //! kinds in declaration order, render each fact body once with later products
-//! cross-referencing the first holder, render packages as member lists, and
+//! cross-referencing the first holder, render packages as member lists, render
+//! the glossary collection from the compile-time vocabularies, and
 //! project the export from the same source map.
 //! Rationale: one rendering per fact keeps pages free of duplicated content,
 //! and the export reusing the source map keeps Markdown and JSON from
@@ -73,6 +74,7 @@ pub(super) fn assign_owners(composed: &BTreeMap<String, Vec<String>>) -> Ownersh
 pub(super) fn render_pages(
     products: &[&Decl],
     packages: &[&Decl],
+    collections: &[&Decl],
     composed: &BTreeMap<String, Vec<String>>,
     ownership: &Ownership,
     docs: &Documents,
@@ -89,8 +91,39 @@ pub(super) fn render_pages(
         let page = render_package_page(package, &ownership.emitted);
         rendered.push((package.name.clone(), Tier::Package, page));
     }
+    for collection in collections {
+        let page = render_collection_page(collection);
+        rendered.push((collection.name.clone(), Tier::Collection, page));
+    }
     rendered.sort_by(|left, right| left.0.cmp(&right.0));
     rendered
+}
+
+/// Render one collection page: the glossary composes its body from the
+/// compile-time closed vocabularies only — the entity types, the relationship
+/// grammar, and the document kinds — so the page needs no ledger read and is
+/// byte-identical from build to build.
+fn render_collection_page(collection: &Decl) -> String {
+    debug_assert_eq!(collection.name, "glossary", "only glossary renders");
+    let mut page = String::from("## Glossary\n\n");
+    page.push_str("The closed vocabulary this build's research graph and publications use.\n\n");
+    page.push_str("### Entities\n\n");
+    for entity in crate::model::EntityType::ALL {
+        page.push_str(&format!("- {}\n", entity.as_str()));
+    }
+    page.push_str("\n### Relationships\n\n");
+    page.push_str(&format!(
+        "A relationship links two entities from the closed set {set}:\n\n",
+        set = crate::model::ENTITY_TYPE_SET,
+    ));
+    for relationship in crate::model::Relationship::ALL {
+        page.push_str(&format!("- {}\n", relationship.as_str()));
+    }
+    page.push_str("\n### Document kinds\n\n");
+    for kind in super::source::DOCUMENT_KINDS {
+        page.push_str(&format!("- {kind}\n"));
+    }
+    page
 }
 
 /// Render one product page: each composed kind's body, or a cross-reference
@@ -143,6 +176,7 @@ fn render_package_page(package: &Decl, emitted: &BTreeSet<String>) -> String {
 pub(super) fn export_json(
     products: &[&Decl],
     packages: &[&Decl],
+    collections: &[&Decl],
     composed: &BTreeMap<String, Vec<String>>,
     emitted: &BTreeSet<String>,
     docs: &Documents,
@@ -157,12 +191,29 @@ pub(super) fn export_json(
         .map(|package| export_package_row(package, emitted))
         .collect();
     package_rows.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut collection_rows: Vec<(String, serde_json::Value)> = collections
+        .iter()
+        .map(|collection| {
+            (
+                collection.name.clone(),
+                json!({
+                    "emitted": true,
+                    "name": collection.name,
+                }),
+            )
+        })
+        .collect();
+    collection_rows.sort_by(|left, right| left.0.cmp(&right.0));
     json!({
         "products": product_rows
             .into_iter()
             .map(|(_, row)| row)
             .collect::<Vec<_>>(),
         "packages": package_rows
+            .into_iter()
+            .map(|(_, row)| row)
+            .collect::<Vec<_>>(),
+        "collections": collection_rows
             .into_iter()
             .map(|(_, row)| row)
             .collect::<Vec<_>>(),

@@ -1,4 +1,10 @@
 {
+  "collections": [
+    {
+      "emitted": true,
+      "name": "glossary"
+    }
+  ],
   "packages": [
     {
       "members": [

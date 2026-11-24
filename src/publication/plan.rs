@@ -3,7 +3,8 @@
 //! Purpose: resolve, validate, and render every page and the export before
 //! any target is touched. Responsibilities: refuse documents filed under
 //! keys they do not name, resolve declarations against the closed
-//! vocabularies, check admission rows and package members, plan page
+//! vocabularies (refusing every collection but the implemented glossary),
+//! check admission rows and package members, plan page
 //! documents against the existing tree, and plan the removal of pages an
 //! omitted product would have occupied.
 //! Rationale: a refusal leaves the tree byte-untouched, an encode failure
@@ -90,17 +91,31 @@ pub fn plan(
     check_source_keys(docs)?;
     // Resolve every declaration against its closed vocabulary before touching
     // the output directory. A refusal must leave the tree byte-untouched.
-    let (products, packages) = partition_declarations(decls)?;
+    let (products, packages, collections) = partition_declarations(decls)?;
     check_admission(&products)?;
     check_package_members(&packages, &products)?;
     let (composed, omitted) = compose_products(&products, docs);
     let ownership = assign_owners(&composed);
     // One rendering per fact: later products cross-reference the first holder.
-    let rendered = render_pages(&products, &packages, &composed, &ownership, docs);
+    let rendered = render_pages(
+        &products,
+        &packages,
+        &collections,
+        &composed,
+        &ownership,
+        docs,
+    );
 
     // Phase one computes every byte this build publishes before any write.
     let pages = plan_pages(rendered, &composed, out, &mut read_text)?;
-    let export = export_json(&products, &packages, &composed, &ownership.emitted, docs);
+    let export = export_json(
+        &products,
+        &packages,
+        &collections,
+        &composed,
+        &ownership.emitted,
+        docs,
+    );
     let (export, export_path, export_previous) = plan_export(export, out, &mut read_bytes)?;
 
     // Phase two plans the pages an omitted product would have occupied: a
@@ -131,9 +146,12 @@ fn check_source_keys(docs: &Documents) -> Result<(), PublicationError> {
 
 /// Resolve every declaration against its closed vocabulary, refusing tier
 /// mismatches, duplicates, stray fields, and unimplemented collections.
-fn partition_declarations(decls: &[Decl]) -> Result<(Vec<&Decl>, Vec<&Decl>), PublicationError> {
+fn partition_declarations(
+    decls: &[Decl],
+) -> Result<(Vec<&Decl>, Vec<&Decl>, Vec<&Decl>), PublicationError> {
     let mut products: Vec<&Decl> = Vec::new();
     let mut packages: Vec<&Decl> = Vec::new();
+    let mut collections: Vec<&Decl> = Vec::new();
     let mut declared: BTreeSet<&str> = BTreeSet::new();
     for decl in decls {
         let (tier, _) = resolve_name(&decl.name)?;
@@ -156,13 +174,28 @@ fn partition_declarations(decls: &[Decl]) -> Result<(Vec<&Decl>, Vec<&Decl>), Pu
                 }
                 packages.push(decl);
             }
-            // Collections resolve, but no collection renderer exists yet. A
-            // declaration is refused rather than silently dropped, because a
-            // dropped declaration reads exactly like an emitted one.
-            Tier::Collection => return Err(PublicationError::tier_unimplemented(&decl.name)),
+            // A collection carries no fields: stray includes/members refuse
+            // before the tier check, so no field of a refused collection is
+            // ever silently ignored. The glossary collection is implemented
+            // and renders from the compile-time vocabularies; the other eight
+            // collections have no renderer yet and are refused rather than
+            // silently dropped, because a dropped declaration reads exactly
+            // like an emitted one.
+            Tier::Collection => {
+                if !decl.includes.is_empty() {
+                    return Err(PublicationError::tier_fields(&decl.name, tier, "includes"));
+                }
+                if !decl.members.is_empty() {
+                    return Err(PublicationError::tier_fields(&decl.name, tier, "members"));
+                }
+                if decl.name != "glossary" {
+                    return Err(PublicationError::tier_unimplemented(&decl.name));
+                }
+                collections.push(decl);
+            }
         }
     }
-    Ok((products, packages))
+    Ok((products, packages, collections))
 }
 
 /// Check every declared include against its product's admission row, present

@@ -114,8 +114,8 @@ impl PublicationError {
         Self::new(
             LABEL_TIER_UNIMPLEMENTED,
             format!(
-                "collection \"{name}\" cannot be declared: collections are not implemented \
-                 yet, so this release composes products and packages only"
+                "collection \"{name}\" cannot be declared: only the glossary collection is \
+                 implemented, so this release refuses every other collection"
             ),
         )
     }

@@ -30,7 +30,10 @@ pub const RUN_COMPLETED_EVENT: &str = "experiment.run.completed";
 /// Adapter capture event that records an observed source entry.
 pub const ENTRY_OBSERVED_EVENT: &str = "capture.entry.observed";
 
-const ENTITY_TYPE_SET: &str = "{Project, Question, Idea, Hypothesis, Model, Experiment, Run, Artifact, Observation, Claim, Finding, Decision, Source}";
+/// The closed thirteen-entity set, named verbatim by refusals and by the
+/// glossary collection page.
+pub(crate) const ENTITY_TYPE_SET: &str = "{Project, Question, Idea, Hypothesis, Model, Experiment, Run, Artifact, Observation, Claim, Finding, Decision, Source}";
+/// The closed relationship set, named verbatim by refusals.
 const RELATIONSHIP_SET: &str = "{investigates, predicts, executes, observes, supports, challenges, influences, realizes, derives, cites}";
 
 /// A labeled refusal produced while building the research graph.

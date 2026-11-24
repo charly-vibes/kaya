@@ -221,15 +221,43 @@ fn product_with_members_and_package_with_includes_are_refused() {
     assert_no_writes(&out);
 }
 
-// 17. kaya.publications.tier_unimplemented — collections are not silently dropped
+// 17. kaya.publications.tier_unimplemented — the glossary collection renders a page
 #[test]
-fn collection_declaration_is_refused_as_unimplemented() {
+fn glossary_declaration_renders_a_collection_page() {
     let tmp = TempDir::new().expect("temp dir");
     let out = tmp.path().join("out");
     fs::create_dir(&out).expect("output directory");
     let decls = [Decl {
         tier: Tier::Collection,
         name: "glossary".to_owned(),
+        includes: Vec::new(),
+        members: Vec::new(),
+    }];
+    let docs = documents(&[(OVERVIEW_KIND, OVERVIEW_BODY, &["evt-1"])]);
+
+    let built = build(&decls, &docs, &out).expect("a collection declaration must build");
+    assert!(
+        built.pages.iter().any(|page| page.name == "glossary"),
+        "the collection is emitted as a page: {:?}",
+        built.pages
+    );
+    let page = fs::read_to_string(out.join("glossary.md")).expect("the glossary page is written");
+    let body = block_body(&page, "publication.collection.glossary");
+    assert!(
+        !body.is_empty(),
+        "the glossary collection block renders a non-empty body: {page}"
+    );
+}
+
+// 17. kaya.publications.tier_unimplemented — non-glossary collections still refused
+#[test]
+fn non_glossary_collection_still_refused_as_unimplemented() {
+    let tmp = TempDir::new().expect("temp dir");
+    let out = tmp.path().join("out");
+    fs::create_dir(&out).expect("output directory");
+    let decls = [Decl {
+        tier: Tier::Collection,
+        name: "topic-map".to_owned(),
         includes: Vec::new(),
         members: Vec::new(),
     }];
@@ -242,13 +270,13 @@ fn collection_declaration_is_refused_as_unimplemented() {
         error.message
     );
     assert!(
-        error.message.contains("glossary"),
+        error.message.contains("topic-map"),
         "the refusal names the collection: {}",
         error.message
     );
     assert!(
         error.message.contains("implemented"),
-        "the refusal states collections are not implemented yet: {}",
+        "the refusal states only the glossary collection is implemented: {}",
         error.message
     );
     assert_no_writes(&out);

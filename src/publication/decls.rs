@@ -1,7 +1,8 @@
 //! Publication declarations: the fixed set `kaya publish` composes.
 //!
-//! Purpose: declare, once, which products and packages the CLI publishes.
-//! Responsibilities: name the default products and packages and bind each
+//! Purpose: declare, once, which products, packages, and collections the CLI
+//! publishes. Responsibilities: name the default products, packages, and the
+//! glossary collection and bind each
 //! product's includes to its admission row. Rationale: declarations derived
 //! from the admission table can never widen a product beyond its contract,
 //! and `kaya check` expects exactly what `kaya publish` declares.
@@ -56,15 +57,20 @@ const DEFAULT_PACKAGES: [(&str, &[&str]); 2] = [
     ),
 ];
 
+/// The collections `kaya publish` declares: the glossary, the only collection
+/// with a renderer.
+const DEFAULT_COLLECTIONS: [&str; 1] = ["glossary"];
+
 /// The declarations `kaya publish` composes, and the ones `kaya check`
-/// expects: eleven products and two packages over the compiled research
-/// documents.
+/// expects: eleven products, two packages, and the glossary collection over
+/// the compiled research documents.
 ///
 /// The products are `overview`, `reference`, `getting-started`, `how-to`,
 /// `concept`, `example`, `troubleshooting`, `faq`, `status-compatibility`,
 /// `release-migration`, and `architecture-design`. The packages are
 /// `project-site` (over `overview` and `reference`) and `developer-guide`
-/// (over the six `getting-started` through `faq` products).
+/// (over the six `getting-started` through `faq` products). The collection is
+/// `glossary`, rendered from the compile-time vocabularies.
 pub fn default_declarations() -> Vec<Decl> {
     DEFAULT_PRODUCTS
         .iter()
@@ -82,6 +88,12 @@ pub fn default_declarations() -> Vec<Decl> {
             name: (*name).to_owned(),
             includes: Vec::new(),
             members: members.iter().map(|member| (*member).to_owned()).collect(),
+        }))
+        .chain(DEFAULT_COLLECTIONS.iter().map(|name| Decl {
+            tier: Tier::Collection,
+            name: (*name).to_owned(),
+            includes: Vec::new(),
+            members: Vec::new(),
         }))
         .collect()
 }
