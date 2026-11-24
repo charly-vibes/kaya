@@ -7,13 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-24
+
 ### Added
+- Capture commands: `kaya note`, `kaya question`, `kaya decision`, and
+  `kaya finding` append `model.entity.created` events with Observation,
+  Question, Decision, and Finding subjects. One capture appends exactly one
+  ledger line; provenance records `kaya` plus the CLI version and the
+  `<subcommand>/<key>` reference; captured text runs the inherited
+  secret-redaction pattern list (`src/capture.rs`).
 - Incremental build regeneration: `kaya build` skips documents whose ledger
   digest, generator version, and on-disk bytes match the last successful
   build (state in `.kaya/build-state.json`, git-ignored), restoring their
   summary contribution instead of re-rendering; citation validation and
   staleness flagging still run on every build. `kaya build --instrument` adds
   `data.render_invocations` counting render constructor invocations.
+- Glossary collection tier end to end: `kaya build` and `kaya publish`
+  compose the `glossary` collection page from its declaration; the other
+  eight collection kinds still refuse at declaration (`src/publication/`).
+- Exploration-brief generator: the `exploration.exploration-brief` record
+  kind now renders into the dossier — the last record kind without a
+  renderer (`src/projection/`).
+- Tutorial product declaration: `kaya publish` declares all twelve
+  vocabulary products; `tutorial` publishes as the spec-pinned
+  `no-backing-document` omission until exploration documents carry records
+  (`src/publication/decls.rs`).
+
+### Fixed
+- `kaya import wai` re-runs are idempotent: a re-observed record with
+  identical content skips, and a re-observed record with changed content
+  appends a superseding correction event instead of refusing with
+  `kaya.ledger.id_reuse` (`src/adapters/`, `src/ledger.rs`).
+- `kaya status` caps pending proposals at the session budget instead of
+  listing unbounded promotion queues (`src/projection/`).
 
 ## [0.2.0] - 2026-11-23
 
