@@ -13,17 +13,23 @@ Reader question: how is it structured and why
 ### Artifacts
 - kaya/Artifact/03fb233 — 03fb233ebba253e3c4e8d582c4d9362b9974f8fc
 - kaya/Artifact/05748b5 — 05748b566e5dc59c23373f5daafd9ec7a0958881
+- kaya/Artifact/06b7a07 — 06b7a07cce9a543f94d66c32719ec1a6def94a97
 - kaya/Artifact/0cd2fd6 — 0cd2fd6af445980341e9687ca6ebb1b36882ba6c
+- kaya/Artifact/0f3b8b2 — 0f3b8b2c8a6476ca728476be3e5ec4484583dbe5
+- kaya/Artifact/10d7f0e — 10d7f0e96cfc704561cb3d9f7a2263e7a19c19bf
 - kaya/Artifact/162afa8 — 162afa812626f09ecd79d05ace6ab01be03ff768
+- kaya/Artifact/1bdef7b — 1bdef7b38389345ac182c452a0ea14419f90de4d
 - kaya/Artifact/1c2b3d3 — 1c2b3d3a9a787e6b8c05e7db9724a0b84e25a8f1
 - kaya/Artifact/1e0c0d7 — 1e0c0d797827152a76043f8dac2bc7a120fda03a
 - kaya/Artifact/21c5fdd — 21c5fddb1f559a58367ec81f7e1540aca7696207
 - kaya/Artifact/22e4505 — 22e45050a24626e5f41b9470773e06c73b52aa78
 - kaya/Artifact/24b4ffc — 24b4ffcd508648a429e0b8c8a8148553d06adeb1
+- kaya/Artifact/25a198b — 25a198b3442282150bbec70ebadf63331501cb7c
 - kaya/Artifact/26dfb0d — 26dfb0d769a4b9c0db3a35d795e629af5827f71b
 - kaya/Artifact/3095266 — 3095266e9b91e0e22c3355a80f9b076637573468
 - kaya/Artifact/32a3d2d — 32a3d2d9dd54159488e4b2aa150fe2e531e1f274
 - kaya/Artifact/36ab8f5 — 36ab8f5d48b48f40d03ba59b47e23f413eba1e62
+- kaya/Artifact/395c006 — 395c0065adddaeefa3dda5b850d4706166205ac0
 - kaya/Artifact/3af5a30 — 3af5a30dd8488914f5c96b77ab6fea82c11f8cae
 - kaya/Artifact/3ec6f5b — 3ec6f5bb2f564d77834c44b8d8bc25e950e10795
 - kaya/Artifact/41f1199 — 41f1199c51fd11ce7d180650ee865df9679e2097
@@ -36,39 +42,54 @@ Reader question: how is it structured and why
 - kaya/Artifact/55a9e2e — 55a9e2e42fe470e43c5fc76732e26ebc9a0bb9da
 - kaya/Artifact/565343c — 565343cf4dd30d4b1b010acb332259ecb44127f4
 - kaya/Artifact/59fea0a — 59fea0aec4136495b44e93afefdae9590c49851c
+- kaya/Artifact/5b05375 — 5b05375218c2ef266eee1f870d4917b377d415cc
 - kaya/Artifact/5c7e381 — 5c7e381572839a48074d71c0f4a8910bcafaec10
 - kaya/Artifact/5dd91b6 — 5dd91b6946fb60054be8d22a13ba149f05bb88a3
 - kaya/Artifact/5eb26f0 — 5eb26f04f2cced2c227147aadc53c92cfad64f6b
 - kaya/Artifact/6377528 — 637752884f1fa33bbcb1e2ce0416ce07b1de8f01
 - kaya/Artifact/645a6b5 — 645a6b525500fb99d35df579a091eb0991f51c00
+- kaya/Artifact/64b5d8f — 64b5d8f5474f31050aab3a33df9ff127eb56cc59
 - kaya/Artifact/64ebc5c — 64ebc5c092f2ffe75476aa33ce5584cd964364a9
 - kaya/Artifact/664b918 — 664b9186c2ce76cc1e8c0bf74771d55bd7b436b0
 - kaya/Artifact/6789829 — 678982988a8009a125886c8ecab964363bcc2f3d
 - kaya/Artifact/687b6d9 — 687b6d962743a6eeb544cb6ffcd0b184bd35a610
+- kaya/Artifact/6955756 — 69557565254871dea6d890d51bbb5860f3fc5ade
 - kaya/Artifact/69f7bef — 69f7bef682bda1247be1c64bb54a33b1a7004d92
 - kaya/Artifact/6ab7285 — 6ab728512593a7a151949800c8f912d9e24fd97a
 - kaya/Artifact/6b41ea5 — 6b41ea5942a76cfe962e5d36acde4a3622450ac1
+- kaya/Artifact/6b7dfd2 — 6b7dfd2976536806ca270cea98db2c391cd0be69
 - kaya/Artifact/6ca120a — 6ca120a3048433384050f786778a908e8b4e8c44
 - kaya/Artifact/6dcd9d2 — 6dcd9d27d1c178bf1d6075e14a9232ae53dec0a0
+- kaya/Artifact/73277d9 — 73277d9d4964b1562d7f8f1a4c0da5c4e7a206e9
+- kaya/Artifact/7429c3c — 7429c3c95e694d56932e39f9fc7ecc44f113ddec
 - kaya/Artifact/75693f9 — 75693f9ad7a3bd937fa656fee47b152347a7e231
 - kaya/Artifact/77f470f — 77f470ffe2212547fb614b1dc8289bd4b92eca1f
 - kaya/Artifact/789ca21 — 789ca21e8fe0beb89b789eefd5d7c9143fa92c7d
+- kaya/Artifact/78dbcfc — 78dbcfcba80513900ec3250285efad62db471593
 - kaya/Artifact/78e3a62 — 78e3a62f4adbc8a2c09f70433dbabb06aea9604f
 - kaya/Artifact/798376c — 798376ce2a5d223c00a2e59ce71c112d18341b86
 - kaya/Artifact/7b5b94d — 7b5b94d0fc78e07d065671db9dcf148420b58724
+- kaya/Artifact/7e623cb — 7e623cbb7c62316879232970ca238074ab65c891
+- kaya/Artifact/7feff24 — 7feff24a5121fc22f2648f6f4b9bed7c75ab1712
+- kaya/Artifact/8121e40 — 8121e40e4d4e2d68c730d9c3506eadc9044140ee
+- kaya/Artifact/842cbfc — 842cbfc5f3ca18706f9ffaf78318b509a03b8bb6
+- kaya/Artifact/85e107b — 85e107b9c55d3916058eda68482c143e923ff586
 - kaya/Artifact/879b4d2 — 879b4d277606db28835c1f7bb3a3c5d953609df8
 - kaya/Artifact/88fad72 — 88fad729b2e70b97e33f8f115049f17acb65e908
 - kaya/Artifact/89e8f1b — 89e8f1b7634209ea108c1631f36376177c31998f
 - kaya/Artifact/8c0be76 — 8c0be763cc2ad689c594add43815263bf7448979
 - kaya/Artifact/8f5ffb4 — 8f5ffb45b0bf6f3ddb55b1af4bed098a3b5068d6
 - kaya/Artifact/904f37f — 904f37fc6fa03785c3df4b48960dda5cf6120d2f
+- kaya/Artifact/91927de — 91927dec2f7716dd802edda11cd6c7cbeadc6418
 - kaya/Artifact/92affc0 — 92affc067559282a0120e8ae95913586befaee86
+- kaya/Artifact/937df7f — 937df7f2a4037e4332e7e9975961fc21a0ecdb6a
 - kaya/Artifact/950e98e — 950e98e7ddc019a70add640d361cab74be668f9a
 - kaya/Artifact/95ab163 — 95ab1637587022a8abefc08b5bb8d11df68b63f3
 - kaya/Artifact/9a51d1e — 9a51d1ef20e513b85080c751fe949f66eedb9955
 - kaya/Artifact/9d2df87 — 9d2df8796fe8563c3e82277fa6db32429359a8af
 - kaya/Artifact/9de6893 — 9de6893acca116dde20e19bf2c3ade7098dd3b95
 - kaya/Artifact/9fb3ea7 — 9fb3ea70195fc96518e358a7954198b8ed2d0e62
+- kaya/Artifact/a07ac35 — a07ac354a1ba10ec69ceee218682020ab4f22185
 - kaya/Artifact/a28aa65 — a28aa65b960507ca07bbbaf76fceacaf2567620b
 - kaya/Artifact/a2b5e44 — a2b5e44e17bbb6917e5d10fab25ddf04c0feadf2
 - kaya/Artifact/a2e2de8 — a2e2de8de4c72fd406befe4a2d57cfc9fce588da
@@ -76,17 +97,23 @@ Reader question: how is it structured and why
 - kaya/Artifact/a68206a — a68206a258ed7a67142c9cba0924751904b0d682
 - kaya/Artifact/a80ded8 — a80ded8bd257ffb243671ab5347c769dfe71c46b
 - kaya/Artifact/a93bc64 — a93bc64afd8931f9859a61bea12c9a3019c37b60
+- kaya/Artifact/aaaa11e — aaaa11e57b4a158dc8ec737670e78b07e4f90742
 - kaya/Artifact/ab319d5 — ab319d59bb12c47e1da09783bb91c4300d61db61
+- kaya/Artifact/ad468ca — ad468ca1c267176873827c15f7a1b11b02485b22
+- kaya/Artifact/af016e5 — af016e5e6d35d05c0c5e146385b66dd650ead622
 - kaya/Artifact/b2ec883 — b2ec883693705b9fe6755ccf6d3de214440e1a73
 - kaya/Artifact/b439a38 — b439a38979aada65cb62213380a00304c45b47eb
+- kaya/Artifact/b6a4e47 — b6a4e47b39cd01b99a1a2069cb8aa87f9e38fa51
 - kaya/Artifact/b76f007 — b76f00767ff13ce2e98f0d62af14a86dfe84fb92
 - kaya/Artifact/b9e5f78 — b9e5f788667b90419e1d5b1b021b8d374fd67c17
 - kaya/Artifact/bb3cd72 — bb3cd72def5e7ef4ac39f6de03cde2747abbf38e
 - kaya/Artifact/bc191e0 — bc191e052041446c284631d09916cd8d032d8735
+- kaya/Artifact/c0c767d — c0c767d1ac6d43b510ce258ea2a1e86553b6b0ed
 - kaya/Artifact/c2afedf — c2afedfe113c0a83ccfc954e1943117f5052f064
 - kaya/Artifact/c4a4f03 — c4a4f038bd7bbf30e0e41e8baa68334226bd08ee
 - kaya/Artifact/c5d2745 — c5d274521b3fa374859ef7bd02dc8556a57776ec
 - kaya/Artifact/cb8be97 — cb8be97696b59f99909ba7f39a10daa2819294bc
+- kaya/Artifact/ccc41d7 — ccc41d76e529ca26468f1c48c72015b81c6ba174
 - kaya/Artifact/ccf3881 — ccf38819c1f4272a38fa32d26d143de883b7f6a1
 - kaya/Artifact/cf2773b — cf2773b9a180e1ed8d63355345b74d23c2fa6022
 - kaya/Artifact/cf6e274 — cf6e274368dfd528f98b2d3ea4e2bad1ab36995a
@@ -96,6 +123,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/d56e106 — d56e10647381a3272ef72d759a919bab8cdeff17
 - kaya/Artifact/d61606c — d61606c0ddc214011f54411169428aa7f6107025
 - kaya/Artifact/d6df368 — d6df368ba4b6e80922f9dc922ccbdb75efd12f0d
+- kaya/Artifact/d75b9ac — d75b9ac3b3f9e062e35999926f263c79bd0aa841
 - kaya/Artifact/d77ce26 — d77ce26ecc8618932ecbc4d3dc657781af31c5ca
 - kaya/Artifact/d798c72 — d798c7230f169dc61792d783842e87a90359b964
 - kaya/Artifact/designs-2026-11-16-bootstrap-decisions-captured-in-openspec-changes-a — .wai/projects/kaya/designs/2026-11-16-bootstrap-decisions-captured-in-openspec-changes-a.md
@@ -205,6 +233,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/designs-2026-11-19-refactor-kaya-nx4-reviewed-the-three-suites-for-s — .wai/projects/kaya/designs/2026-11-19-refactor-kaya-nx4-reviewed-the-three-suites-for-s.md
 - kaya/Artifact/designs-2026-11-19-refactor-kaya-syx-deliberate-no-op-tidy-reviewed — .wai/projects/kaya/designs/2026-11-19-refactor-kaya-syx-deliberate-no-op-tidy-reviewed.md
 - kaya/Artifact/designs-2026-11-19-refactor-sh6-doc-one-test-hand-edit-helper-sim — .wai/projects/kaya/designs/2026-11-19-refactor-sh6-doc-one-test-hand-edit-helper-sim.md
+- kaya/Artifact/designs-2026-11-22-refactor-kaya-xjp-two-tidies-both-behavior-prese — .wai/projects/kaya/designs/2026-11-22-refactor-kaya-xjp-two-tidies-both-behavior-prese.md
 - kaya/Artifact/df81656 — df81656005a9c0e10b392db0af2b8b91a8436dc1
 - kaya/Artifact/e178048 — e178048e81017f9667b091311aa7ce912483cd0e
 - kaya/Artifact/e21ae25 — e21ae253a005fcfb4b40532fbaf539115d08a7e1
@@ -216,17 +245,23 @@ Reader question: how is it structured and why
 - kaya/Artifact/e5cf768 — e5cf768fa020c223b7ea533fff65864528703312
 - kaya/Artifact/e644f4c — e644f4cc55d33a16dd530cf2a2a0f297983f98e2
 - kaya/Artifact/e8dcfcb — e8dcfcb9740720143958d6ffbe672ee3b9aa2592
+- kaya/Artifact/e948080 — e94808089cea28ae38a3fcacb0dbb871545c6fa3
 - kaya/Artifact/eb4f2c9 — eb4f2c98e2c6201803b8a5a8ec81207bb6a1ac7a
 - kaya/Artifact/ec6371e — ec6371e1cdad62d26f8f2104618f49416ae9967d
 - kaya/Artifact/ecb28f8 — ecb28f8dc84a8e18552c17e2bfbf0e3dd0ca3cc8
 - kaya/Artifact/ed2474f — ed2474fb56318a36230a34922d5eef2e312829b6
 - kaya/Artifact/ed9adef — ed9adefbeaff44438d60c4bcd07532f0e4a01b66
+- kaya/Artifact/eecd2c4 — eecd2c458fcb09767749d8199672d02dc7acd14e
 - kaya/Artifact/f2709ac — f2709ac34c57a2489f778b4dde40579c69f1dc12
 - kaya/Artifact/f31f940 — f31f9401a8826d5e2a676beb47993708d698b708
 - kaya/Artifact/f39a1fd — f39a1fd3da9a6a6861cfacce47294a00404efa81
+- kaya/Artifact/f4a7993 — f4a7993d2068cefc3dffc70f14c1832d2aea4229
 - kaya/Artifact/f7f9752 — f7f97522ef8abf3d52130c0a0ea49e37e61b320f
+- kaya/Artifact/f965984 — f96598435402ea93e855f8bf8acba8f29f702dd7
 - kaya/Artifact/fa20cb2 — fa20cb292d213a3df260e904e09d79b92ded7589
 - kaya/Artifact/fbd08ac — fbd08ac7a63976b3985b270856a4df7313d9f65c
+- kaya/Artifact/fbf8c2b — fbf8c2b3fe25380a18f6dd07b15d50170080fbb5
+- kaya/Artifact/fde2cb5 — fde2cb5e826fc533c42ce74a7372e1f18d61fb0e
 - kaya/Artifact/fe33a0b — fe33a0b43706e8d0dac36e4b2b9d6dea8b56ca52
 - kaya/Artifact/fe7214b — fe7214bda7f62b1dcea1507fa36a7f239afecf11
 - kaya/Artifact/fedd8d4 — fedd8d405ea2ee5136c22694381ce9f614fb9a0e
@@ -541,6 +576,10 @@ Reader question: how is it structured and why
 - kaya/Artifact/research-2026-11-19-ship-kaya-syx-turu-adapter-approved-by-user-2026-1 — .wai/projects/kaya/research/2026-11-19-ship-kaya-syx-turu-adapter-approved-by-user-2026-1.md
 - kaya/Artifact/research-2026-11-19-ship-nx4-hegel-property-tests-approved-path-all-g — .wai/projects/kaya/research/2026-11-19-ship-nx4-hegel-property-tests-approved-path-all-g.md
 - kaya/Artifact/research-2026-11-19-ship-sh6-per-delegated-batch-approval-documentati — .wai/projects/kaya/research/2026-11-19-ship-sh6-per-delegated-batch-approval-documentati.md
+- kaya/Artifact/research-2026-11-21-ship-kaya-q5e-capture-attributes-in-wai-events — .wai/projects/kaya/research/2026-11-21-ship-kaya-q5e-capture-attributes-in-wai-events.md
+
+### Runs
+- kaya/Run/cargo-test-results — passed 430, failed 0, ignored 0
 
 ### Sources
 - kaya/Source/docs-src-index.md@43b606f — docs/src/index.md@43b606f
@@ -550,6 +589,6 @@ Reader question: how is it structured and why
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_540 nodes from 639 events._
+_577 nodes from 676 events._
 
 <!-- kaya:end generated:publication.product.architecture-design -->

@@ -84,9 +84,9 @@ written empty. The project-level `docs/research/overview.md` implements
 `orientation.project-overview`: Project, Question, and Finding records in three
 sections in a fixed order — Project, Questions, Findings — with the rows of
 each section id-sorted, empty sections omitted, and no document at all when
-none of the three groups has a record. `exploration-brief`,
-`technical-reference`, and `knowledge-brief` are not generated yet;
-`reproduction-package` and `handoff` render reference rows from the ledger.
+none of the three groups has a record. `exploration-brief` is not generated
+yet; `technical-reference`, `knowledge-brief`, `reproduction-package`, and
+`handoff` render reference rows from the ledger.
 
 ## Publication layer: twelve products
 

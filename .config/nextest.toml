@@ -1,0 +1,4 @@
+# The stable-toolchain path for `kaya import test`: nextest emits JUnit XML,
+# scripts/junit-to-libtest.py converts it to libtest JSONL (docs/src/status.md).
+[profile.ci.junit]
+path = "junit.xml"

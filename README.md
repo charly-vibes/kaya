@@ -40,6 +40,12 @@ kaya check --index                 # verify the staged tree a hook would commit
 kaya acknowledge <document> --block <name> --events <id>... --actor <name>
 kaya promote <assertion> --actor <name>
 kaya challenge <conclusion> --events <id>... --actor <name>
+kaya ir --out docs/research        # print the document IR without writing
+kaya publish --out docs/public     # compose the client-facing publication tree
+kaya doctest --out docs/research   # run declared doctest contracts, record one fact
+kaya supersede-doctest <document> --label <name> --actor <name>
+kaya impact --range origin/main    # gate a change set: impacted records and obligations
+kaya disposition <record> reviewed|waived --actor <name>
 ```
 
 - The ledger lives at `.kaya/ledger.jsonl`: one `kaya.event/v0` record per

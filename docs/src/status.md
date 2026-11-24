@@ -17,12 +17,12 @@ MVP-1 implements those capabilities end to end as a static research compiler.
 | Architecture | implemented (MVP-1) | Four subsystems: capture adapters (`src/adapters`), research ledger (`src/ledger.rs`), research model (`src/model.rs`), documentation projections (`src/projection`) |
 | Event format | [implemented (draft)](https://github.com/charly-vibes/kaya/blob/main/openspec/specs/kaya-event/spec.md) | `kaya.event/v0` — closed 9-field schema, append-only JSONL, provenance-preserving, observation-only |
 | Research vocabulary | [implemented](https://github.com/charly-vibes/kaya/blob/main/openspec/specs/kaya-model/spec.md) | 13 entities, 9 typed direction-fixed relationships; relationships over entity count |
-| CLI | implemented | `kaya init`, `kaya status`, `kaya import` (wai, git, test, turu), `kaya build [--out] [--expect-digest]`, `kaya check [--index]`, `kaya acknowledge`, `kaya promote`, `kaya challenge` |
+| CLI | implemented | `kaya init`, `kaya status`, `kaya import` (wai, git, test, turu, model), `kaya build [--out] [--expect-digest] [--allow-uncommitted]`, `kaya ir`, `kaya publish [--out]`, `kaya check [--index --require-kind --require-source --fail-on-stale-authored]`, `kaya acknowledge`, `kaya promote`, `kaya challenge`, `kaya doctest`, `kaya supersede-doctest`, `kaya impact [--staged --range]`, `kaya disposition` |
 | Integrations | wai, git, test runner, whisper (turu) implemented; dont, specodelic [specified](https://github.com/charly-vibes/kaya/blob/main/openspec/specs/kaya-adapters/spec.md) (contracts under `.espectacular/kaya-adapters/`), not implemented | Adapters translate tool outputs into `kaya.event/v0`; the remaining sources have encoded specs but no adapter |
-| Document taxonomy | implemented and deployed (eleven record kinds, publications) | [Record layer: four families, eleven kinds; publication layer: twelve products, collections, packages](specs/kaya-documents.md) ([publications](specs/kaya-publications.md)). Implemented: `research-map`, `project-overview`, `experiment-specification`, `experiment-record`, `findings-and-analysis`, `decision-record`, `technical-reference`, `reproduction-package`, `knowledge-brief`, `handoff`; `kaya publish` declares all eleven non-tutorial products (`overview`, `reference`, `getting-started`, `how-to`, `concept`, `example`, `troubleshooting`, `faq`, `status-compatibility`, `release-migration`, `architecture-design`), emits the backed ones and both the `project-site` and `developer-guide` packages, and reports unbacked products as omissions instead of stubbing them. `exploration-brief`, `technical-reference`, `knowledge-brief` remain specified. See [Documentation taxonomy](document-taxonomy.md) |
+| Document taxonomy | implemented and deployed (eleven record kinds, publications) | [Record layer: four families, eleven kinds; publication layer: twelve products, collections, packages](specs/kaya-documents.md) ([publications](specs/kaya-publications.md)). Implemented: `research-map`, `project-overview`, `experiment-specification`, `experiment-record`, `findings-and-analysis`, `decision-record`, `technical-reference`, `reproduction-package`, `knowledge-brief`, `handoff`; `kaya publish` declares all eleven non-tutorial products (`overview`, `reference`, `getting-started`, `how-to`, `concept`, `example`, `troubleshooting`, `faq`, `status-compatibility`, `release-migration`, `architecture-design`), emits the backed ones and both the `project-site` and `developer-guide` packages, and reports unbacked products as omissions instead of stubbing them. `exploration-brief` remains specified. See [Documentation taxonomy](document-taxonomy.md) |
 | Docs | buildable, deploy workflow present | `book.toml` + `theme/charly.css` at root; `.github/workflows/docs.yml` builds the book and deploys it to GitHub Pages on push to `main` |
 | CI | implemented | `just ci` (cargo test, fmt + clippy, mdbook build, `ah check`, `spk lint`, `openspec validate --strict`) run by `.github/workflows/ci.yml`; lefthook gates `ah check`, `spk lint`, and `pretender` on commit |
-| Release | v0.1.0 published; v0.2.0 prepared | `.github/workflows/release.yml` builds the five standard targets on a `v*` tag and publishes the canonical archives, `checksums.txt`, and `provenance.json`. GitHub Release v0.1.0 and crates.io `kaya-vibes` 0.1.0 are published; homebrew and scoop remain token-gated. Install: `cargo install --git https://github.com/charly-vibes/kaya kaya-vibes` |
+| Release | v0.1.0 and v0.2.0 released | `.github/workflows/release.yml` builds the five standard targets on a `v*` tag and publishes the canonical archives, `checksums.txt`, and `provenance.json`. GitHub Releases v0.1.0 and v0.2.0 and crates.io `kaya-vibes` 0.2.0 are published; homebrew and scoop remain token-gated. Install: `cargo install --git https://github.com/charly-vibes/kaya kaya-vibes` |
 
 ## Implemented
 
@@ -30,7 +30,7 @@ MVP-1 implements those capabilities end to end as a static research compiler.
   regular file.
 - `kaya status` — reports event count, byte size, digest, and pending
   proposals; a missing ledger fails as `missing-ledger`.
-- `kaya import wai|git|test|model` — captures observations from the `.wai/`
+- `kaya import wai|git|test|turu|model` — captures observations from the `.wai/`
   artifact tree, recent repository commits, one libtest JSONL run, and a
   JSONL file of research-structure events (validated `model.*` records only).
 - `kaya build [--out DIR] [--expect-digest HEX] [--allow-uncommitted]` —
@@ -45,6 +45,11 @@ MVP-1 implements those capabilities end to end as a static research compiler.
   `kaya challenge <conclusion> --events <ids...> --actor <name>` — the
   human-only door into the record: proposals become conclusions, conclusions
   gain counter-evidence, and neither happens automatically.
+- Document-IR tooling: `kaya ir` prints the record's document IR;
+  `kaya publish` composes the client-facing publication tree;
+  `kaya doctest` / `kaya supersede-doctest` run and disposition declared
+  doctest contracts; `kaya impact` / `kaya disposition` gate a change set over
+  the document IR into reviewed/waived record obligations.
 - Library modules: event parsing, append-only ledger with digest anchoring,
   crash-truncated tail recovery and supersede resolution, the research model,
   deterministic projections with authored-block preservation and stale
@@ -104,4 +109,4 @@ openspec proposals when picked up.
 ## Notes
 
 - Install: `cargo install --git https://github.com/charly-vibes/kaya kaya-vibes`.
-  crates.io `kaya-vibes` 0.1.0 is published; the binary remains `kaya`.
+  crates.io `kaya-vibes` 0.2.0 is published; the binary remains `kaya`.
