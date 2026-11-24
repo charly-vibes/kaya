@@ -210,9 +210,7 @@ fn build_contract(
     let runner = Runner::parse(runner_name).ok_or_else(|| {
         ProjectionError::new(
             LABEL_DOCTEST_RUNNER,
-            format!(
-                "runner \"{runner_name}\" is outside the closed runner vocabulary (shell)"
-            ),
+            format!("runner \"{runner_name}\" is outside the closed runner vocabulary (shell)"),
         )
     })?;
     let mut declared_label = None;
@@ -255,9 +253,7 @@ fn build_contract(
         } else if !line.trim().is_empty() {
             return Err(ProjectionError::new(
                 LABEL_DOCTEST_GRAMMAR,
-                format!(
-                    "the doctest contract \"{label}\" carries output before its first $ step"
-                ),
+                format!("the doctest contract \"{label}\" carries output before its first $ step"),
             ));
         }
     }
@@ -325,10 +321,7 @@ fn workspace_dir() -> std::path::PathBuf {
         .duration_since(UNIX_EPOCH)
         .map(|since| since.as_nanos())
         .unwrap_or_default();
-    std::env::temp_dir().join(format!(
-        "kaya-doctest-run-{}-{nanos}",
-        std::process::id()
-    ))
+    std::env::temp_dir().join(format!("kaya-doctest-run-{}-{nanos}", std::process::id()))
 }
 
 /// Execute one step, returning its stdout or why the step failed.
@@ -482,7 +475,8 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("kaya-doctest-{name}-{}-{nanos}", process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("kaya-doctest-{name}-{}-{nanos}", process::id()));
         fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -491,10 +485,7 @@ mod tests {
 
     #[test]
     fn extract_parses_declared_contract() {
-        let document = authored(&fence(
-            "shell",
-            "$ echo hello\nhello\n$ echo bye\nbye\n",
-        ));
+        let document = authored(&fence("shell", "$ echo hello\nhello\n$ echo bye\nbye\n"));
         let contracts = extract(&document).expect("the declared contract extracts");
         assert_eq!(contracts.len(), 1);
         let contract = &contracts[0];
@@ -510,10 +501,7 @@ mod tests {
 
     #[test]
     fn declared_label_is_used_verbatim() {
-        let document = authored(&fence(
-            "shell #build-check",
-            "$ echo hello\nhello\n",
-        ));
+        let document = authored(&fence("shell #build-check", "$ echo hello\nhello\n"));
         let contracts = extract(&document).expect("the declared contract extracts");
         assert_eq!(contracts[0].label, "build-check");
     }
@@ -537,7 +525,11 @@ mod tests {
     fn extract_refuses_unknown_runner() {
         let document = authored(&fence("python", "$ print('hi')\nhi\n"));
         let error = extract(&document).expect_err("an unlisted runner refuses");
-        assert!(error.message.contains("python"), "message: {}", error.message);
+        assert!(
+            error.message.contains("python"),
+            "message: {}",
+            error.message
+        );
     }
 
     #[test]
@@ -650,8 +642,7 @@ mod tests {
             "{\"type\":\"test\",\"event\":\"ok\"}\n{\"type\":\"test\",\"event\":\"ok\"}\n{\"type\":\"test\",\"event\":\"failed\"}\n",
         )
         .unwrap();
-        let event =
-            capture_with_kind(&report, "kaya", Some("doctest")).expect("the fact captures");
+        let event = capture_with_kind(&report, "kaya", Some("doctest")).expect("the fact captures");
         assert_eq!(event.r#type, "experiment.run.completed");
         assert_eq!(event.data.get("kind"), Some(&serde_json::json!("doctest")));
         assert_eq!(event.data.get("passed"), Some(&serde_json::json!(2)));
@@ -713,9 +704,16 @@ mod tests {
         let found = collect_documents(&dir).expect("the walk succeeds");
         let names: Vec<String> = found
             .iter()
-            .filter_map(|path| path.file_name().map(|name| name.to_string_lossy().to_string()))
+            .filter_map(|path| {
+                path.file_name()
+                    .map(|name| name.to_string_lossy().to_string())
+            })
             .collect();
-        assert_eq!(names, vec!["b.md", "c.md"], "nested .md found, sorted, no .txt");
+        assert_eq!(
+            names,
+            vec!["b.md", "c.md"],
+            "nested .md found, sorted, no .txt"
+        );
         fs::remove_dir_all(&dir).ok();
     }
 
@@ -739,9 +737,8 @@ mod tests {
             name: "sasha".to_string(),
         };
         let hash = contract_hash("$ echo hello\nhello\n");
-        let first =
-            supersede_event("docs/research/index.md#doctest-1", &hash, None, &actor)
-                .expect("a human may supersede");
+        let first = supersede_event("docs/research/index.md#doctest-1", &hash, None, &actor)
+            .expect("a human may supersede");
         // Ledger::open refuses a nonexistent record, exactly like the CLI does
         // before `kaya init`; an empty file is an initialized empty ledger.
         fs::File::create(dir.join("ledger.jsonl")).unwrap();
@@ -759,7 +756,9 @@ mod tests {
         )
         .expect("a chained supersede builds");
         assert!(matches!(
-            ledger.append(&second).expect("the chained supersede appends"),
+            ledger
+                .append(&second)
+                .expect("the chained supersede appends"),
             crate::ledger::AppendOutcome::Appended
         ));
         drop(ledger);
@@ -788,7 +787,10 @@ mod tests {
             event.data.get("to_hash"),
             Some(&serde_json::json!(contract_hash("$ echo hello\nhello\n")))
         );
-        assert_eq!(event.data.get("supersedes"), Some(&serde_json::json!("evt-previous")));
+        assert_eq!(
+            event.data.get("supersedes"),
+            Some(&serde_json::json!("evt-previous"))
+        );
     }
 
     #[test]
