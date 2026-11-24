@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-24-kaya-j00-release-0-4-0, pipeline-step:plan]
+---
+
+PLAN kaya-j00: behavior = the six acceptance statements in the ORIENT note. Out of scope: any code change, adapter work, new features, kaya-msh (already in v0.3.0). Red: bump Cargo.toml version to 0.4.0 BEFORE touching docs — scripts/check-release-claims.py must fail ('does not name v0.4.0') proving the gate bites; that failure is the test-first fixture. Green: finalize CHANGELOG Unreleased -> [0.4.0] - 2026-11-24; refresh status.md (CLI row five collections/seven refuse, Release row through v0.4.0 + crates.io 0.4.0); cargo update -p kaya-vibes for the lock; release-claims passes; narrow command = python3 scripts/check-release-claims.py; full verification = just ci (test, fmt+clippy, mdbook, ah check, spk lint, openspec validate --strict) plus just record-check. Files: Cargo.toml, Cargo.lock, CHANGELOG.md, docs/src/status.md. Commit shape: one release commit 'chore(release): kaya-j00 - v0.4.0'; tag v0.4.0 on it after ship-close approval; bd close + wai artifacts as follow-up chore commit (repo pattern from kaya-3tm).
