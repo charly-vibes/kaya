@@ -96,6 +96,7 @@ pub fn plan(
 
 /// Render the generated body and collect the node ids backing its rows.
 fn render(graph: &Graph, event_count: usize) -> (String, Vec<String>) {
+    crate::projection::bump_render_calls();
     let mut body = String::new();
     let mut sources = BTreeSet::new();
 

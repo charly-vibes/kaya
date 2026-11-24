@@ -9,6 +9,9 @@
 # Rust build output
 /target/
 
+# kaya incremental build state (per-workspace cache)
+.kaya/build-state.json
+
 # release workflow artifacts (downloaded binaries + packaged archives)
 /bins/
 /dist/

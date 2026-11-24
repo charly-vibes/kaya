@@ -33,7 +33,8 @@ use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, new_i
 use kaya::impact::{self, ChangeSet};
 use kaya::model::{self, EntityType, ModelError};
 use kaya::projection::{
-    BlockKind, ProjectionError, StaleBlock, Summary, index, ir, report, reuse, scan,
+    BlockKind, ProjectionError, StaleBlock, Summary, index, ir, render_invocations, report,
+    reuse, scan, state,
 };
 use kaya::promotion::{self, PROPOSAL_BUDGET, PromotionError, PromotionState, cap_proposals};
 use kaya::publication;
@@ -84,6 +85,9 @@ enum Command {
         /// Accept an untracked ledger whose history git cannot verify
         #[arg(long)]
         allow_uncommitted: bool,
+        /// Count render constructor invocations into data.render_invocations
+        #[arg(long)]
+        instrument: bool,
     },
     /// Print the document IR of the record without writing anything
     Ir {
@@ -316,7 +320,8 @@ fn main() -> ExitCode {
             out,
             expect_digest,
             allow_uncommitted,
-        } => cmd_build(&out, expect_digest.as_deref(), allow_uncommitted),
+            instrument,
+        } => cmd_build(&out, expect_digest.as_deref(), allow_uncommitted, instrument),
         Command::Ir {
             out,
             expect_digest,
@@ -810,6 +815,7 @@ fn cmd_build(
     out: &Path,
     expect_digest: Option<&str>,
     allow_uncommitted: bool,
+    instrument: bool,
 ) -> Result<Envelope, Failure> {
     let (events, ledger_digest) = read_build_ledger(expect_digest, allow_uncommitted)?;
     let changed_ids = changed_event_ids(&events);
@@ -824,10 +830,43 @@ fn cmd_build(
             format!("failed to create {}: {err}", out.display()),
         )
     })?;
+
+    // Incremental regeneration: a document whose inputs — ledger digest,
+    // generator identity, and on-disk bytes — all match the last successful
+    // build is not rebuilt; its recorded contribution is restored into the
+    // summary instead, so the envelope stays complete and truthful. Citation
+    // validation and staleness flagging below always run, even when skipped.
+    let state_path = Path::new(LEDGER_PATH).with_file_name("build-state.json");
+    let saved = state::BuildState::current(
+        state::BuildState::load(&state_path),
+        &ledger_digest,
+    );
+    // Skipped documents keep their recorded entries: a run that skips every
+    // document must persist the same gate it consumed, or the next build
+    // would alternate back to a full render. The digest gate above guarantees
+    // carried entries still belong to this build's document set.
+    let mut documents = saved
+        .as_ref()
+        .map(|saved| saved.documents.clone())
+        .unwrap_or_default();
+    let mut omitted: Vec<state::OmittedEntry> = Vec::new();
+    let mut summary = Summary::default();
+
     let index_path = out.join("index.md");
-    let mut summary = index::build(&graph, &index_path, report::recorded_event_count(&events))
-        .map_err(projection_failure)?
-        .summary;
+    let index_paths = vec![("index.md".to_owned(), index_path.clone())];
+    match saved.as_ref().and_then(|s| s.skippable("index.md", &index_paths)) {
+        Some(entry) => restore_skipped(&mut summary, entry),
+        None => {
+            let built = index::build(
+                &graph,
+                &index_path,
+                report::recorded_event_count(&events),
+            )
+            .map_err(projection_failure)?;
+            state::record(&mut documents, "index.md", &index_paths, &built.summary, &[]);
+            merge_summary(&mut summary, built.summary);
+        }
+    }
     flag_stale_authored(&mut summary, &index_path, &changed_ids, &known_ids, &events)?;
 
     let experiments: Vec<String> = graph
@@ -835,7 +874,6 @@ fn cmd_build(
         .filter(|node| node.entity == EntityType::Experiment)
         .map(|node| node.id.clone())
         .collect();
-    let mut omitted: Vec<report::Omitted> = Vec::new();
     if !experiments.is_empty() {
         let experiments_dir = out.join("experiments");
         fs::create_dir_all(&experiments_dir).map_err(|err| {
@@ -846,11 +884,30 @@ fn cmd_build(
         })?;
         for experiment_id in experiments {
             let file_name = format!("{}.md", experiment_id.replace('/', "-"));
-            let report_path = experiments_dir.join(file_name);
-            let built = report::build(&graph, &experiment_id, &report_path, &state)
-                .map_err(projection_failure)?;
-            omitted.extend(built.omitted);
-            merge_summary(&mut summary, built.summary);
+            let report_path = experiments_dir.join(&file_name);
+            let key = format!("experiments/{file_name}");
+            let paths = vec![(key.clone(), report_path.clone())];
+            match saved.as_ref().and_then(|s| s.skippable(&key, &paths)) {
+                Some(entry) => {
+                    restore_skipped(&mut summary, entry);
+                    omitted.extend(entry.omitted.iter().cloned());
+                }
+                None => {
+                    let built = report::build(&graph, &experiment_id, &report_path, &state)
+                        .map_err(projection_failure)?;
+                    let entry_omitted: Vec<state::OmittedEntry> =
+                        built.omitted.iter().map(state::OmittedEntry::from).collect();
+                    omitted.extend(entry_omitted.iter().cloned());
+                    state::record(
+                        &mut documents,
+                        &key,
+                        &paths,
+                        &built.summary,
+                        &entry_omitted,
+                    );
+                    merge_summary(&mut summary, built.summary);
+                }
+            }
             flag_stale_authored(
                 &mut summary,
                 &report_path,
@@ -864,14 +921,18 @@ fn cmd_build(
     // The understanding projection is project-level: one document, both
     // kinds, whether or not the ledger declares an experiment. An empty
     // ledger leaves the document absent rather than writing a blank file.
-    let understanding_path = out.join("understanding.md");
-    let built =
-        report::build_understanding(&graph, &understanding_path).map_err(projection_failure)?;
-    omitted.extend(built.omitted);
-    merge_summary(&mut summary, built.summary);
+    build_single(
+        &mut summary,
+        &mut omitted,
+        &mut documents,
+        saved.as_ref(),
+        "understanding.md",
+        &out.join("understanding.md"),
+        |path| report::build_understanding(&graph, path),
+    )?;
     flag_stale_authored(
         &mut summary,
-        &understanding_path,
+        &out.join("understanding.md"),
         &changed_ids,
         &known_ids,
         &events,
@@ -879,32 +940,63 @@ fn cmd_build(
 
     // The overview is the orientation slice of the same graph: Project,
     // Question, and current Findings, or no document at all.
-    let overview_path = out.join("overview.md");
-    let built = report::build_overview(&graph, &overview_path).map_err(projection_failure)?;
-    omitted.extend(built.omitted);
-    merge_summary(&mut summary, built.summary);
+    build_single(
+        &mut summary,
+        &mut omitted,
+        &mut documents,
+        saved.as_ref(),
+        "overview.md",
+        &out.join("overview.md"),
+        |path| report::build_overview(&graph, path),
+    )?;
     flag_stale_authored(
         &mut summary,
-        &overview_path,
+        &out.join("overview.md"),
         &changed_ids,
         &known_ids,
         &events,
     )?;
 
-    let brief_path = out.join("brief.md");
-    let built = report::build_brief(&graph, &brief_path).map_err(projection_failure)?;
-    omitted.extend(built.omitted);
-    merge_summary(&mut summary, built.summary);
-    flag_stale_authored(&mut summary, &brief_path, &changed_ids, &known_ids, &events)?;
+    build_single(
+        &mut summary,
+        &mut omitted,
+        &mut documents,
+        saved.as_ref(),
+        "brief.md",
+        &out.join("brief.md"),
+        |path| report::build_brief(&graph, path),
+    )?;
+    flag_stale_authored(
+        &mut summary,
+        &out.join("brief.md"),
+        &changed_ids,
+        &known_ids,
+        &events,
+    )?;
 
     // The reuse projection always runs, even when the ledger holds no reuse
     // references: an existing document's stale blocks and legacy names are
     // only visible by validating the documents, and an empty kind is reported
     // once so callers see the whole closed family.
-    let reuse_inputs = reuse::inputs(&graph).map_err(projection_failure)?;
-    let built = reuse::build(&reuse_inputs, out).map_err(projection_failure)?;
-    omitted.extend(built.omitted);
-    merge_summary(&mut summary, built.summary);
+    let reuse_paths: Vec<(String, PathBuf)> = reuse::documents(out)
+        .into_iter()
+        .map(|(block, path)| (block.to_owned(), path))
+        .collect();
+    match saved.as_ref().and_then(|s| s.skippable("reuse", &reuse_paths)) {
+        Some(entry) => {
+            restore_skipped(&mut summary, entry);
+            omitted.extend(entry.omitted.iter().cloned());
+        }
+        None => {
+            let reuse_inputs = reuse::inputs(&graph).map_err(projection_failure)?;
+            let built = reuse::build(&reuse_inputs, out).map_err(projection_failure)?;
+            let entry_omitted: Vec<state::OmittedEntry> =
+                built.omitted.iter().map(state::OmittedEntry::from).collect();
+            omitted.extend(entry_omitted.iter().cloned());
+            state::record(&mut documents, "reuse", &reuse_paths, &built.summary, &entry_omitted);
+            merge_summary(&mut summary, built.summary);
+        }
+    }
     for (_, path) in reuse::documents(out) {
         flag_stale_authored(&mut summary, &path, &changed_ids, &known_ids, &events)?;
     }
@@ -931,7 +1023,7 @@ fn cmd_build(
         ids.sort();
         ids.dedup();
     }
-    omitted.sort_by(|left, right| (left.family, left.kind).cmp(&(right.family, right.kind)));
+    omitted.sort();
     omitted.dedup();
     let omitted: Vec<serde_json::Value> = omitted
         .into_iter()
@@ -944,20 +1036,77 @@ fn cmd_build(
         })
         .collect();
 
-    Ok(Envelope::ok(
-        "build",
-        json!({
-            "out": out.display().to_string(),
-            "recomputed": recomputed,
-            "unchanged": unchanged,
-            "omitted": omitted,
-            "stale": stale,
-            "sources": sources,
-            "events": events.len(),
-            "pending_proposals": state.pending_count(),
-            "ledger_digest": ledger_digest,
-        }),
-    ))
+    // Persist the state only after a successful build, so a failed build
+    // leaves the previous state authoritative for the next run.
+    let final_state = state::BuildState::empty(&ledger_digest).with_documents(documents);
+    final_state.store(&state_path).map_err(|error| {
+        failure(
+            "build-io",
+            format!("failed to write {}: {error}", state_path.display()),
+        )
+    })?;
+
+    let mut data = json!({
+        "out": out.display().to_string(),
+        "recomputed": recomputed,
+        "unchanged": unchanged,
+        "omitted": omitted,
+        "stale": stale,
+        "sources": sources,
+        "events": events.len(),
+        "pending_proposals": state.pending_count(),
+        "ledger_digest": ledger_digest,
+    });
+    if instrument {
+        data["render_invocations"] = json!(render_invocations());
+    }
+    Ok(Envelope::ok("build", data))
+}
+
+/// Build one single-document projection with the skip predicate, or record
+/// and merge its contribution after a real build.
+fn build_single<B>(
+    summary: &mut Summary,
+    omitted: &mut Vec<state::OmittedEntry>,
+    documents: &mut BTreeMap<String, state::DocumentState>,
+    saved: Option<&state::BuildState>,
+    key: &str,
+    path: &Path,
+    build: B,
+) -> Result<(), Failure>
+where
+    B: FnOnce(&Path) -> Result<report::Built, ProjectionError>,
+{
+    let paths = vec![(key.to_owned(), path.to_path_buf())];
+    match saved.and_then(|s| s.skippable(key, &paths)) {
+        Some(entry) => {
+            restore_skipped(summary, entry);
+            omitted.extend(entry.omitted.iter().cloned());
+        }
+        None => {
+            let built = build(path).map_err(projection_failure)?;
+            let entry_omitted: Vec<state::OmittedEntry> =
+                built.omitted.iter().map(state::OmittedEntry::from).collect();
+            omitted.extend(entry_omitted.iter().cloned());
+            state::record(documents, key, &paths, &built.summary, &entry_omitted);
+            merge_summary(summary, built.summary);
+        }
+    }
+    Ok(())
+}
+
+/// Restore a skipped document's recorded summary contribution: its generated
+/// blocks report `unchanged` exactly as a real unchanged build would, and its
+/// source map is restored verbatim.
+fn restore_skipped(summary: &mut Summary, entry: &state::DocumentState) {
+    summary.unchanged.extend(entry.blocks.iter().cloned());
+    for (block, ids) in &entry.sources {
+        summary
+            .sources
+            .entry(block.clone())
+            .or_default()
+            .extend(ids.iter().cloned());
+    }
 }
 
 /// Print the document IR of the compiled record without writing anything.

@@ -93,9 +93,13 @@ requires a nightly toolchain and an upstream format that is still unstable.
 
 The `dont` and specodelic adapters are specified but not written (deferred,
 tracked as kaya-dt2 and kaya-24c); the turu adapter shipped. The MVP-2 seams —
-continuous capture, agent traces, deduplication, missing-evidence detection,
-and incremental regeneration — are named but not yet specified; they start as
-openspec proposals when picked up.
+continuous capture, agent traces, deduplication, missing-evidence detection —
+are named but not yet specified; they start as
+openspec proposals when picked up. Incremental regeneration is implemented on
+the build side: a document whose ledger digest, generator version, and on-disk
+bytes all match the last build (recorded in `.kaya/build-state.json`) is
+skipped instead of re-rendered, and `kaya build --instrument` reports the
+render-invocation count.
 
 ## Dogfooding
 

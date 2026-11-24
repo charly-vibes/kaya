@@ -452,6 +452,11 @@ fn listing(root: &Path) -> BTreeSet<PathBuf> {
     // are setup bookkeeping, not kaya's writes; the property holds kaya to
     // everything else. The ledger itself is still checked byte-exactly.
     out.retain(|path| !path.starts_with(".git/"));
+    // The incremental-build sidecar (.kaya/build-state.json) is build output
+    // by design (kaya-7r3): a content-addressed cache that must never change
+    // projections, only skip their recomputation. Its deletion degrades to a
+    // full deterministic render.
+    out.retain(|path| path != Path::new(".kaya/build-state.json"));
     out
 }
 

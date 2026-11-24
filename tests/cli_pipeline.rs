@@ -6,8 +6,10 @@
 
 use assert_cmd::Command;
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
+use std::path::Path;
 use std::process::Command as StdCommand;
 use tempfile::TempDir;
 
@@ -2879,7 +2881,7 @@ fn publish_preserves_authored_pages_at_omitted_product_paths() {
             .expect("pages is a list")
             .len(),
         5,
-        "only the packages, the research-map-backed reference and the always-emitted glossary remain: {second}"
+        "only the packages, the research-map-backed architecture-design and reference, and the always-emitted glossary remain: {second}"
     );
     assert_eq!(
         second["data"]["omitted"],
@@ -3025,4 +3027,170 @@ fn stale_brief_without_records_is_removed() {
         !brief_path.exists(),
         "a brief without backing records is removed by the rebuild"
     );
+}
+
+#[test]
+fn second_identical_build_performs_zero_render_invocations() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_ledger(
+        &dir,
+        &[
+            event_line(&node_event(
+                "entity-1",
+                "Question",
+                "kaya/Question/q-1",
+                "Q One",
+            )),
+            event_line(&node_event(
+                "entity-2",
+                "Experiment",
+                "kaya/Experiment/e-1",
+                "Exp One",
+            )),
+            event_line(&relationship_event(
+                "rel-1",
+                "investigates",
+                "kaya/Experiment/e-1",
+                "kaya/Question/q-1",
+            )),
+        ],
+    );
+
+    assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    let first = snapshot_docs_research(&dir);
+
+    let built = assert_success(&run(
+        &dir,
+        &["build", "--allow-uncommitted", "--instrument"],
+    ));
+    assert_eq!(
+        built["envelope_kind"],
+        json!("build"),
+        "an instrumented build emits the normal build envelope: {built}"
+    );
+    assert_eq!(
+        built["data"]["render_invocations"],
+        json!(0),
+        "a second identical build renders nothing: {built}"
+    );
+    assert_eq!(
+        built["data"]["recomputed"],
+        json!([]),
+        "a second identical build rewrites nothing: {built}"
+    );
+
+    let second = snapshot_docs_research(&dir);
+    assert_eq!(
+        first, second,
+        "the output tree is byte-identical after an incremental build"
+    );
+
+    // The state an all-skipped build persists must gate the next build too:
+    // a third identical build still renders nothing, so the skip never
+    // alternates back into a full render.
+    let third = assert_success(&run(
+        &dir,
+        &["build", "--allow-uncommitted", "--instrument"],
+    ));
+    assert_eq!(
+        third["data"]["render_invocations"],
+        json!(0),
+        "the build after an all-skipped build still renders nothing: {third}"
+    );
+}
+
+#[test]
+fn new_event_recomputes_affected_projections() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    let lines = vec![
+        event_line(&node_event("entity-1", "Question", "kaya/Question/q-1", "Q One")),
+        event_line(&node_event(
+            "entity-2",
+            "Experiment",
+            "kaya/Experiment/e-1",
+            "Exp One",
+        )),
+        event_line(&relationship_event(
+            "rel-1",
+            "investigates",
+            "kaya/Experiment/e-1",
+            "kaya/Question/q-1",
+        )),
+    ];
+    write_ledger(&dir, &lines);
+
+    assert_success(&run(&dir, &["build", "--allow-uncommitted"]));
+    let unchanged = assert_success(&run(
+        &dir,
+        &["build", "--allow-uncommitted", "--instrument"],
+    ));
+    assert_eq!(
+        unchanged["data"]["render_invocations"],
+        json!(0),
+        "a second identical build renders nothing: {unchanged}"
+    );
+
+    let mut updated = lines;
+    updated.push(event_line(&node_event(
+        "entity-3",
+        "Experiment",
+        "kaya/Experiment/e-2",
+        "Exp Two",
+    )));
+    write_ledger(&dir, &updated);
+    let recomputed = assert_success(&run(
+        &dir,
+        &["build", "--allow-uncommitted", "--instrument"],
+    ));
+    let invocations = recomputed["data"]["render_invocations"]
+        .as_i64()
+        .expect("render_invocations is an integer");
+    assert!(
+        invocations > 0,
+        "a new ledger event triggers at least one render: {recomputed}"
+    );
+
+    // Steady state: the build after the recompute renders nothing again.
+    let steady = assert_success(&run(
+        &dir,
+        &["build", "--allow-uncommitted", "--instrument"],
+    ));
+    assert_eq!(
+        steady["data"]["render_invocations"],
+        json!(0),
+        "the build after a recompute settles back to zero renders: {steady}"
+    );
+}
+
+fn snapshot_docs_research(dir: &TempDir) -> Vec<(String, String)> {
+    fn walk(root: &Path, dir: &Path, out: &mut Vec<(String, String)>) {
+        let mut entries: Vec<_> = fs::read_dir(dir)
+            .expect("directory is readable")
+            .map(|entry| entry.expect("entry is readable").path())
+            .collect();
+        entries.sort();
+        for path in entries {
+            if path.is_dir() {
+                walk(root, &path, out);
+            } else {
+                let bytes = fs::read(&path).expect("file is readable");
+                let mut hasher = Sha256::new();
+                hasher.update(&bytes);
+                let digest = format!("{:x}", hasher.finalize());
+                let relative = path
+                    .strip_prefix(root)
+                    .expect("path is under the snapshot root")
+                    .to_string_lossy()
+                    .into_owned();
+                out.push((relative, digest));
+            }
+        }
+    }
+
+    let root = dir.path().join("docs/research");
+    let mut snapshot = Vec::new();
+    walk(&root, &root, &mut snapshot);
+    snapshot
 }

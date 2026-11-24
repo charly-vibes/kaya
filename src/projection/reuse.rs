@@ -366,6 +366,7 @@ struct Rendered {
 ///
 /// Sections appear only when non-empty; a kind with no rows renders nothing.
 fn render_reproduction(inputs: &Inputs) -> Option<Rendered> {
+    crate::projection::bump_render_calls();
     let revisions = rows(&inputs.revisions);
     let commands = rows(&inputs.commands);
     if revisions.is_empty() && commands.is_empty() {
@@ -389,22 +390,26 @@ fn render_reproduction(inputs: &Inputs) -> Option<Rendered> {
 
 /// Render the technical-reference block from specodelic spec ids.
 fn render_technical_reference(inputs: &Inputs) -> Option<Rendered> {
+    crate::projection::bump_render_calls();
     render_flat(&inputs.specs, "Specs")
 }
 
 /// Render the knowledge-brief block from turu/whisper entry ids.
 fn render_knowledge_brief(inputs: &Inputs) -> Option<Rendered> {
+    crate::projection::bump_render_calls();
     render_flat(&inputs.entries, "Entries")
 }
 
 /// Render the handoff block from handoff artifact references.
 fn render_handoff(inputs: &Inputs) -> Option<Rendered> {
+    crate::projection::bump_render_calls();
     render_flat(&inputs.handoffs, "Handoffs")
 }
 
 /// Render one single-section reference kind: the sorted rows under `title`
 /// and the distinct node ids backing them. No rows renders nothing.
 fn render_flat(references: &[SourceRef], title: &str) -> Option<Rendered> {
+    crate::projection::bump_render_calls();
     let rows = rows(references);
     if rows.is_empty() {
         return None;

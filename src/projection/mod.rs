@@ -17,6 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::model::Node;
 
@@ -24,6 +25,23 @@ pub mod index;
 pub mod ir;
 pub mod report;
 pub mod reuse;
+pub mod state;
+
+/// Render constructors invoked so far in this process. Each CLI invocation is
+/// a fresh process, so the counter needs no reset: process lifetime is
+/// exactly one command's rendering scope.
+pub static RENDER_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+/// Record one render constructor invocation. Every projection render
+/// constructor calls this first thing.
+pub fn bump_render_calls() {
+    RENDER_CALLS.fetch_add(1, Ordering::Relaxed);
+}
+
+/// Render constructors invoked so far in this process.
+pub fn render_invocations() -> usize {
+    RENDER_CALLS.load(Ordering::Relaxed)
+}
 
 /// Prefix of a generated-block begin marker.
 pub const BEGIN_PREFIX: &str = "<!-- kaya:begin generated:";

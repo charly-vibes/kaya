@@ -699,6 +699,7 @@ struct RenderedBlock {
 
 /// Declared intent only: the questions investigated and hypotheses predicted.
 fn render_specification(graph: &Graph, anchors: &BTreeSet<String>) -> Option<RenderedBlock> {
+    crate::projection::bump_render_calls();
     let questions = linked(
         graph,
         &[Relationship::Investigates],
@@ -736,6 +737,7 @@ fn render_record(
     anchors: &BTreeSet<String>,
     promotion: &PromotionState,
 ) -> Option<RenderedBlock> {
+    crate::projection::bump_render_calls();
     let runs = linked(graph, &[Relationship::Executes], anchors, EntityType::Run);
     let observations = linked(
         graph,
@@ -824,6 +826,7 @@ fn entity_rows(graph: &Graph, entities: &[EntityType]) -> (Vec<String>, BTreeSet
 /// its own section, id-sorted. Runs, artifacts, observations, decisions, and
 /// every other entity never enter this block.
 fn render_overview(graph: &Graph) -> Option<RenderedBlock> {
+    crate::projection::bump_render_calls();
     let (projects, project_ids) = entity_rows(graph, &[EntityType::Project]);
     let (questions, question_ids) = entity_rows(graph, &[EntityType::Question]);
     let (findings, finding_ids) = entity_rows(graph, &[EntityType::Finding]);
@@ -852,6 +855,7 @@ fn render_overview(graph: &Graph) -> Option<RenderedBlock> {
 /// walks — the brief's source records are the three kinds; relationships are
 /// the research-map's job.
 fn render_brief(graph: &Graph) -> Option<RenderedBlock> {
+    crate::projection::bump_render_calls();
     let (questions, question_ids) = entity_rows(graph, &[EntityType::Question]);
     let (ideas, idea_ids) = entity_rows(graph, &[EntityType::Idea]);
     let (hypotheses, hypothesis_ids) = entity_rows(graph, &[EntityType::Hypothesis]);
@@ -878,6 +882,7 @@ fn render_brief(graph: &Graph) -> Option<RenderedBlock> {
 /// Findings and their analysis only: Finding, Observation, and Claim records,
 /// each in its own section. Runs and artifacts never enter this block.
 fn render_findings(graph: &Graph) -> Option<RenderedBlock> {
+    crate::projection::bump_render_calls();
     let (findings, finding_ids) = entity_rows(graph, &[EntityType::Finding]);
     let (observations, observation_ids) = entity_rows(graph, &[EntityType::Observation]);
     let (claims, claim_ids) = entity_rows(graph, &[EntityType::Claim]);
@@ -922,6 +927,7 @@ fn render_findings(graph: &Graph) -> Option<RenderedBlock> {
 /// all, so a decisions-only record never claims global evidence it does not
 /// have.
 fn render_decision(graph: &Graph) -> Option<RenderedBlock> {
+    crate::projection::bump_render_calls();
     let (decisions, mut sources) = entity_rows(graph, &[EntityType::Decision]);
     if decisions.is_empty() {
         return None;

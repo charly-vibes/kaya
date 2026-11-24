@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Incremental build regeneration: `kaya build` skips documents whose ledger
+  digest, generator version, and on-disk bytes match the last successful
+  build (state in `.kaya/build-state.json`, git-ignored), restoring their
+  summary contribution instead of re-rendering; citation validation and
+  staleness flagging still run on every build. `kaya build --instrument` adds
+  `data.render_invocations` counting render constructor invocations.
+
 ## [0.2.0] - 2026-11-23
 
 ### Added
