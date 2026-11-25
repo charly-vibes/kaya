@@ -77,6 +77,9 @@ pub const LABEL_IO: &str = "kaya.publications.io";
 /// Reason reported for a product with no admissible backing document.
 pub const REASON_NO_BACKING_DOCUMENT: &str = "no-backing-document";
 
+/// Reason reported when a name's feeder attributes refuse the build.
+pub const REASON_REFUSED_ATTRIBUTE: &str = "refused-attribute";
+
 /// The one tier a publication name resolves to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Tier {

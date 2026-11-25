@@ -213,6 +213,136 @@ fn explain_product_view_agrees_with_the_bare_census() {
 }
 
 #[test]
+fn wrong_typed_feeder_attribute_reads_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+
+    // A present-but-non-string feeder attribute refuses the build with
+    // kaya.projection.reuse_attribute; explain must say "refused" naming
+    // the node, never "unpopulated".
+    let ledger = dir.path().join(".kaya/ledger.jsonl");
+    std::fs::create_dir_all(ledger.parent().unwrap()).unwrap();
+    std::fs::write(
+        &ledger,
+        format!(
+            "{}\n",
+            json!({
+                "id": "event-spec-source",
+                "schema": "kaya.event/v0",
+                "type": "model.entity.created",
+                "timestamp": "2026-11-25T09:00:00Z",
+                "actor": { "type": "human", "name": "alice" },
+                "subject": { "type": "Source", "id": "kaya/Source/spec-bad" },
+                "data": { "attributes": { "spec": 42 } },
+                "provenance": { "tool": "kaya", "version": "0.1.0", "reference": "event-spec-source" },
+                "artifacts": [],
+            })
+        ),
+    )
+    .unwrap();
+
+    let output = kaya(&dir)
+        .args(["explain", "technical-reference"])
+        .output()
+        .unwrap();
+    let env = envelope(&output);
+    assert_eq!(env["ok"], json!(true));
+    assert_eq!(
+        env["data"]["status"],
+        json!("refused"),
+        "a wrong-typed feeder attribute refuses the kind, not unpopulated"
+    );
+    assert_eq!(
+        env["data"]["refusals"],
+        json!([{ "node": "kaya/Source/spec-bad", "attribute": "spec" }]),
+        "the kind view names the offending node and attribute"
+    );
+
+    let output = kaya(&dir).arg("explain").output().unwrap();
+    let env = envelope(&output);
+    let refused: Vec<&Value> = env["data"]["omitted"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entry| entry["reason"] == json!("refused-attribute"))
+        .collect();
+    let catalogue = refused
+        .iter()
+        .find(|entry| entry["name"] == json!("api-catalogue"))
+        .expect("the collection backed by the technical reference reports refused");
+    assert_eq!(
+        catalogue["tier"],
+        json!("collection"),
+        "the api-catalogue census row: {catalogue}"
+    );
+    assert_eq!(catalogue["reason"], json!("refused-attribute"));
+    assert_eq!(catalogue["nodes"], json!(["kaya/Source/spec-bad"]));
+    assert_eq!(
+        catalogue["admits"],
+        json!(["reuse-handoff.technical-reference"])
+    );
+    assert!(
+        refused
+            .iter()
+            .any(|entry| entry["name"] == json!("reference")
+                && entry["tier"] == json!("product")
+                && entry["nodes"] == json!(["kaya/Source/spec-bad"])),
+        "every product admitting the refused kind reads refused: {refused:?}"
+    );
+    assert!(
+        !refused
+            .iter()
+            .any(|entry| entry["name"] == json!("overview")),
+        "products whose kinds are untouched keep the plain omission reason"
+    );
+}
+
+#[test]
+fn commit_refusal_requires_non_blank_path_like_build() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+
+    // The build reaches the commit check only through a non-blank string
+    // path; a wrong-typed commit with no path builds fine, so explain must
+    // keep reading unpopulated, never refused.
+    let ledger = dir.path().join(".kaya/ledger.jsonl");
+    std::fs::create_dir_all(ledger.parent().unwrap()).unwrap();
+    std::fs::write(
+        &ledger,
+        format!(
+            "{}\n",
+            json!({
+                "id": "event-commit-source",
+                "schema": "kaya.event/v0",
+                "type": "model.entity.created",
+                "timestamp": "2026-11-25T09:10:00Z",
+                "actor": { "type": "human", "name": "alice" },
+                "subject": { "type": "Source", "id": "kaya/Source/commit-only" },
+                "data": { "attributes": { "commit": 42 } },
+                "provenance": { "tool": "kaya", "version": "0.1.0", "reference": "event-commit-source" },
+                "artifacts": [],
+            })
+        ),
+    )
+    .unwrap();
+
+    let output = kaya(&dir)
+        .args(["explain", "reproduction-package"])
+        .output()
+        .unwrap();
+    let env = envelope(&output);
+    assert_eq!(
+        env["data"]["status"],
+        json!("unpopulated"),
+        "commit without a path never reaches the build's commit check"
+    );
+    assert!(
+        env["data"].get("refusals").is_none(),
+        "no refusals are reported when the build would accept the graph"
+    );
+}
+
+#[test]
 fn brief_backed_tutorial_publishes() {
     let dir = tempfile::tempdir().unwrap();
     init(&dir);

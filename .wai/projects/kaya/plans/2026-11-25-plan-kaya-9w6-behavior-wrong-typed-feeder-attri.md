@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-25-kaya-9w6-explain-refuses-wrong-typed-attributes, pipeline-step:orient]
+---
+
+PLAN kaya-9w6 — Behavior: wrong-typed feeder attributes surface as status refused naming offending node ids in kind view, product view, and census (reason refused-attribute, nodes array), instead of unpopulated/no-backing-document. Out of scope: changing build refusal behavior; attribute VALIDATION beyond type; collection-specific rendering beyond census reason. RED test first: tests/explain.rs::wrong_typed_feeder_attribute_reads_refused — ledger with Source{spec:42}, kaya explain technical-reference -> status refused + refusals [{node,attribute}]; census -> technical-reference omitted with reason refused-attribute + nodes; expected failure at HEAD (status unpopulated). Narrow: cargo test --test explain wrong_typed_feeder_attribute_reads_refused. Full: cargo test + just record-check + ah-check check. Files: src/explain.rs, tests/explain.rs. Commits: one feature commit.

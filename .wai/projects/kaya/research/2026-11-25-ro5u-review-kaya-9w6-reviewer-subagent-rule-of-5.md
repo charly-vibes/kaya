@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-25-kaya-9w6-explain-refuses-wrong-typed-attributes, pipeline-step:ro5u-review]
+---
+
+RO5U REVIEW kaya-9w6 (reviewer subagent, rule-of-5-universal, five lenses): CRITICALS: 0, verdict incorrect pending one mirror divergence. Finding 1 MAJOR: attribute_refusals flags wrong-typed commit even when path absent/blank, but build short-circuits commit behind non-blank path (reuse.rs:277-285) so Source{commit:42} with no path builds fine while explain reads refused - fix: only check commit when non_blank(node,'path'). Finding 5 minor: doc comment overclaims family-wide refusal for sibling kinds - add scope note. Finding 2 minor deliberate scope gap: per-name collection view not extended to refused (ticket scopes it out) - follow-up ticket. Finding 3 minor: push_refused doc says graph order but sorts - fix comment. Finding 4 minor: REASON_REFUSED_ATTRIBUTE doc says product, used for collections too - fix comment. Lenses 2 (precedence) and 4 (performance O(K*N) bounded) sound. Fixing 1,3,4,5; 2 deferred by scope.

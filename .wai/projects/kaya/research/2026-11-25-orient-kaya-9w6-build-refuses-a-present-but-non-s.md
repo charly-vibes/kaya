@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-25-kaya-9w6-explain-refuses-wrong-typed-attributes, pipeline-step:orient]
+---
+
+ORIENT kaya-9w6: build refuses a present-but-non-string feeder attribute with kaya.projection.reuse_attribute naming node+attribute (src/projection/reuse.rs string_attribute/command_refs/inputs), but explain's populated() (src/explain.rs:402) uses as_str()-based non_blank, so wrong-typed attributes read as absent -> unpopulated/omitted exactly where diagnosis is needed (kaya-dsv L3). Refusal surfaces to mirror: Source.spec (technical-reference), Source.entry (knowledge-brief), Source.path+commit and Run.command+commands incl. non-array/foreign-element (reproduction-package), Artifact.path when kind=='handoffs' (handoff). Artifact.kind wrong-type stays a skip (build treats != 'handoffs' as continue). Change: explain gains attribute_refusals(graph, block) -> Vec<(node, attribute)>; kind view status refused + refusals; product view refused with reason refused-attribute; census omitted entry reason refused-attribute + nodes.

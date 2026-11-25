@@ -23,8 +23,8 @@ use kaya::envelope::Envelope;
 use kaya::event::parse_line;
 use kaya::model::{self, EntityType, Graph, Relationship};
 use kaya::publication::{
-    COLLECTIONS, IMPLEMENTED, PRODUCTS, REASON_NO_BACKING_DOCUMENT, Tier, admission, backing_kinds,
-    reader_question, resolve_name,
+    COLLECTIONS, IMPLEMENTED, PRODUCTS, REASON_NO_BACKING_DOCUMENT, REASON_REFUSED_ATTRIBUTE, Tier,
+    admission, backing_kinds, reader_question, resolve_name,
 };
 
 use crate::LEDGER_PATH;
@@ -223,14 +223,25 @@ fn bare_explain(graph: &Graph) -> Envelope {
     let mut omitted = Vec::new();
     let mut emitted = Vec::new();
     for product in PRODUCTS {
-        push_state(
-            &mut omitted,
-            &mut emitted,
-            product,
-            "product",
-            admission(product),
-            product_emitted(graph, product),
-        );
+        let refusals = kind_refusals(graph, admission(product));
+        if refusals.is_empty() {
+            push_state(
+                &mut omitted,
+                &mut emitted,
+                product,
+                "product",
+                admission(product),
+                product_emitted(graph, product),
+            );
+        } else {
+            push_refused(
+                &mut omitted,
+                product,
+                "product",
+                admission(product),
+                &refusals,
+            );
+        }
     }
     // Only the implemented collections can appear in a built tree; the rest
     // refuse at declaration, so they are never omissions to explain.
@@ -243,14 +254,19 @@ fn bare_explain(graph: &Graph) -> Envelope {
         } else {
             backing_kinds(collection).unwrap_or(&[])
         };
-        push_state(
-            &mut omitted,
-            &mut emitted,
-            collection,
-            "collection",
-            kinds,
-            collection_emitted(graph, collection),
-        );
+        let refusals = kind_refusals(graph, kinds);
+        if refusals.is_empty() {
+            push_state(
+                &mut omitted,
+                &mut emitted,
+                collection,
+                "collection",
+                kinds,
+                collection_emitted(graph, collection),
+            );
+        } else {
+            push_refused(&mut omitted, collection, "collection", kinds, &refusals);
+        }
     }
     Envelope::ok(
         "explain",
@@ -261,18 +277,41 @@ fn bare_explain(graph: &Graph) -> Envelope {
     )
 }
 
+/// Wrong-typed feeder attributes across a set of blocks, in graph order.
+fn kind_refusals(graph: &Graph, kinds: &[&str]) -> Vec<(String, &'static str)> {
+    kinds
+        .iter()
+        .flat_map(|kind| attribute_refusals(graph, kind))
+        .collect()
+}
+
 /// One product's view: its reader question, admission row, and status.
 fn product_explain(graph: &Graph, product: &'static str) -> Envelope {
     let kinds = admission(product);
     let emitted = product_emitted(graph, product);
+    let refusals = kind_refusals(graph, kinds);
     let mut data = json!({
         "name": product,
         "tier": "product",
         "question": reader_question(product),
         "admits": kinds,
-        "status": if emitted { "emitted" } else { "omitted" },
+        "status": if !refusals.is_empty() {
+            "refused"
+        } else if emitted {
+            "emitted"
+        } else {
+            "omitted"
+        },
     });
-    if !emitted {
+    if !refusals.is_empty() {
+        data["reason"] = json!(REASON_REFUSED_ATTRIBUTE);
+        data["refusals"] = json!(
+            refusals
+                .iter()
+                .map(|(node, attribute)| json!({ "node": node, "attribute": attribute }))
+                .collect::<Vec<_>>()
+        );
+    } else if !emitted {
         data["reason"] = json!(REASON_NO_BACKING_DOCUMENT);
     }
     // Carry any structural caveat an admitted kind attaches, so the product
@@ -334,6 +373,7 @@ fn kind_explain(graph: &Graph, contract: &KindContract) -> Envelope {
         })
         .collect();
     let populated = populated(graph, contract.block);
+    let refusals = attribute_refusals(graph, contract.block);
     let mut data = json!({
         "name": contract.bare,
         "tier": "document-kind",
@@ -345,8 +385,22 @@ fn kind_explain(graph: &Graph, contract: &KindContract) -> Envelope {
         "ingestion": contract.ingestion,
         "backs": backs,
         "collections": collections,
-        "status": if populated { "populated" } else { "unpopulated" },
+        "status": if !refusals.is_empty() {
+            "refused"
+        } else if populated {
+            "populated"
+        } else {
+            "unpopulated"
+        },
     });
+    if !refusals.is_empty() {
+        data["refusals"] = json!(
+            refusals
+                .iter()
+                .map(|(node, attribute)| json!({ "node": node, "attribute": attribute }))
+                .collect::<Vec<_>>()
+        );
+    }
     if let Some(seed) = contract.seed_example {
         data["seed_example"] = json!(seed);
     }
@@ -373,6 +427,27 @@ fn push_state(
         "name": name,
         "tier": tier,
         "reason": REASON_NO_BACKING_DOCUMENT,
+        "admits": kinds,
+    }));
+}
+
+/// Append one refused name to the omitted census side, naming the offending
+/// node ids sorted and de-duplicated.
+fn push_refused(
+    omitted: &mut Vec<Value>,
+    name: &str,
+    tier: &str,
+    kinds: &[&str],
+    refusals: &[(String, &'static str)],
+) {
+    let mut nodes: Vec<&str> = refusals.iter().map(|(node, _)| node.as_str()).collect();
+    nodes.sort_unstable();
+    nodes.dedup();
+    omitted.push(json!({
+        "name": name,
+        "tier": tier,
+        "reason": REASON_REFUSED_ATTRIBUTE,
+        "nodes": nodes,
         "admits": kinds,
     }));
 }
@@ -486,6 +561,67 @@ fn source_with(graph: &Graph, attribute: &str) -> bool {
     graph
         .nodes()
         .any(|node| node.entity == EntityType::Source && non_blank(node, attribute))
+}
+
+/// Wrong-typed feeder attributes for a kind's block, as `(node, attribute)`
+/// pairs. This mirrors exactly the surfaces `reuse::inputs` refuses at build
+/// time with `kaya.projection.reuse_attribute`, so a kind that would refuse
+/// the build reads "refused" here instead of silently "unpopulated". A
+/// wrong-typed `kind` on an Artifact stays a skip, as in build. Refusals are
+/// attributed to the kind owning the attribute; the build refuses the whole
+/// reuse family, which sibling kinds' views do not reflect.
+fn attribute_refusals(graph: &Graph, block: &str) -> Vec<(String, &'static str)> {
+    let wrong_typed = |node: &kaya::model::Node, attribute: &str| {
+        node.attributes
+            .get(attribute)
+            .is_some_and(|value| !value.is_string())
+    };
+    let mut refusals = Vec::new();
+    for node in graph.nodes() {
+        match (block, node.entity) {
+            ("reuse-handoff.technical-reference", EntityType::Source) => {
+                if wrong_typed(node, "spec") {
+                    refusals.push((node.id.clone(), "spec"));
+                }
+            }
+            ("reuse-handoff.knowledge-brief", EntityType::Source) => {
+                if wrong_typed(node, "entry") {
+                    refusals.push((node.id.clone(), "entry"));
+                }
+            }
+            ("reuse-handoff.reproduction-package", EntityType::Source) => {
+                if wrong_typed(node, "path") {
+                    refusals.push((node.id.clone(), "path"));
+                } else if non_blank(node, "path") && wrong_typed(node, "commit") {
+                    // Build reaches the commit check only through a non-blank
+                    // string path (reuse.rs short-circuits with `continue`).
+                    refusals.push((node.id.clone(), "commit"));
+                }
+            }
+            ("reuse-handoff.reproduction-package", EntityType::Run) => {
+                if wrong_typed(node, "command") {
+                    refusals.push((node.id.clone(), "command"));
+                }
+                match node.attributes.get("commands") {
+                    Some(Value::Array(entries)) => {
+                        if entries.iter().any(|entry| !entry.is_string()) {
+                            refusals.push((node.id.clone(), "commands"));
+                        }
+                    }
+                    Some(_) => refusals.push((node.id.clone(), "commands")),
+                    None => {}
+                }
+            }
+            ("reuse-handoff.handoff", EntityType::Artifact)
+                if node.attributes.get("kind").and_then(Value::as_str) == Some("handoffs")
+                    && wrong_typed(node, "path") =>
+            {
+                refusals.push((node.id.clone(), "path"));
+            }
+            _ => {}
+        }
+    }
+    refusals
 }
 
 /// Whether a node carries a non-blank string attribute.

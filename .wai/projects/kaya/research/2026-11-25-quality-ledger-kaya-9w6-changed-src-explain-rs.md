@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-25-kaya-9w6-explain-refuses-wrong-typed-attributes, pipeline-step:quality-ledger]
+---
+
+QUALITY LEDGER kaya-9w6: Changed: src/explain.rs (attribute_refusals mirror + refused status in kind/product/census views + kind_refusals helper + push_refused), src/publication/vocabulary.rs + mod.rs (REASON_REFUSED_ATTRIBUTE const + re-export), tests/explain.rs (wrong_typed_feeder_attribute_reads_refused red-first, commit_refusal_requires_non_blank_path_like_build regression). Verified: cargo test 504 passed 0 failed; ah check --run-tests 230 passed 0 findings; openspec validate --all --strict 13 passed 0 failed; cargo fmt clean; cargo clippy --all-targets --all-features -D warnings clean. Review: RO5U CRITICALS: 0; F1 major fixed with regression test; F3/F4/F5 comment truths fixed; F2 minor deferred by ticket scope (per-name collection view refused status). Risks: none known beyond the scoped-out collection per-name view gap. Next: ship-close needs human approval, atomic commit, close beads ticket.
