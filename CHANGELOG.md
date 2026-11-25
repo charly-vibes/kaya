@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- The spec-correspondence gate runs `ah check` through `scripts/ah-check`,
+  which prepends `target/release` to PATH so espectacular pipelines can never
+  resolve a stale global `kaya` install (e.g. `~/.cargo/bin/kaya`) and rewrite
+  generated publications in an outdated export format.
+
 ## [0.4.0] - 2026-11-24
 
 ### Added

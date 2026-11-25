@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# ah-check — run espectacular's `ah` with the repo-built kaya pinned on PATH.
+#
+# Ah pipelines can resolve `kaya` by name from PATH; a stale global install
+# (~/.cargo/bin/kaya) would then rewrite generated artifacts such as
+# docs/public/publication.json in an outdated export format. Prepending
+# target/release keeps every such resolution inside the repo's own build.
+set -euo pipefail
+
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ ! -x "$repo/target/release/kaya" ]]; then
+	echo "scripts/ah-check: $repo/target/release/kaya is missing; run 'cargo build --release' first" >&2
+	exit 1
+fi
+
+export PATH="$repo/target/release:$PATH"
+exec ah "$@"

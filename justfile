@@ -70,9 +70,10 @@ record-verify:
 record-lag mode="fail" bound="25":
 	python3 scripts/record-lag.py --mode {{mode}} --bound {{bound}}
 
-# Validate spec ↔ test correspondence (espectacular, bin: ah)
+# Validate spec ↔ test correspondence (espectacular, bin: ah, run through
+# scripts/ah-check so PATH resolves the repo-built kaya, not a stale install)
 validate:
-	ah check
+	scripts/ah-check check
 
 # Lint the spec corpus (specodelic, bin: spk). Exit 2 means "no specs
 # found" — an empty corpus is not a violation.
