@@ -71,6 +71,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/24d5424 — 24d5424020a92983e189e7372328b641d5d2c676
 - kaya/Artifact/25a198b — 25a198b3442282150bbec70ebadf63331501cb7c
 - kaya/Artifact/26dfb0d — 26dfb0d769a4b9c0db3a35d795e629af5827f71b
+- kaya/Artifact/2cb05bb — 2cb05bbcc75b0f6517e0c9906fe023016f86ae74
 - kaya/Artifact/3095266 — 3095266e9b91e0e22c3355a80f9b076637573468
 - kaya/Artifact/32a3d2d — 32a3d2d9dd54159488e4b2aa150fe2e531e1f274
 - kaya/Artifact/331401a — 331401a14a5a1b5658e5e51c6cab9d78682be4f9
@@ -981,6 +982,6 @@ Reader question: how is it structured and why
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_943 nodes from 1084 events._
+_944 nodes from 1085 events._
 
 <!-- kaya:end generated:publication.product.architecture-design -->
