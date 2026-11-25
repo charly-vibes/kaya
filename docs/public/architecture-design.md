@@ -132,6 +132,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/88fad72 — 88fad729b2e70b97e33f8f115049f17acb65e908
 - kaya/Artifact/89e8f1b — 89e8f1b7634209ea108c1631f36376177c31998f
 - kaya/Artifact/8c0be76 — 8c0be763cc2ad689c594add43815263bf7448979
+- kaya/Artifact/8f45b8b — 8f45b8b310ba7becc24b20cf9f545807fe317119
 - kaya/Artifact/8f5ffb4 — 8f5ffb45b0bf6f3ddb55b1af4bed098a3b5068d6
 - kaya/Artifact/904f37f — 904f37fc6fa03785c3df4b48960dda5cf6120d2f
 - kaya/Artifact/91927de — 91927dec2f7716dd802edda11cd6c7cbeadc6418
@@ -358,10 +359,12 @@ Reader question: how is it structured and why
 - kaya/Artifact/designs-2026-11-25-design-kaya-9w6-refactor-the-only-duplication-w — .wai/projects/kaya/designs/2026-11-25-design-kaya-9w6-refactor-the-only-duplication-w.md
 - kaya/Artifact/designs-2026-11-25-fix-kaya-w68-ro5u-critical-count-0-verdict-pro — .wai/projects/kaya/designs/2026-11-25-fix-kaya-w68-ro5u-critical-count-0-verdict-pro.md
 - kaya/Artifact/designs-2026-11-25-green-kaya-34g-implementation-record-data-only-ch — .wai/projects/kaya/designs/2026-11-25-green-kaya-34g-implementation-record-data-only-ch.md
+- kaya/Artifact/designs-2026-11-25-green-kaya-dar-edit-pretender-toml-exclude-array — .wai/projects/kaya/designs/2026-11-25-green-kaya-dar-edit-pretender-toml-exclude-array.md
 - kaya/Artifact/designs-2026-11-25-green-kaya-dsv-implemented-kaya-explain-as-src-ex — .wai/projects/kaya/designs/2026-11-25-green-kaya-dsv-implemented-kaya-explain-as-src-ex.md
 - kaya/Artifact/designs-2026-11-25-green-kaya-g9u-split-executed-in-waves-w1-w7-by-t — .wai/projects/kaya/designs/2026-11-25-green-kaya-g9u-split-executed-in-waves-w1-w7-by-t.md
 - kaya/Artifact/designs-2026-11-25-green-kaya-w68-added-brief-md-to-reader-files-sr — .wai/projects/kaya/designs/2026-11-25-green-kaya-w68-added-brief-md-to-reader-files-sr.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-34g-no-op-change-is-ledger-data-s — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-34g-no-op-change-is-ledger-data-s.md
+- kaya/Artifact/designs-2026-11-25-refactor-kaya-dar-no-refactor-step-applies-the — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-dar-no-refactor-step-applies-the.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-dsv-dropped-the-duplicate-all-block — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-dsv-dropped-the-duplicate-all-block.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-g9u-the-ticket-is-a-refactor-no-fu — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-g9u-the-ticket-is-a-refactor-no-fu.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-w68-no-production-extraction-warran — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-w68-no-production-extraction-warran.md
@@ -488,6 +491,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/plans-2026-11-25-plan-kaya-34g-dogfood-the-experiment-record-produ — .wai/projects/kaya/plans/2026-11-25-plan-kaya-34g-dogfood-the-experiment-record-produ.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-9w6-behavior-wrong-typed-feeder-attri — .wai/projects/kaya/plans/2026-11-25-plan-kaya-9w6-behavior-wrong-typed-feeder-attri.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-9w6-step-plan-red-first-tests-expla — .wai/projects/kaya/plans/2026-11-25-plan-kaya-9w6-step-plan-red-first-tests-expla.md
+- kaya/Artifact/plans-2026-11-25-plan-kaya-dar-single-line-config-change-in-preten — .wai/projects/kaya/plans/2026-11-25-plan-kaya-dar-single-line-config-change-in-preten.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-dsv-part-a-kaya-explain-a-read-only — .wai/projects/kaya/plans/2026-11-25-plan-kaya-dsv-part-a-kaya-explain-a-read-only.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-g9u-mechanical-extraction-in-waves-eac — .wai/projects/kaya/plans/2026-11-25-plan-kaya-g9u-mechanical-extraction-in-waves-eac.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-g9u-mechanical-extraction-in-waves-eac-2 — .wai/projects/kaya/plans/2026-11-25-plan-kaya-g9u-mechanical-extraction-in-waves-eac-2.md
@@ -917,9 +921,11 @@ Reader question: how is it structured and why
 - kaya/Artifact/research-2026-11-25-fix-kaya-9w6-f1-fixed-commit-refusal-now-gated — .wai/projects/kaya/research/2026-11-25-fix-kaya-9w6-f1-fixed-commit-refusal-now-gated.md
 - kaya/Artifact/research-2026-11-25-green-kaya-34g-seeded-kaya-seeds-kaya-34g-execut — .wai/projects/kaya/research/2026-11-25-green-kaya-34g-seeded-kaya-seeds-kaya-34g-execut.md
 - kaya/Artifact/research-2026-11-25-green-kaya-9w6-src-explain-rs-attribute-refusals — .wai/projects/kaya/research/2026-11-25-green-kaya-9w6-src-explain-rs-attribute-refusals.md
+- kaya/Artifact/research-2026-11-25-green-kaya-dar-three-edits-applied-1-pretender — .wai/projects/kaya/research/2026-11-25-green-kaya-dar-three-edits-applied-1-pretender.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-34g-verified-against-head-2ad99853c7 — .wai/projects/kaya/research/2026-11-25-orient-kaya-34g-verified-against-head-2ad99853c7.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-34g-verified-against-head-2ad99853c7-2 — .wai/projects/kaya/research/2026-11-25-orient-kaya-34g-verified-against-head-2ad99853c7-2.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-9w6-build-refuses-a-present-but-non-s — .wai/projects/kaya/research/2026-11-25-orient-kaya-9w6-build-refuses-a-present-but-non-s.md
+- kaya/Artifact/research-2026-11-25-orient-kaya-dar-pretender-0-7-0-src-main-rs-colle — .wai/projects/kaya/research/2026-11-25-orient-kaya-dar-pretender-0-7-0-src-main-rs-colle.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-dsv-products-compose-from-the-11-kind — .wai/projects/kaya/research/2026-11-25-orient-kaya-dsv-products-compose-from-the-11-kind.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-g9u-verified-at-head-028e748-src-ma — .wai/projects/kaya/research/2026-11-25-orient-kaya-g9u-verified-at-head-028e748-src-ma.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-w68-brief-md-is-in-neither — .wai/projects/kaya/research/2026-11-25-orient-kaya-w68-brief-md-is-in-neither.md
@@ -927,17 +933,20 @@ Reader question: how is it structured and why
 - kaya/Artifact/research-2026-11-25-plan-kaya-w68-behavior-a-populated-exploration — .wai/projects/kaya/research/2026-11-25-plan-kaya-w68-behavior-a-populated-exploration.md
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-34g-changed-kaya-ledger-jso — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-34g-changed-kaya-ledger-jso.md
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-9w6-changed-src-explain-rs — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-9w6-changed-src-explain-rs.md
+- kaya/Artifact/research-2026-11-25-quality-ledger-kaya-dar-changed-pretender-toml — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-dar-changed-pretender-toml.md
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-dsv-changed-src-explain-rs — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-dsv-changed-src-explain-rs.md
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-g9u-changed-src-main-rs-245 — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-g9u-changed-src-main-rs-245.md
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-w68-changed-src-publication — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-w68-changed-src-publication.md
 - kaya/Artifact/research-2026-11-25-red-kaya-34g-command-kaya-explain-example-galler — .wai/projects/kaya/research/2026-11-25-red-kaya-34g-command-kaya-explain-example-galler.md
 - kaya/Artifact/research-2026-11-25-red-kaya-9w6-tests-explain-rs-wrong-typed-feeder — .wai/projects/kaya/research/2026-11-25-red-kaya-9w6-tests-explain-rs-wrong-typed-feeder.md
+- kaya/Artifact/research-2026-11-25-red-kaya-dar-failing-precondition-captured-at-hea — .wai/projects/kaya/research/2026-11-25-red-kaya-dar-failing-precondition-captured-at-hea.md
 - kaya/Artifact/research-2026-11-25-red-kaya-dsv-command-cargo-test-test-explain-e — .wai/projects/kaya/research/2026-11-25-red-kaya-dsv-command-cargo-test-test-explain-e.md
 - kaya/Artifact/research-2026-11-25-red-kaya-g9u-failing-precondition-src-main-rs-2 — .wai/projects/kaya/research/2026-11-25-red-kaya-g9u-failing-precondition-src-main-rs-2.md
 - kaya/Artifact/research-2026-11-25-red-kaya-g9u-failing-precondition-src-main-rs-2-2 — .wai/projects/kaya/research/2026-11-25-red-kaya-g9u-failing-precondition-src-main-rs-2-2.md
 - kaya/Artifact/research-2026-11-25-red-kaya-w68-tests-explain-rs-brief-backed-tutor — .wai/projects/kaya/research/2026-11-25-red-kaya-w68-tests-explain-rs-brief-backed-tutor.md
 - kaya/Artifact/research-2026-11-25-refactor-kaya-9w6-extracted-kind-refusals-graph — .wai/projects/kaya/research/2026-11-25-refactor-kaya-9w6-extracted-kind-refusals-graph.md
 - kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-34g-no-fixes-required-verdict-r — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-34g-no-fixes-required-verdict-r.md
+- kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-dar-verdict-ready-criticals-0-re — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-dar-verdict-ready-criticals-0-re.md
 - kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-dsv-zero-critical-h1-research-ma — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-dsv-zero-critical-h1-research-ma.md
 - kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-g9u-applied-the-single-review-fin — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-g9u-applied-the-single-review-fin.md
 - kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-w68-all-findings-fixed-before-the — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-w68-all-findings-fixed-before-the.md
@@ -946,6 +955,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/research-2026-11-25-ship-close-kaya-w68-commit-e78546885a-feat-publi — .wai/projects/kaya/research/2026-11-25-ship-close-kaya-w68-commit-e78546885a-feat-publi.md
 - kaya/Artifact/research-2026-11-25-ship-kaya-34g-data-only-dogfood-commit-ledger — .wai/projects/kaya/research/2026-11-25-ship-kaya-34g-data-only-dogfood-commit-ledger.md
 - kaya/Artifact/research-2026-11-25-ship-kaya-9w6-commit-2ad99853c7-feat-explain-r — .wai/projects/kaya/research/2026-11-25-ship-kaya-9w6-commit-2ad99853c7-feat-explain-r.md
+- kaya/Artifact/research-2026-11-25-ship-kaya-dar-commit-the-4-file-fix-pretender-to — .wai/projects/kaya/research/2026-11-25-ship-kaya-dar-commit-the-4-file-fix-pretender-to.md
 - kaya/Artifact/research-2026-11-25-ship-kaya-dsv-commit-14a01124f0-feat-explain-on — .wai/projects/kaya/research/2026-11-25-ship-kaya-dsv-commit-14a01124f0-feat-explain-on.md
 - kaya/Artifact/research-2026-11-25-ship-kaya-g9u-refactor-commit-src-main-rs-split — .wai/projects/kaya/research/2026-11-25-ship-kaya-g9u-refactor-commit-src-main-rs-split.md
 
@@ -960,6 +970,6 @@ Reader question: how is it structured and why
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_922 nodes from 1063 events._
+_932 nodes from 1073 events._
 
 <!-- kaya:end generated:publication.product.architecture-design -->
