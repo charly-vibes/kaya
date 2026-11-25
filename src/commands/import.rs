@@ -18,8 +18,8 @@ use kaya::ledger::{AppendOutcome, LABEL_ID_REUSE};
 use serde_json::json;
 
 use kaya::adapters::{
-    correction_generation, git, reobservation_correction, stored_correction_for, testrunner, turu,
-    wai,
+    correction_generation, git, latest_stored_same_identity, reobservation_correction,
+    root_observation, same_observation, stored_correction_for, testrunner, turu, wai,
 };
 
 use crate::{
@@ -58,6 +58,38 @@ pub(crate) fn cmd_import(source: ImportSource) -> Result<Envelope, Failure> {
     let mut duplicates = 0usize;
     let mut stored = ledger.read_recovered().map_err(ledger_failure)?.0;
     for event in &events {
+        if event.r#type.starts_with("capture.")
+            && let Some(prior) = latest_stored_same_identity(&stored, event)
+        {
+            if same_observation(prior, event) {
+                // A re-observation of a state the ledger already holds
+                // (e.g. mtime drift on a date-less artifact re-ids the
+                // event while its content stays put): skip as a
+                // duplicate.
+                duplicates += 1;
+                continue;
+            }
+            // A re-observation with changed content: supersede the
+            // root observation exactly as the id_reuse arm does for
+            // dated files (same salt inputs, so dated behavior stays
+            // byte-identical).
+            // Relies on the adapter emitting at most one event per
+            // stable identity per run (wai: one event per unique
+            // relative path), so `stored` needs no push on the plain
+            // append path below.
+            let root = root_observation(&stored, event).unwrap_or(prior);
+            let mut target = event.clone();
+            target.id = root.id.clone();
+            let generation = correction_generation(&stored, &target);
+            let correction = reobservation_correction(&target, generation);
+            let outcome = ledger.append(&correction).map_err(ledger_failure)?;
+            stored.push(correction);
+            match outcome {
+                AppendOutcome::Appended => appended += 1,
+                AppendOutcome::Duplicate => duplicates += 1,
+            }
+            continue;
+        }
         let outcome = match ledger.append(event) {
             Ok(outcome @ AppendOutcome::Appended) => outcome,
             Ok(_outcome @ AppendOutcome::Duplicate)

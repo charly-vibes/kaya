@@ -76,6 +76,63 @@ pub fn correction_generation(stored: &[Event], event: &Event) -> usize {
         .count()
 }
 
+/// The content-stable identity of a capture observation, if it has one.
+///
+/// Some only when the event's data carries a string `path` (the shape wai
+/// emits); the identity joins the actor name, subject id, data `kind`, and
+/// data `path`, so re-observations of the same artifact match regardless
+/// of the id their capture timestamp minted. Other event shapes have no
+/// stable identity and stay untouched by the import dedup path.
+pub fn stable_identity(event: &Event) -> Option<String> {
+    let path = event.data.get("path")?;
+    let path = path.as_str()?;
+    let kind = event.data["kind"].to_string();
+    Some(format!(
+        "{}\x1f{}\x1f{}\x1f{}",
+        event.actor.name, event.subject.id, kind, path
+    ))
+}
+
+/// Whether two observations report the same facts, ignoring correction links.
+///
+/// Compares each event's data with the `supersedes` key removed, so a
+/// correction and its target compare equal when nothing else changed.
+pub fn same_observation(stored: &Event, event: &Event) -> bool {
+    let strip = |event: &Event| {
+        let mut data = event.data.clone();
+        data.as_object_mut()
+            .expect("event data is a JSON object")
+            .remove("supersedes");
+        data
+    };
+    strip(stored) == strip(event)
+}
+
+/// The most recent stored event with the same stable identity as `event`.
+///
+/// Scans from the end, so the returned observation is the ledger's newest
+/// view of the artifact.
+pub fn latest_stored_same_identity<'a>(stored: &'a [Event], event: &Event) -> Option<&'a Event> {
+    let identity = stable_identity(event)?;
+    stored
+        .iter()
+        .rev()
+        .find(|stored_event| stable_identity(stored_event).as_deref() == Some(identity.as_str()))
+}
+
+/// The root (uncorrected) stored observation for `event`'s identity.
+///
+/// The first same-identity stored event whose data carries no `supersedes`
+/// key; corrections name this root id, keeping the supersede chain rooted
+/// at the original observation.
+pub fn root_observation<'a>(stored: &'a [Event], event: &Event) -> Option<&'a Event> {
+    let identity = stable_identity(event)?;
+    stored.iter().find(|stored_event| {
+        stable_identity(stored_event).as_deref() == Some(identity.as_str())
+            && stored_event.data.get("supersedes").is_none()
+    })
+}
+
 /// Failure class for an adapter run that must contribute no events.
 pub(crate) const LABEL_FAILURE_ATOMIC: &str = "kaya.adapters.failure_atomic";
 

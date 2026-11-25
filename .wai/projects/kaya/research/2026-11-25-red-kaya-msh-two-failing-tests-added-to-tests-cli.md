@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-25-kaya-msh-wai-adapter-idempotent-re-import, pipeline-step:red]
+---
+
+RED kaya-msh: two failing tests added to tests/cli_pipeline.rs beside the pinned re-import tests (325-460). Test 1 reimport_of_drifted_dateless_artifact_appends_nothing: date-less file, byte-identical content, mtime drifted via File::set_modified between imports - currently FAILS because timestamp_for mtime fallback (wai.rs:304) puts mtime in the identity, minting a new id appended as an uncorrected duplicate instead of appending 0/duplicates 1. Test 2 edited_dateless_artifact_supersedes_previous_observation: date-less file, heading edit + mtime drift - currently FAILS because the new id skips both the Duplicate arm and the id_reuse correction arm, appending a second observation with no data.supersedes. Both fail for the bug reason (uncorrected duplicates), pinning the ticket meter: append-then-reimport appends nothing (exit 0); edited record yields correction/supersede, never kaya.ledger.id_reuse.

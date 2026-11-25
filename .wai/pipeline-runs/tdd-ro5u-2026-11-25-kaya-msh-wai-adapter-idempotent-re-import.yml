@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-25-kaya-msh-wai-adapter-idempotent-re-import
+pipeline: tdd-ro5u
+topic: kaya-msh wai adapter idempotent re-import
+created_at: '2026-11-25T13:12:18.456488724+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-25T13:29:37.154327916+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

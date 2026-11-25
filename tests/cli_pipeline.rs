@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command as StdCommand;
+use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
 
 use kaya::projection::report::BRIEF_BLOCK;
@@ -472,6 +473,114 @@ fn corrected_state_revisit_mints_fresh_correction_and_replays_stable() {
         })
         .collect();
     assert_ne!(correction_ids[0], correction_ids[1]);
+}
+
+#[test]
+fn reimport_of_drifted_dateless_artifact_appends_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_wai_design(&dir, "design-notes.md");
+
+    let path = dir
+        .path()
+        .join(".wai")
+        .join("projects")
+        .join("kaya")
+        .join("designs")
+        .join("design-notes.md");
+
+    let first = assert_success(&import_wai(&dir));
+    assert_eq!(first["data"]["appended"], json!(1));
+
+    let before = ledger_lines(&dir);
+    assert_eq!(before.len(), 1, "one artifact yields one ledger line");
+
+    // Drift the mtime without touching a single byte: a date-less artifact's
+    // identity must not depend on the filesystem timestamp.
+    let file = fs::File::options().write(true).open(&path).unwrap();
+    file.set_modified(SystemTime::now() + Duration::from_secs(60))
+        .unwrap();
+
+    let second = assert_success(&import_wai(&dir));
+    assert_eq!(
+        second["data"]["appended"],
+        json!(0),
+        "drifted mtime alone must not mint a new event"
+    );
+    assert_eq!(second["data"]["duplicates"], json!(1));
+    let after = ledger_lines(&dir);
+    assert_eq!(after.len(), 1, "unchanged bytes append nothing");
+    assert_eq!(
+        after[0], before[0],
+        "the ledger is append-only: the original line is untouched"
+    );
+}
+
+#[test]
+fn edited_dateless_artifact_supersedes_previous_observation() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+    write_wai_design(&dir, "design-notes.md");
+
+    let path = dir
+        .path()
+        .join(".wai")
+        .join("projects")
+        .join("kaya")
+        .join("designs")
+        .join("design-notes.md");
+
+    let first = assert_success(&import_wai(&dir));
+    assert_eq!(first["data"]["appended"], json!(1));
+
+    let before = ledger_lines(&dir);
+    assert_eq!(before.len(), 1, "one artifact yields one ledger line");
+    let original: Value = serde_json::from_str(&before[0]).unwrap();
+    let original_id = original["id"].as_str().expect("event carries an id");
+
+    fs::write(&path, "# revised heading\n").unwrap();
+    let file = fs::File::options().write(true).open(&path).unwrap();
+    file.set_modified(SystemTime::now() + Duration::from_secs(60))
+        .unwrap();
+
+    let correction = assert_success(&import_wai(&dir));
+    assert_eq!(
+        correction["data"]["appended"],
+        json!(1),
+        "the correction appends exactly one line, never two"
+    );
+
+    let after = ledger_lines(&dir);
+    assert_eq!(after.len(), 2, "one observation and one correction");
+    assert_eq!(
+        after[0], before[0],
+        "the ledger is append-only: the original line is untouched"
+    );
+    let correction_event: Value = serde_json::from_str(&after[1]).unwrap();
+    let correction_id = correction_event["id"]
+        .as_str()
+        .expect("correction carries an id");
+    assert_ne!(
+        correction_id, original_id,
+        "a correction mints a fresh id, never reuses the original"
+    );
+    assert_eq!(
+        correction_event["data"]["supersedes"], original["id"],
+        "the correction points back at the record it replaces"
+    );
+    assert_eq!(
+        correction_event["data"]["title"],
+        json!("revised heading"),
+        "the title is the first # heading, minus its marker"
+    );
+
+    let replay = assert_success(&import_wai(&dir));
+    assert_eq!(replay["data"]["appended"], json!(0));
+    assert_eq!(
+        replay["data"]["duplicates"],
+        json!(1),
+        "the replay lands on the stored correction byte-identically"
+    );
 }
 
 #[test]
