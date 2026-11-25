@@ -108,6 +108,9 @@ enum Command {
         /// Accept an untracked ledger whose history git cannot verify
         #[arg(long)]
         allow_uncommitted: bool,
+        /// Walk each generated block beside its resolved provenance and human trail
+        #[arg(long)]
+        walk: bool,
     },
     /// Compose the client-facing publication tree from the compiled research
     Publish {
@@ -373,7 +376,8 @@ fn main() -> ExitCode {
             out,
             expect_digest,
             allow_uncommitted,
-        } => commands::publication::cmd_ir(&out, expect_digest.as_deref(), allow_uncommitted),
+            walk,
+        } => commands::publication::cmd_ir(&out, expect_digest.as_deref(), allow_uncommitted, walk),
         Command::Publish { out } => commands::publication::cmd_publish(&out),
         Command::Check {
             root,
@@ -655,9 +659,9 @@ fn read_document(path: &Path) -> Result<Option<String>, Failure> {
 /// Accumulates the document sources and rendered blocks the IR materializes
 /// from.
 #[derive(Default)]
-struct IrCollector {
-    sources: Vec<ir::SourceDocument>,
-    rendered: Vec<ir::RenderedDocument>,
+pub(crate) struct IrCollector {
+    pub(crate) sources: Vec<ir::SourceDocument>,
+    pub(crate) rendered: Vec<ir::RenderedDocument>,
 }
 
 impl IrCollector {

@@ -12,6 +12,8 @@
 //! its own generated blocks — the authored answers and a foreign tool's
 //! managed block survive byte for byte.
 
+use kaya::impact::dependency_digest;
+use kaya::projection::ir::{Record, RecordKind};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -724,5 +726,411 @@ fn committed_ledger_builds_without_the_uncommitted_flag() {
     assert!(
         has_node_count_line(generated_index),
         "the generated map ends with its `_N nodes from M events._` summary: {generated_index}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// kaya-l46: dispositions bind evidence digests; `kaya ir --walk` explains.
+// ---------------------------------------------------------------------------
+
+/// The authored region the l46 fixture seeds into the research index; a
+/// record with a citation, so its dependency digest is content-bearing.
+const L46_AUTHORED_RECORD: &str = "docs/research/index.md#authored";
+
+/// The generated research-map block the build appends to the index.
+const L46_GENERATED_RECORD: &str = "docs/research/index.md#orientation.research-map";
+
+/// The map block's rendered body opens with the Relationships heading.
+const L46_BLOCK_BODY_TEXT: &str = "### Relationships\\n";
+
+/// A disposable workspace seeded like `committed_ledger_builds_without_the_
+/// uncommitted_flag`, plus an authored region citing a seed event so the
+/// index carries one content-bearing record after the build.
+struct L46Fixture {
+    workspace: TempDir,
+    /// The seed event id the authored region cites.
+    cited: String,
+    /// A different seed event id, for mutating the citation later.
+    second: String,
+}
+
+impl L46Fixture {
+    fn new() -> Self {
+        let workspace = TempDir::new().expect("temp workspace");
+        let root = workspace.path();
+        let manifest = manifest_dir();
+
+        git(root, &["init", "--quiet"]);
+        let init = run_kaya(root, &["init"]);
+        assert_eq!(init["envelope_kind"], json!("init"));
+        copy_seed(root, &manifest);
+        run_kaya(root, &["import", "model", "--file", SEED]);
+
+        let seed_events = ledger_events(root);
+        let cited = seed_events[0]["id"]
+            .as_str()
+            .expect("a seed event id")
+            .to_owned();
+        let second = seed_events[1]["id"]
+            .as_str()
+            .expect("a seed event id")
+            .to_owned();
+        let index = root.join(INDEX);
+        fs::create_dir_all(index.parent().expect("the index has a parent"))
+            .expect("create research directory");
+        fs::write(
+            &index,
+            format!(
+                "# Research index\n\n\
+                 <!-- kaya:authored -->\n\
+                 Authored interpretation of the compiled record.\n\
+                 <!-- kaya:cites {cited} -->\n\
+                 <!-- kaya:end authored -->\n"
+            ),
+        )
+        .expect("seed the authored research index");
+
+        git(root, &["add", "--all"]);
+        git(
+            root,
+            &["commit", "--quiet", "--message", "seed the workspace"],
+        );
+        run_kaya(root, &["build"]);
+
+        Self {
+            workspace,
+            cited,
+            second,
+        }
+    }
+
+    fn root(&self) -> PathBuf {
+        self.workspace.path().to_path_buf()
+    }
+}
+
+/// Every ledger event, one JSON value per line.
+fn ledger_events(root: &Path) -> Vec<Value> {
+    let text = fs::read_to_string(root.join(LEDGER)).expect("the ledger is readable");
+    text.lines()
+        .map(|line| {
+            serde_json::from_str(line)
+                .unwrap_or_else(|error| panic!("a ledger line is one JSON event ({error}): {line}"))
+        })
+        .collect()
+}
+
+/// The IR record behind `ir_json`, rebuilt for `dependency_digest`.
+///
+/// The digest covers only the record's id, cited event ids, and artifact
+/// references, so the untouched kind placeholder never changes the result.
+fn l46_record(ir_json: &Value, id: &str) -> Record {
+    let entry = &ir_json["data"]["records"][id];
+    assert!(
+        entry.is_object(),
+        "the IR materializes record {id}: {ir_json}"
+    );
+    let strings = |field: &str| -> Vec<String> {
+        entry[field]
+            .as_array()
+            .map(|items| {
+                items
+                    .iter()
+                    .map(|item| item.as_str().expect("a string id").to_owned())
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    Record {
+        id: id.to_owned(),
+        kind: RecordKind::AuthoredBlock,
+        content_hash: String::new(),
+        provenance: strings("provenance"),
+        cites: strings("cites"),
+        artifacts: strings("artifacts"),
+        contains: strings("contains"),
+    }
+}
+
+/// Every object in `value` for which `keep` holds, searched recursively.
+fn objects_where(value: &Value, keep: &dyn Fn(&Value) -> bool) -> Vec<Value> {
+    let mut found = Vec::new();
+    fn walk(value: &Value, keep: &dyn Fn(&Value) -> bool, found: &mut Vec<Value>) {
+        if keep(value) {
+            found.push(value.clone());
+        }
+        match value {
+            Value::Array(items) => {
+                for item in items {
+                    walk(item, keep, found);
+                }
+            }
+            Value::Object(map) => {
+                for item in map.values() {
+                    walk(item, keep, found);
+                }
+            }
+            _ => {}
+        }
+    }
+    walk(value, keep, &mut found);
+    found
+}
+
+/// Record a human `reviewed` disposition for the fixture's authored record.
+fn l46_review_authored(root: &Path) -> Value {
+    run_kaya(
+        root,
+        &[
+            "disposition",
+            L46_AUTHORED_RECORD,
+            "reviewed",
+            "--actor",
+            "alice",
+        ],
+    )
+}
+
+/// Run `kaya ir --walk`, requiring exit 0 and an ok envelope; a refusal
+/// panics naming the refusal message.
+#[track_caller]
+fn run_kaya_walk(root: &Path) -> Value {
+    let output = AssertCommand::cargo_bin("kaya")
+        .expect("kaya binary is built")
+        .current_dir(root)
+        .args(["ir", "--walk"])
+        .output()
+        .expect("kaya runs");
+    let envelope: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "kaya ir --walk did not print one JSON envelope ({error}): {}",
+            String::from_utf8_lossy(&output.stdout)
+        )
+    });
+    assert!(
+        output.status.success() && envelope["ok"] == json!(true),
+        "kaya ir --walk must run: {}{}",
+        envelope["error"]["message"].as_str().unwrap_or(""),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    envelope
+}
+
+/// A `reviewed` disposition binds the record's evidence digest, and a
+/// `waived` disposition keeps binding rationale and digest as before.
+#[test]
+fn reviewed_disposition_binds_evidence_digest() {
+    let fixture = L46Fixture::new();
+    let root = fixture.root();
+
+    let ir = run_kaya(root.as_path(), &["ir"]);
+    let expected = dependency_digest(&l46_record(&ir, L46_AUTHORED_RECORD));
+
+    let review = l46_review_authored(&root);
+    assert_eq!(
+        review["data"]["event"]["type"],
+        json!("verification.record.reviewed"),
+        "the review is a verification.record.reviewed event: {review}"
+    );
+    assert_eq!(
+        review["data"]["event"]["data"]["digest"],
+        json!(expected),
+        "a reviewed disposition binds the dependency digest of its record: {review}"
+    );
+    let ledger = ledger_events(&root);
+    let recorded = ledger
+        .iter()
+        .find(|event| event["type"] == json!("verification.record.reviewed"))
+        .expect("the ledger records the review");
+    assert_eq!(
+        recorded["data"],
+        json!({
+            "record": L46_AUTHORED_RECORD,
+            "disposition": "reviewed",
+            "digest": expected,
+        }),
+        "the appended review event carries record, disposition, and digest"
+    );
+
+    // Unchanged guard: waivers still bind rationale and digest.
+    let waiver = run_kaya(
+        root.as_path(),
+        &[
+            "disposition",
+            L46_GENERATED_RECORD,
+            "waived",
+            "--rationale",
+            "accepted risk",
+            "--actor",
+            "bob",
+        ],
+    );
+    let waived_digest = dependency_digest(&l46_record(&ir, L46_GENERATED_RECORD));
+    assert_eq!(
+        waiver["data"]["event"]["data"],
+        json!({
+            "record": L46_GENERATED_RECORD,
+            "disposition": "waived",
+            "rationale": "accepted risk",
+            "digest": waived_digest,
+        }),
+        "the waiver still binds its rationale and dependency digest: {waiver}"
+    );
+}
+
+/// `kaya ir --walk` resolves provenance and the human trail; staleness
+/// shows the moment the record's backing input changes without a re-review.
+#[test]
+fn ir_walk_resolves_provenance_and_trail() {
+    let fixture = L46Fixture::new();
+    let root = fixture.root();
+
+    l46_review_authored(&root);
+    let ir = run_kaya(root.as_path(), &["ir"]);
+    let reviewed_digest = dependency_digest(&l46_record(&ir, L46_AUTHORED_RECORD));
+    let provenance_id = ir["data"]["records"][L46_GENERATED_RECORD]["provenance"][0]
+        .as_str()
+        .expect("the research map cites at least one backing event id")
+        .to_owned();
+    let backing = ledger_events(&root)
+        .into_iter()
+        .find(|event| event["subject"]["id"] == json!(provenance_id))
+        .expect("the provenance node id names a ledger subject");
+    let backing_type = backing["type"].as_str().expect("an event type");
+    let backing_actor = backing["actor"]["name"].as_str().expect("an actor name");
+
+    let walk = run_kaya_walk(&root);
+    let rendered = serde_json::to_string(&walk["data"]).expect("the walk serializes");
+
+    // The walk carries the block body a human checks.
+    assert!(
+        rendered.contains(L46_BLOCK_BODY_TEXT),
+        "the walk emits the rendered block body ({L46_BLOCK_BODY_TEXT:?}): {rendered}"
+    );
+    // The walk resolves each provenance id to its event summary.
+    let resolved = objects_where(&walk["data"], &|value: &Value| {
+        value["id"] == json!(provenance_id)
+    });
+    assert!(
+        !resolved.is_empty(),
+        "the walk resolves provenance id {provenance_id}: {rendered}"
+    );
+    assert!(
+        resolved
+            .iter()
+            .any(|entry| entry["type"] == json!(backing_type)),
+        "the resolved provenance names the backing event type {backing_type}: {resolved:?}"
+    );
+    assert!(
+        rendered.contains(backing_actor),
+        "the resolved provenance names the backing actor {backing_actor}: {rendered}"
+    );
+    // The walk reports the human trail with freshness.
+    let fresh_trail = objects_where(&walk["data"], &|value: &Value| {
+        value["disposition"] == json!("reviewed")
+            && value["actor"] == json!("alice")
+            && value["digest"] == json!(reviewed_digest)
+            && value["fresh"] == json!(true)
+    });
+    assert!(
+        !fresh_trail.is_empty(),
+        "the walk reports the reviewed trail fresh: {rendered}"
+    );
+
+    // Change the record's backing input without a re-review: the same trail
+    // entry now reports stale.
+    let index = root.join(INDEX);
+    let before = fs::read_to_string(&index).expect("the built index exists");
+    let after = before.replace(&fixture.cited, &fixture.second);
+    assert_ne!(after, before, "the fixture citation changes");
+    fs::write(&index, after).expect("rewrite the citation");
+
+    let stale_walk = run_kaya_walk(&root);
+    let stale_trail = objects_where(&stale_walk["data"], &|value: &Value| {
+        value["disposition"] == json!("reviewed")
+            && value["actor"] == json!("alice")
+            && value["digest"] == json!(reviewed_digest)
+            && value["fresh"] == json!(false)
+    });
+    assert!(
+        !stale_trail.is_empty(),
+        "the walk reports the reviewed trail stale after the backing input changed: {stale_walk}"
+    );
+}
+
+/// Guard: plain `kaya ir` keeps its shape and never carries walk-only
+/// trail or freshness fields.
+#[test]
+fn ir_plain_output_unchanged() {
+    let fixture = L46Fixture::new();
+    let root = fixture.root();
+
+    l46_review_authored(&root);
+    let plain = run_kaya(root.as_path(), &["ir"]);
+    let rendered = serde_json::to_string(&plain["data"]).expect("the IR serializes");
+
+    assert!(
+        plain["data"]["records"].is_object(),
+        "plain ir still materializes records: {plain}"
+    );
+    assert!(
+        !rendered.contains("\"fresh\""),
+        "plain ir carries no walk-only freshness fields: {rendered}"
+    );
+    assert!(
+        !rendered.contains("\"disposition\""),
+        "plain ir carries no walk-only trail fields: {rendered}"
+    );
+    assert!(
+        !rendered.contains("\"trail\""),
+        "plain ir carries no trail key: {rendered}"
+    );
+}
+
+/// An acknowledgement names the document and carries the block in its data,
+/// so `kaya ir --walk` still finds it for the record it covers: the trail
+/// entry carries no digest and no freshness verdict.
+#[test]
+fn ir_walk_includes_acknowledged_blocks() {
+    let fixture = L46Fixture::new();
+    let root = fixture.root();
+
+    let acknowledged = run_kaya(
+        root.as_path(),
+        &[
+            "acknowledge",
+            INDEX,
+            "--block",
+            "authored-1",
+            "--events",
+            fixture.cited.as_str(),
+            "--actor",
+            "carol",
+        ],
+    );
+    assert_eq!(
+        acknowledged["data"]["appended"],
+        json!(true),
+        "the acknowledgment appends its event: {acknowledged}"
+    );
+
+    let walk = run_kaya_walk(&root);
+    let authored = objects_where(&walk["data"], &|value: &Value| {
+        value["id"] == json!(L46_AUTHORED_RECORD)
+    });
+    assert_eq!(
+        authored.len(),
+        1,
+        "the walk lists the authored record once: {walk}"
+    );
+    assert_eq!(
+        authored[0]["trail"],
+        json!([{
+            "actor": "carol",
+            "disposition": "acknowledged",
+            "digest": Value::Null,
+            "fresh": Value::Null,
+        }]),
+        "the acknowledged block's trail carries the acknowledgement entry: {walk}"
     );
 }

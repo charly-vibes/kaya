@@ -99,7 +99,7 @@ pub(crate) fn cmd_impact(
 ///
 /// The record must exist in the current IR; the event names it with the
 /// subject typed Document, carries the actor and, for a waiver, the
-/// rationale and the dependency digest the waiver binds. Refusals happen
+/// rationale; both dispositions bind the dependency digest of the record. Refusals happen
 /// before any append, so a refused decision appends nothing.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_disposition(
@@ -148,15 +148,16 @@ pub(crate) fn cmd_disposition(
             ),
         )
     })?;
+    // Both dispositions bind the digest of the record as materialized now,
+    // so a later walk can tell whether the human decision still covers the
+    // evidence it was recorded against.
     let digest = impact::dependency_digest(record);
 
     let mut data = json!({ "record": record_id, "disposition": kind });
     if let Some(rationale) = rationale {
         data["rationale"] = json!(rationale);
     }
-    if waived {
-        data["digest"] = json!(digest);
-    }
+    data["digest"] = json!(digest);
 
     let existing = events.iter().find(|event| {
         event.r#type == event_type

@@ -19,10 +19,11 @@ use std::process::ExitCode;
 
 use kaya::envelope::Envelope;
 use kaya::event::Event;
+use kaya::impact;
 use kaya::ledger::changed_event_ids;
 use kaya::model::{self, EntityType};
 use kaya::projection::{
-    ProjectionError, StaleBlock, Summary, index, render_invocations, report, reuse, state,
+    ProjectionError, StaleBlock, Summary, index, ir, render_invocations, report, reuse, state,
 };
 use kaya::promotion::PromotionState;
 use kaya::publication;
@@ -357,16 +358,220 @@ pub(crate) fn cmd_ir(
     out: &Path,
     expect_digest: Option<&str>,
     allow_uncommitted: bool,
+    walk: bool,
 ) -> Result<Envelope, Failure> {
     let (events, _) = read_build_ledger(expect_digest, allow_uncommitted)?;
-    let (document_ir, _) = collect_document_ir(out, &events)?;
-    let payload = serde_json::to_value(&document_ir).map_err(|error| {
-        failure(
-            "ir-serialize",
-            format!("failed to serialize the document IR: {error}"),
-        )
-    })?;
-    Ok(Envelope::ok("ir", payload))
+    let (document_ir, collector) = collect_document_ir(out, &events)?;
+    if !walk {
+        let payload = serde_json::to_value(&document_ir).map_err(|error| {
+            failure(
+                "ir-serialize",
+                format!("failed to serialize the document IR: {error}"),
+            )
+        })?;
+        return Ok(Envelope::ok("ir", payload));
+    }
+    Ok(Envelope::ok(
+        "ir",
+        walk_payload(&document_ir, &collector, &events),
+    ))
+}
+
+/// One trail entry of the walk: the human verification behind a record and
+/// whether the decision still covers the record's evidence as it now stands.
+///
+/// `fresh` is `null` — unknown, never false — when the event carries no
+/// digest to compare, as acknowledgements and legacy reviews never do.
+fn trail_entry(event: &Event, current_digest: Option<&str>) -> serde_json::Value {
+    let event_digest = event.data.get("digest").and_then(|d| d.as_str());
+    let fresh = match (event_digest, current_digest) {
+        (Some(recorded), Some(current)) => serde_json::Value::Bool(recorded == current),
+        _ => serde_json::Value::Null,
+    };
+    json!({
+        "actor": event.actor.name,
+        "disposition": event
+            .data
+            .get("disposition")
+            .and_then(|d| d.as_str())
+            .unwrap_or("acknowledged"),
+        "digest": event_digest,
+        "fresh": fresh,
+    })
+}
+
+/// Events sharing one key — a subject id or an event id — each with its
+/// ledger position, in ledger append order.
+type EventIndex<'a> = BTreeMap<&'a str, Vec<(usize, &'a Event)>>;
+
+/// The verification events for one record, in ledger order: reviews and
+/// waivers whose subject names the record, plus — for records that name a
+/// block — acknowledgements of that block. An acknowledgement names the
+/// document in its subject and carries the block in `data.block`, so it never
+/// matches by subject id alone.
+fn record_trail<'a>(by_subject: &EventIndex<'a>, record_id: &str) -> Vec<&'a Event> {
+    let mut trail: Vec<(usize, &'a Event)> = by_subject
+        .get(record_id)
+        .into_iter()
+        .flatten()
+        .filter(|(_, event)| {
+            event.subject.r#type == report::DOCUMENT_SUBJECT
+                && matches!(
+                    event.r#type.as_str(),
+                    impact::REVIEWED_EVENT | impact::WAIVED_EVENT
+                )
+        })
+        .cloned()
+        .collect();
+    if let Some((document, block)) = record_id.rsplit_once('#') {
+        // The IR names the first authored block `authored` while the ledger's
+        // acknowledgments carry the document-ordinal spelling `authored-1`;
+        // every later ordinal is spelled the same way, so a record matches the
+        // acknowledgment of its block under either form of its own name.
+        let names: &[&str] = if block == "authored" {
+            &["authored", "authored-1"]
+        } else {
+            &[block]
+        };
+        trail.extend(
+            by_subject
+                .get(document)
+                .into_iter()
+                .flatten()
+                .filter(|(_, event)| {
+                    event.r#type == report::ACKNOWLEDGED_EVENT
+                        && event.subject.r#type == report::DOCUMENT_SUBJECT
+                        && report::document_label(&event.subject.id)
+                            == report::document_label(document)
+                        && event
+                            .data
+                            .get("block")
+                            .and_then(|b| b.as_str())
+                            .is_some_and(|ack_block| names.contains(&ack_block))
+                })
+                .cloned(),
+        );
+    }
+    trail.sort_unstable_by_key(|(position, _)| *position);
+    trail.into_iter().map(|(_, event)| event).collect()
+}
+
+/// Resolve one provenance id against the ledger: the latest event whose
+/// subject it names — a superseded origin resolves to its successor — or,
+/// failing that, the latest event with that id; an id the ledger does not
+/// know stays unresolved.
+fn resolve_provenance<'a>(
+    by_subject: &EventIndex<'a>,
+    by_id: &EventIndex<'a>,
+    id: &str,
+) -> serde_json::Value {
+    let event = by_subject
+        .get(id)
+        .and_then(|events| events.last())
+        .or_else(|| by_id.get(id).and_then(|events| events.last()))
+        .map(|(_, event)| *event);
+    let Some(event) = event else {
+        return json!({ "id": id, "unresolved": true });
+    };
+    json!({
+        "id": id,
+        "type": event.r#type,
+        "subject": event.subject,
+        "actor": {
+            "name": event.actor.name,
+            "type": event.actor.r#type,
+        },
+        "timestamp": event.timestamp,
+    })
+}
+
+/// The walk envelope: every generated block beside its resolved provenance
+/// and the human trail of the record that owns it, plus the trails of the
+/// document's other records — the records that carry trail events and own no
+/// rendered block, such as the authored regions.
+fn walk_payload(
+    document_ir: &ir::DocumentIr,
+    collector: &crate::IrCollector,
+    events: &[Event],
+) -> serde_json::Value {
+    // Index the ledger once per walk: every trail and provenance lookup below
+    // is a map hit, and each vec keeps ledger append order, so its last
+    // element is the latest event for the key.
+    let mut by_subject: EventIndex<'_> = BTreeMap::new();
+    let mut by_id: EventIndex<'_> = BTreeMap::new();
+    for (position, event) in events.iter().enumerate() {
+        by_subject
+            .entry(event.subject.id.as_str())
+            .or_default()
+            .push((position, event));
+        by_id
+            .entry(event.id.as_str())
+            .or_default()
+            .push((position, event));
+    }
+
+    let documents: Vec<serde_json::Value> = collector
+        .rendered
+        .iter()
+        .map(|document| {
+            let blocks: Vec<serde_json::Value> = document
+                .blocks
+                .iter()
+                .map(|block| {
+                    let record_id = format!("{}#{}", document.path, block.name);
+                    let current = document_ir
+                        .records
+                        .get(&record_id)
+                        .map(impact::dependency_digest);
+                    let trail: Vec<serde_json::Value> = record_trail(&by_subject, &record_id)
+                        .into_iter()
+                        .map(|event| trail_entry(event, current.as_deref()))
+                        .collect();
+                    json!({
+                        "name": block.name,
+                        "body": block.body,
+                        "provenance": block
+                            .provenance
+                            .iter()
+                            .map(|id| resolve_provenance(&by_subject, &by_id, id))
+                            .collect::<Vec<_>>(),
+                        "trail": trail,
+                    })
+                })
+                .collect();
+            // Records of this document that carry trail events and own no
+            // rendered block.
+            let prefix = format!("{}#", document.path);
+            let owned: BTreeSet<String> = document
+                .blocks
+                .iter()
+                .map(|block| format!("{}#{}", document.path, block.name))
+                .collect();
+            let records: Vec<serde_json::Value> = document_ir
+                .records
+                .keys()
+                .filter(|id| id.starts_with(&prefix) && !owned.contains(id.as_str()))
+                .filter_map(|id| {
+                    let trail = record_trail(&by_subject, id);
+                    if trail.is_empty() {
+                        return None;
+                    }
+                    let current = document_ir.records.get(id).map(impact::dependency_digest);
+                    let trail: Vec<serde_json::Value> = trail
+                        .into_iter()
+                        .map(|event| trail_entry(event, current.as_deref()))
+                        .collect();
+                    Some(json!({ "id": id, "trail": trail }))
+                })
+                .collect();
+            json!({
+                "path": document.path,
+                "blocks": blocks,
+                "records": records,
+            })
+        })
+        .collect();
+    json!({ "documents": documents })
 }
 
 /// Compose the twelve declared products and both declared packages over the

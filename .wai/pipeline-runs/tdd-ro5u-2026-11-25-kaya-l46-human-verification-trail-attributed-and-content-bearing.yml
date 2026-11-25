@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-25-kaya-l46-human-verification-trail-attributed-and-content-bearing
+pipeline: tdd-ro5u
+topic: kaya-l46 human verification trail attributed and content-bearing
+created_at: '2026-11-25T14:45:47.988579145+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-25T15:14:46.543584444+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []
