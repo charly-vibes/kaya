@@ -93,11 +93,16 @@ const CELLS: [(Mutation, Profile); 10] = [
 #[hegel::test]
 fn status_build_envelope_parity(_tc: TestCase) {
     for &(mutation, profile) in &CELLS {
-        run_cell(mutation, profile);
+        let (accepts, build_digest) = run_cell(mutation, profile);
+        assert_eq!(
+            build_digest.is_null(),
+            !accepts,
+            "cell {mutation:?} × {profile:?}: accepted builds carry a ledger digest, refused builds carry none"
+        );
     }
 }
 
-fn run_cell(mutation: Mutation, profile: Profile) {
+fn run_cell(mutation: Mutation, profile: Profile) -> (bool, serde_json::Value) {
     let ws = tempfile::tempdir().expect("workspace tempdir");
     let out = tempfile::tempdir().expect("build --out tempdir");
     let ledger_path = ws.path().join(LEDGER);
@@ -193,6 +198,7 @@ fn run_cell(mutation: Mutation, profile: Profile) {
             "cell {mutation:?} × {profile:?}: refusal must carry a non-empty error.label"
         );
     }
+    (accepts, build["data"]["ledger_digest"].clone())
 }
 
 // ---- seeding ------------------------------------------------------------

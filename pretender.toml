@@ -23,6 +23,16 @@ exclude = [
     "target/**",
     ".wai/**",
     "docs/book/**",
+    "book/**",
+    # pretender 0.7.0 collect_path matches exclude globs against
+    # walk-relative paths ("./target/..."), so every rooted pattern also
+    # needs a "./"-prefixed twin for default scans (kaya-dar).
+    "./vendor/**",
+    "./node_modules/**",
+    "./target/**",
+    "./.wai/**",
+    "./docs/book/**",
+    "./book/**",
 ]
 
 [roles]

@@ -443,6 +443,11 @@ fn dependents_found() {
     stage(root, &[INDEX]);
 
     let envelope = gate_failing(root, &["impact", "--staged"]);
+    assert_eq!(
+        envelope["ok"],
+        json!(true),
+        "impact gate ran to a valid envelope"
+    );
     let edge = json!({ "edge": format!("path:{DOC}") });
     assert_impacted(&envelope, RECORD_AUTHORED, edge.clone());
     assert_impacted(&envelope, RECORD_DOCTEST, edge.clone());

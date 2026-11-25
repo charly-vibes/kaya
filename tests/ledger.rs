@@ -768,6 +768,14 @@ fn mutual_supersedes_cycle_is_refused() {
         json!({"passed": 4, "supersedes": FIRST}),
     );
     assert_supersedes_refused(&mut ledger, &path, &b);
+    assert_eq!(
+        fs::read_to_string(&path)
+            .expect("ledger reads")
+            .lines()
+            .count(),
+        1,
+        "refusal leaves only the stored line"
+    );
 }
 
 #[test]
