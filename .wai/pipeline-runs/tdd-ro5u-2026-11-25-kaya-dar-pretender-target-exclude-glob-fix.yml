@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-25-kaya-dar-pretender-target-exclude-glob-fix
+pipeline: tdd-ro5u
+topic: kaya-dar pretender target exclude glob fix
+created_at: '2026-11-25T12:38:23.669460338+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-25T12:47:56.050960951+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []
