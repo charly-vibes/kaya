@@ -7,11 +7,11 @@ Reader question: how is it structured and why
 
 ### Decisions
 
-- kaya/Decision/2026-11-25-05000531 — 2026-11-25-05000531
-- kaya/Decision/2026-11-25-0c7dd16e — 2026-11-25-0c7dd16e
-- kaya/Decision/2026-11-25-9806082e — 2026-11-25-9806082e
-- kaya/Decision/2026-11-25-a6d6cf17 — 2026-11-25-a6d6cf17
-- kaya/Decision/2026-11-25-e1533efd — 2026-11-25-e1533efd
+- kaya/Decision/2026-11-25-05000531 — Ledger event ids are content-derived and never reused; corrections append superseding events instead of rewriting, and the wai adapter skips unchanged artifacts on re-import so replays stay idempotent.
+- kaya/Decision/2026-11-25-0c7dd16e — Content-derived artifact attributes (title, title_digest) never feed the event id, so re-observing an edited artifact keeps its identity while the title moves.
+- kaya/Decision/2026-11-25-9806082e — Conclusions stay proposals until a human promotes them; promotion is the only path from assertion to established fact, so the record cannot self-establish.
+- kaya/Decision/2026-11-25-a6d6cf17 — Release claims are checked mechanically: the status document must agree with the Cargo.toml version, so shipped docs cannot drift from the manifest.
+- kaya/Decision/2026-11-25-e1533efd — A publication product without a populated backing block is omitted and reported with reason no-backing-document; the tree never carries stub pages, so absence is always truthful.
 
 ### Evidence
 
@@ -30,18 +30,18 @@ Reader question: how is it structured and why
 ### orientation.research-map
 
 ### Relationships
-- kaya/Hypothesis/H-001 -[predicts]-> kaya/Experiment/add-core-research-record
-- kaya/Model/M-001 -[realizes]-> kaya/Hypothesis/H-001
-- kaya/Question/mvp-1-acceptance -[investigates]-> kaya/Experiment/add-core-research-record
+- kaya/Hypothesis/H-001 (development artifacts can compile into a trustworthy research dossier) -[predicts]-> kaya/Experiment/add-core-research-record (add-core-research-record)
+- kaya/Model/M-001 (event-sourced documentation compiler) -[realizes]-> kaya/Hypothesis/H-001 (development artifacts can compile into a trustworthy research dossier)
+- kaya/Question/mvp-1-acceptance (mvp-1-acceptance) -[investigates]-> kaya/Experiment/add-core-research-record (add-core-research-record)
 
 ### Isolated
-- kaya/Decision/2026-11-25-05000531 — Decision — 2026-11-25-05000531
-- kaya/Decision/2026-11-25-0c7dd16e — Decision — 2026-11-25-0c7dd16e
-- kaya/Decision/2026-11-25-9806082e — Decision — 2026-11-25-9806082e
-- kaya/Decision/2026-11-25-a6d6cf17 — Decision — 2026-11-25-a6d6cf17
-- kaya/Decision/2026-11-25-e1533efd — Decision — 2026-11-25-e1533efd
-- kaya/Finding/2026-11-25-121fc9ca — Finding — 2026-11-25-121fc9ca
-- kaya/Finding/2026-11-25-5be3a163 — Finding — 2026-11-25-5be3a163
+- kaya/Decision/2026-11-25-05000531 — Decision — Ledger event ids are content-derived and never reused; corrections append superseding events instead of rewriting, and the wai adapter skips unchanged artifacts on re-import so replays stay idempotent.
+- kaya/Decision/2026-11-25-0c7dd16e — Decision — Content-derived artifact attributes (title, title_digest) never feed the event id, so re-observing an edited artifact keeps its identity while the title moves.
+- kaya/Decision/2026-11-25-9806082e — Decision — Conclusions stay proposals until a human promotes them; promotion is the only path from assertion to established fact, so the record cannot self-establish.
+- kaya/Decision/2026-11-25-a6d6cf17 — Decision — Release claims are checked mechanically: the status document must agree with the Cargo.toml version, so shipped docs cannot drift from the manifest.
+- kaya/Decision/2026-11-25-e1533efd — Decision — A publication product without a populated backing block is omitted and reported with reason no-backing-document; the tree never carries stub pages, so absence is always truthful.
+- kaya/Finding/2026-11-25-121fc9ca — Finding — The omission machinery was honest about absence but silent about the unblock path; the admission table and feeder rules were source-code-only knowledge until kaya explain made them first-class CLI answers.
+- kaya/Finding/2026-11-25-5be3a163 — Finding — Doc audit 2026-11-24: the kaya-managed human surface was navigational, not explanatory - getting-started and reference were citation stubs, five products and two collections had no backing documents, and newcomer comprehension flowed around kaya through README and openspec specs.
 
 ### Artifacts
 - kaya/Artifact/0029641 — 0029641f432c4e38e55934810af318ffa8025e0f

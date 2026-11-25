@@ -142,12 +142,14 @@ fn lists(names: &[String], expected: &str) -> bool {
 
 /// Relationships the committed model seed declares, as the map renders them.
 ///
-/// Line shape: `- <from> -[<relationship>]-> <to>`, sorted by
-/// `(from, relationship, to)`.
+/// Edge signature: `-[<relationship>]-> <to>`, unique per declared edge.
+/// Endpoint ids stay asserted separately (EXPERIMENT/QUESTION/HYPOTHESIS);
+/// the match starts at the marker because endpoint labels are appended after
+/// each id, so a pin beginning at `- <from>` would split mid-row.
 const COMMITTED_EDGES: [&str; 3] = [
-    "- kaya/Hypothesis/H-001 -[predicts]-> kaya/Experiment/add-core-research-record",
-    "- kaya/Model/M-001 -[realizes]-> kaya/Hypothesis/H-001",
-    "- kaya/Question/mvp-1-acceptance -[investigates]-> kaya/Experiment/add-core-research-record",
+    "-[predicts]-> kaya/Experiment/add-core-research-record",
+    "-[realizes]-> kaya/Hypothesis/H-001",
+    "-[investigates]-> kaya/Experiment/add-core-research-record",
 ];
 
 /// Whether `document` carries the map's trailing `_N nodes from M events._` line.

@@ -351,7 +351,9 @@ pub(crate) fn key(node: &Node) -> String {
 
 /// A node's single-line title, or the key segment of its id when untitled.
 pub(crate) fn title_or_key(node: &Node) -> String {
-    attribute(node, "title").unwrap_or_else(|| key(node))
+    attribute(node, "title")
+        .or_else(|| attribute(node, "text"))
+        .unwrap_or_else(|| key(node))
 }
 
 /// A repo file reference as `path@commit`, pinned to the recorded revision.

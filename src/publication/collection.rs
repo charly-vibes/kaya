@@ -123,8 +123,11 @@ fn render_topic_map(docs: &Documents, map_owner: Option<&str>) -> Option<String>
         let Some((relationship, to)) = rest.split_once("]->") else {
             continue;
         };
-        let from = from.trim();
-        let to = to.trim();
+        // Labeled rows carry a human title after the id (`kaya/Decision/keep
+        // (keep the gate)`); node ids contain neither whitespace nor parens,
+        // so the label suffix is stripped before the id is indexed.
+        let from = from.split(" (").next().unwrap_or(from).trim();
+        let to = to.split(" (").next().unwrap_or(to).trim();
         let relationship = relationship.trim();
         edges.push((from, relationship, to));
         let (_, rels) = topic_row(&mut topics, from);

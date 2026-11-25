@@ -18,6 +18,10 @@ use crate::projection::{BlockKind, scan};
 
 use super::error::PublicationError;
 
+/// The research-map document kind, the only block whose rows carry
+/// parenthesized labels.
+const MAP_KIND: &str = "orientation.research-map";
+
 /// The closed document vocabulary an admission row may name, and the list
 /// the glossary collection page renders.
 pub const DOCUMENT_KINDS: [&str; 11] = [
@@ -171,7 +175,16 @@ fn collect_documents(
         {
             continue;
         }
-        let event_ids = node_ids(&block.body);
+        let event_ids = if name == MAP_KIND {
+            // The research map's rows carry human labels in parentheses; their
+            // prose may name other node ids that are not topics of this map,
+            // so the parenthesized groups are stripped before the census.
+            // Other blocks carry no such labels and are tokenized verbatim.
+            let census_body = strip_paren_groups(&block.body);
+            node_ids(&census_body)
+        } else {
+            node_ids(&block.body)
+        };
         documents.insert(
             name.clone(),
             DocumentRef {
@@ -182,6 +195,25 @@ fn collect_documents(
         );
     }
     Ok(())
+}
+
+/// The body with every balanced parenthesized group removed.
+///
+/// Row labels wrap their human prose in parentheses; stripping the groups
+/// keeps the census to the node ids the rows actually name. Depth-counted,
+/// so nested groups are handled and unbalanced text passes through.
+fn strip_paren_groups(body: &str) -> String {
+    let mut stripped = String::with_capacity(body.len());
+    let mut depth = 0usize;
+    for character in body.chars() {
+        match character {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            _ if depth == 0 => stripped.push(character),
+            _ => {}
+        }
+    }
+    stripped
 }
 
 /// The `kaya/...` node ids named in a block body, sorted and deduplicated.

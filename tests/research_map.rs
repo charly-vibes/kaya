@@ -5,7 +5,8 @@
 use std::fs;
 use std::path::Path;
 
-use kaya::model::{EntityType, Graph, GraphBuilder, Relationship};
+use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject};
+use kaya::model::{self, EntityType, Graph, GraphBuilder, Relationship};
 use kaya::projection::BEGIN_PREFIX;
 use kaya::projection::index::{RESEARCH_MAP_BLOCK, build};
 use kaya::projection::report::{Kind, LABEL_LEGACY_BLOCK};
@@ -14,10 +15,10 @@ use tempfile::tempdir;
 
 /// One row per declared edge in [`edge_graph`], in canonical sort order.
 const EDGE_ROWS: [&str; 4] = [
-    "- p/Finding/f1 -[challenges]-> p/Hypothesis/h1",
-    "- p/Finding/f1 -[derives]-> p/Observation/o1",
-    "- p/Run/r1 -[executes]-> p/Experiment/e1",
-    "- p/Run/r1 -[supports]-> p/Hypothesis/h1",
+    "- p/Finding/f1 (It follows) -[challenges]-> p/Hypothesis/h1 (It holds)",
+    "- p/Finding/f1 (It follows) -[derives]-> p/Observation/o1 (Saw it)",
+    "- p/Run/r1 (Try it) -[executes]-> p/Experiment/e1 (Run it)",
+    "- p/Run/r1 (Try it) -[supports]-> p/Hypothesis/h1 (It holds)",
 ];
 
 fn graph_of(nodes: &[(&str, EntityType, Value)]) -> Graph {
@@ -167,10 +168,10 @@ fn relationship_rows_are_sorted_and_deduplicated() {
     assert_eq!(
         section(&body, "### Relationships"),
         vec![
-            "- p/Finding/f1 -[challenges]-> p/Hypothesis/h1".to_owned(),
-            "- p/Finding/f1 -[derives]-> p/Observation/o1".to_owned(),
-            "- p/Finding/f1 -[supports]-> p/Hypothesis/h1".to_owned(),
-            "- p/Run/r1 -[executes]-> p/Experiment/e1".to_owned(),
+            "- p/Finding/f1 (It follows) -[challenges]-> p/Hypothesis/h1 (It holds)".to_owned(),
+            "- p/Finding/f1 (It follows) -[derives]-> p/Observation/o1 (Saw it)".to_owned(),
+            "- p/Finding/f1 (It follows) -[supports]-> p/Hypothesis/h1 (It holds)".to_owned(),
+            "- p/Run/r1 (Try it) -[executes]-> p/Experiment/e1 (Run it)".to_owned(),
         ],
         "rows are sorted by (from, relationship, to) and the repeated triple renders once; body:\n{body}"
     );
@@ -200,7 +201,7 @@ fn self_edge_renders_once_and_node_is_not_isolated() {
     build(&graph, &path, 1).expect("the research map must build");
 
     let body = body_of(&path);
-    let row = "- p/Hypothesis/h1 -[supports]-> p/Hypothesis/h1";
+    let row = "- p/Hypothesis/h1 (It holds) -[supports]-> p/Hypothesis/h1 (It holds)";
     assert_eq!(
         section(&body, "### Relationships"),
         vec![row.to_owned()],
@@ -282,7 +283,7 @@ fn isolated_entity_is_listed_once_and_no_edge_is_invented() {
     let edges = section(&body, "### Relationships");
     assert_eq!(
         edges,
-        vec!["- p/Run/r1 -[executes]-> p/Experiment/e1".to_owned()],
+        vec!["- p/Run/r1 (Try it) -[executes]-> p/Experiment/e1 (Run it)".to_owned()],
         "only the declared edge renders; body:\n{body}"
     );
     for row in &edges {
@@ -417,5 +418,159 @@ fn map_is_deterministic_and_idempotent() {
         fs::metadata(&first_path).unwrap().modified().unwrap(),
         modified,
         "a rebuild must not touch the document"
+    );
+}
+
+/// One `model.entity.created` event in the flat capture shape (mirrors
+/// `src/capture.rs`): `data` carries `text` and `key` directly, with no
+/// `attributes` object.
+fn entity_created_event(id: &str, subject_id: &str, data: Value) -> Event {
+    Event {
+        id: id.to_owned(),
+        schema: SCHEMA_V0.to_owned(),
+        r#type: "model.entity.created".to_owned(),
+        timestamp: "2026-11-24T00:00:00Z".to_owned(),
+        actor: Actor {
+            r#type: ActorType::Agent,
+            name: "tests".to_owned(),
+        },
+        subject: Subject {
+            r#type: "Decision".to_owned(),
+            id: subject_id.to_owned(),
+        },
+        data,
+        provenance: Provenance {
+            tool: "kaya".to_owned(),
+            version: "0.0.0".to_owned(),
+            reference: "tests".to_owned(),
+        },
+        artifacts: Vec::new(),
+    }
+}
+
+#[test]
+fn isolated_decision_renders_its_text_without_a_title() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("index.md");
+
+    let events = [entity_created_event(
+        "ev-1",
+        "p/Decision/d1",
+        json!({"text": "Ship the gate before dusk", "key": "d1"}),
+    )];
+    let graph = model::build(&events).expect("capture-shaped events must build a graph");
+
+    build(&graph, &path, 4).expect("the research map must build");
+
+    let body = body_of(&path);
+    let rows = section(&body, "### Isolated");
+    let row = rows
+        .iter()
+        .find(|row| row.contains("p/Decision/d1"))
+        .unwrap_or_else(|| panic!("the isolated section must list p/Decision/d1; body:\n{body}"));
+    assert!(
+        row.contains("Ship the gate before dusk"),
+        "a captured decision with no title must render its text as the label; \
+         row: {row:?}; body:\n{body}"
+    );
+}
+
+#[test]
+fn title_beats_text_when_both_present() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("index.md");
+
+    let events = [entity_created_event(
+        "ev-2",
+        "p/Decision/d2",
+        json!({
+            "title": "Tight gate",
+            "text": "body prose nobody needs",
+            "key": "d2"
+        }),
+    )];
+    let graph = model::build(&events).expect("capture-shaped events must build a graph");
+
+    build(&graph, &path, 4).expect("the research map must build");
+
+    let body = body_of(&path);
+    let rows = section(&body, "### Isolated");
+    let row = rows
+        .iter()
+        .find(|row| row.contains("p/Decision/d2"))
+        .unwrap_or_else(|| panic!("the isolated section must list p/Decision/d2; body:\n{body}"));
+    assert!(
+        row.contains("Tight gate"),
+        "the title must win over the text as the rendered label; \
+         row: {row:?}; body:\n{body}"
+    );
+    assert!(
+        !row.contains("body prose nobody needs"),
+        "the text must not leak into the row when a title exists; \
+         row: {row:?}; body:\n{body}"
+    );
+}
+
+#[test]
+fn relationship_rows_carry_endpoint_labels() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("index.md");
+
+    let events = [
+        entity_created_event(
+            "ev-3",
+            "p/Decision/d1",
+            json!({"text": "Ship the gate before dusk", "key": "d1"}),
+        ),
+        entity_created_event(
+            "ev-4",
+            "p/Decision/d2",
+            json!({"text": "Keep the gate open", "key": "d2"}),
+        ),
+        Event {
+            id: "ev-5".to_owned(),
+            schema: SCHEMA_V0.to_owned(),
+            r#type: "model.relationship.asserted".to_owned(),
+            timestamp: "2026-11-24T00:00:00Z".to_owned(),
+            actor: Actor {
+                r#type: ActorType::Agent,
+                name: "tests".to_owned(),
+            },
+            subject: Subject {
+                r#type: "Decision".to_owned(),
+                id: "p/Decision/d1".to_owned(),
+            },
+            data: json!({
+                "relationship": "supports",
+                "from": "p/Decision/d1",
+                "to": "p/Decision/d2"
+            }),
+            provenance: Provenance {
+                tool: "kaya".to_owned(),
+                version: "0.0.0".to_owned(),
+                reference: "tests".to_owned(),
+            },
+            artifacts: Vec::new(),
+        },
+    ];
+    let graph = model::build(&events).expect("capture-shaped events must build a graph");
+
+    build(&graph, &path, 4).expect("the research map must build");
+
+    let body = body_of(&path);
+    let rows = section(&body, "### Relationships");
+    let row = rows
+        .iter()
+        .find(|row| row.contains("p/Decision/d1") && row.contains("p/Decision/d2"))
+        .unwrap_or_else(|| panic!("the relationship row must name both endpoints; body:\n{body}"));
+    assert!(
+        row.contains("(Ship the gate before dusk)"),
+        "the relationship row must label the from endpoint with its text; \
+         row: {row:?}; body:\n{body}"
+    );
+    assert!(
+        row.contains("(Keep the gate open)"),
+        "the relationship row must label the to endpoint with its text; \
+         row: {row:?}; body:\n{body}"
     );
 }

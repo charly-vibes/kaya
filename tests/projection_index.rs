@@ -147,7 +147,7 @@ fn identical_graphs_build_byte_identical_files() {
     assert_eq!(read(&first), read(&second));
 
     let document = read(&first);
-    let edge = "- p/Experiment/E-1 -[supports]-> p/Finding/F-1";
+    let edge = "- p/Experiment/E-1 (Try it) -[supports]-> p/Finding/F-1 (It holds)";
     assert_eq!(
         document.matches(edge).count(),
         1,
@@ -448,8 +448,8 @@ fn edge_endpoint_with_a_detail_section_renders_once_per_section_and_is_never_iso
     assert_eq!(
         section_rows(&document, "### Relationships"),
         vec![
-            "- p/Artifact/A-1 -[supports]-> p/Hypothesis/h1".to_owned(),
-            "- p/Observation/o1 -[observes]-> p/Run/R-1".to_owned(),
+            "- p/Artifact/A-1 (A-1) -[supports]-> p/Hypothesis/h1 (It holds)".to_owned(),
+            "- p/Observation/o1 (Saw it) -[observes]-> p/Run/R-1 (R-1)".to_owned(),
         ],
         "each endpoint's edge renders exactly once in Relationships: {document}"
     );

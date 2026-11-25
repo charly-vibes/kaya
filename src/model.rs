@@ -501,6 +501,24 @@ fn entity_from_event(event: &Event, builder: &mut GraphBuilder) -> Result<(), Mo
             ));
         }
     };
+    let attributes = match attributes {
+        Value::Object(mut map) => {
+            if let Some(text) = event.data.get("text").and_then(|v| v.as_str())
+                && !text.trim().is_empty()
+                && !map.contains_key("text")
+            {
+                map.insert("text".to_owned(), Value::String(text.to_owned()));
+            }
+            if let Some(title) = event.data.get("title").and_then(|v| v.as_str())
+                && !title.trim().is_empty()
+                && !map.contains_key("title")
+            {
+                map.insert("title".to_owned(), Value::String(title.to_owned()));
+            }
+            Value::Object(map)
+        }
+        other => other,
+    };
     builder.entity(event.subject.id.clone(), entity, attributes)?;
     Ok(())
 }

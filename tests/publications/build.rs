@@ -7,7 +7,7 @@ use std::fs;
 
 use tempfile::TempDir;
 
-use kaya::publication::{Decl, DocumentRef, Documents, Tier, build};
+use kaya::publication::{Decl, DocumentRef, Documents, Tier, build, read_documents_from};
 
 use crate::common::*;
 
@@ -336,7 +336,8 @@ fn topic_map_renders_one_row_per_topic_with_type_and_relationship_types() {
     fs::create_dir(&out).expect("output directory");
     let map_body = "### Relationships\n\n\
                     - kaya/Question/why -[cites]-> kaya/Source/docs-src-index.md@43b606f\n\
-                    - kaya/Question/why -[investigates]-> kaya/Model/cache\n\n\
+                    - kaya/Question/why -[investigates]-> kaya/Model/cache\n\
+                    - kaya/Decision/keep (keep the gate) -[supports]-> kaya/Decision/ship (ship it)\n\n\
                     ### Isolated\n\n\
                     - kaya/Decision/keep — Decision — keep the gate\n";
     let docs = documents(&[(MAP_KIND, map_body, &[])]);
@@ -355,12 +356,21 @@ fn topic_map_renders_one_row_per_topic_with_type_and_relationship_types() {
         "- kaya/Model/cache — Model — investigates",
         "- kaya/Source/docs-src-index.md@43b606f — Source — cites",
         "- kaya/Decision/keep — Decision",
+        "- kaya/Decision/ship — Decision — supports",
     ] {
         assert!(
             body.contains(row),
             "one row per distinct topic id with its type and relationship types ({row}): {body}"
         );
     }
+    assert!(
+        body.contains("- kaya/Decision/keep -[supports]-> kaya/Decision/ship"),
+        "the embedded edge statement keeps bare ids, not labels: {body}"
+    );
+    assert!(
+        !body.contains("keep the gate) -[") && !body.contains("-> kaya/Decision/ship ("),
+        "labels never leak into the topic rows or the edge statements: {body}"
+    );
 }
 
 #[test]
@@ -694,3 +704,33 @@ fn document_kind_mismatch_is_refused_before_any_write() {
 }
 
 // 20. kaya.publications.stub_free — only present kinds get a heading
+
+// Publication source — the research map's census strips label prose
+#[test]
+fn read_documents_census_of_the_research_map_ignores_ids_inside_labels() {
+    let body = "### Relationships\n\n\
+                - kaya/Decision/d1 (see kaya/Decision/old-gate) -[supersedes]-> kaya/Decision/d0\n";
+    let files = [(
+        std::path::PathBuf::from("research/orientation.md"),
+        format!(
+            "<!-- kaya:begin generated:{MAP_KIND} -->\n{body}<!-- kaya:end generated:{MAP_KIND} -->\n"
+        ),
+    )];
+
+    let docs = read_documents_from(files).expect("the compiled documents are readable");
+    let map = docs.0.get(MAP_KIND).expect("the research map is kept");
+    assert_eq!(
+        map.event_ids,
+        vec![
+            "kaya/Decision/d0".to_string(),
+            "kaya/Decision/d1".to_string()
+        ],
+        "label prose names no census ids: {:?}",
+        map.event_ids
+    );
+    assert!(
+        !map.event_ids.iter().any(|id| id.contains("old-gate")),
+        "the label's referenced id never becomes a phantom topic: {:?}",
+        map.event_ids
+    );
+}

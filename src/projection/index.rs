@@ -177,10 +177,16 @@ fn relationship_section(graph: &Graph, sources: &mut BTreeSet<String>) -> String
     for (from, relationship, to) in edges {
         section.push_str("- ");
         section.push_str(from);
+        if let Some(node) = graph.node(from) {
+            section.push_str(&format!(" ({})", title_or_key(node)));
+        }
         section.push_str(" -[");
         section.push_str(relationship);
         section.push_str("]-> ");
         section.push_str(to);
+        if let Some(node) = graph.node(to) {
+            section.push_str(&format!(" ({})", title_or_key(node)));
+        }
         section.push('\n');
         sources.insert(from.to_owned());
         sources.insert(to.to_owned());
