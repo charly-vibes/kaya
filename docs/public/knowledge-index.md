@@ -31,7 +31,7 @@ _(none)_
 
 - kaya/Run/cargo-test-results
 
-### Artifact — 849
+### Artifact — 888
 
 - kaya/Artifact/0291837
 - kaya/Artifact/03fb233
@@ -47,6 +47,7 @@ _(none)_
 - kaya/Artifact/1cfa1a1
 - kaya/Artifact/1ddee00
 - kaya/Artifact/1e0c0d7
+- kaya/Artifact/1f3cd2f
 - kaya/Artifact/1fa5b50
 - kaya/Artifact/21c5fdd
 - kaya/Artifact/22d3276
@@ -73,6 +74,7 @@ _(none)_
 - kaya/Artifact/44165f4
 - kaya/Artifact/449a102
 - kaya/Artifact/4a68ae2
+- kaya/Artifact/4e48758
 - kaya/Artifact/510751b
 - kaya/Artifact/55a9e2e
 - kaya/Artifact/565343c
@@ -125,6 +127,7 @@ _(none)_
 - kaya/Artifact/950e98e
 - kaya/Artifact/95ab163
 - kaya/Artifact/9a51d1e
+- kaya/Artifact/9c9e761
 - kaya/Artifact/9d2df87
 - kaya/Artifact/9de6893
 - kaya/Artifact/9fb3ea7
@@ -142,6 +145,7 @@ _(none)_
 - kaya/Artifact/aaaa11e
 - kaya/Artifact/ab319d5
 - kaya/Artifact/ad468ca
+- kaya/Artifact/ad8e8f6
 - kaya/Artifact/af016e5
 - kaya/Artifact/afd222d
 - kaya/Artifact/b2ec883
@@ -166,6 +170,7 @@ _(none)_
 - kaya/Artifact/cfa552b
 - kaya/Artifact/d11747e
 - kaya/Artifact/d29f6f6
+- kaya/Artifact/d3709c3
 - kaya/Artifact/d3bc2f4
 - kaya/Artifact/d56e106
 - kaya/Artifact/d61606c
@@ -333,8 +338,16 @@ _(none)_
 - kaya/Artifact/designs-2026-11-24-refactor-step-kaya-w9t-tidy-applied-while-tests-s
 - kaya/Artifact/designs-2026-11-24-refactor-step-kaya-y5v-refactor-pass-recorded-sa
 - kaya/Artifact/designs-2026-11-24-ro5u-review-step-kaya-w9t-step-artifact-reviewe
+- kaya/Artifact/designs-2026-11-25-design-kaya-9w6-fix-the-else-if-shape-encodes-b
+- kaya/Artifact/designs-2026-11-25-design-kaya-9w6-one-mirror-function-attribute-ref
+- kaya/Artifact/designs-2026-11-25-design-kaya-9w6-refactor-the-only-duplication-w
+- kaya/Artifact/designs-2026-11-25-fix-kaya-w68-ro5u-critical-count-0-verdict-pro
+- kaya/Artifact/designs-2026-11-25-green-kaya-34g-implementation-record-data-only-ch
 - kaya/Artifact/designs-2026-11-25-green-kaya-dsv-implemented-kaya-explain-as-src-ex
+- kaya/Artifact/designs-2026-11-25-green-kaya-w68-added-brief-md-to-reader-files-sr
+- kaya/Artifact/designs-2026-11-25-refactor-kaya-34g-no-op-change-is-ledger-data-s
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-dsv-dropped-the-duplicate-all-block
+- kaya/Artifact/designs-2026-11-25-refactor-kaya-w68-no-production-extraction-warran
 - kaya/Artifact/df81656
 - kaya/Artifact/dfe6d6c
 - kaya/Artifact/e0685ac
@@ -359,6 +372,7 @@ _(none)_
 - kaya/Artifact/f2709ac
 - kaya/Artifact/f31f940
 - kaya/Artifact/f39a1fd
+- kaya/Artifact/f45d47a
 - kaya/Artifact/f4a7993
 - kaya/Artifact/f7f9752
 - kaya/Artifact/f91b1e7
@@ -453,7 +467,11 @@ _(none)_
 - kaya/Artifact/plans-2026-11-24-plan-remediation-batch-desired-behavior-the-six
 - kaya/Artifact/plans-2026-11-24-plan-step-kaya-bvg-step-artifact-minimal-tdd
 - kaya/Artifact/plans-2026-11-24-plan-step-kaya-w9t-step-artifact-content-the-p
+- kaya/Artifact/plans-2026-11-25-plan-kaya-34g-dogfood-the-experiment-record-produ
+- kaya/Artifact/plans-2026-11-25-plan-kaya-9w6-behavior-wrong-typed-feeder-attri
+- kaya/Artifact/plans-2026-11-25-plan-kaya-9w6-step-plan-red-first-tests-expla
 - kaya/Artifact/plans-2026-11-25-plan-kaya-dsv-part-a-kaya-explain-a-read-only
+- kaya/Artifact/plans-2026-11-25-plan-kaya-w68-behavior-a-populated-exploration
 - kaya/Artifact/research-2026-11-16-orient-kaya-10k-closed-nine-field-kaya-event-v0-s
 - kaya/Artifact/research-2026-11-16-orient-kaya-5cg-experiment-report-projection-with
 - kaya/Artifact/research-2026-11-16-orient-kaya-5ea-promotion-rate-cap-requirement-fr
@@ -876,11 +894,32 @@ _(none)_
 - kaya/Artifact/research-2026-11-24-ship-kaya-yd9-pending-approval-implementation-c
 - kaya/Artifact/research-2026-11-24-ship-remediation-batch-committed-6c0892373e-fix-r
 - kaya/Artifact/research-2026-11-24-tags-pipeline-run-tdd-ro5u-2026-11-24-kaya-y
+- kaya/Artifact/research-2026-11-25-fix-kaya-9w6-f1-fixed-commit-refusal-now-gated
+- kaya/Artifact/research-2026-11-25-green-kaya-34g-seeded-kaya-seeds-kaya-34g-execut
+- kaya/Artifact/research-2026-11-25-green-kaya-9w6-src-explain-rs-attribute-refusals
+- kaya/Artifact/research-2026-11-25-orient-kaya-34g-verified-against-head-2ad99853c7
+- kaya/Artifact/research-2026-11-25-orient-kaya-34g-verified-against-head-2ad99853c7-2
+- kaya/Artifact/research-2026-11-25-orient-kaya-9w6-build-refuses-a-present-but-non-s
 - kaya/Artifact/research-2026-11-25-orient-kaya-dsv-products-compose-from-the-11-kind
+- kaya/Artifact/research-2026-11-25-orient-kaya-w68-brief-md-is-in-neither
+- kaya/Artifact/research-2026-11-25-orient-kaya-w68-reader-files-src-publication-sou
+- kaya/Artifact/research-2026-11-25-plan-kaya-w68-behavior-a-populated-exploration
+- kaya/Artifact/research-2026-11-25-quality-ledger-kaya-34g-changed-kaya-ledger-jso
+- kaya/Artifact/research-2026-11-25-quality-ledger-kaya-9w6-changed-src-explain-rs
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-dsv-changed-src-explain-rs
+- kaya/Artifact/research-2026-11-25-quality-ledger-kaya-w68-changed-src-publication
+- kaya/Artifact/research-2026-11-25-red-kaya-34g-command-kaya-explain-example-galler
+- kaya/Artifact/research-2026-11-25-red-kaya-9w6-tests-explain-rs-wrong-typed-feeder
 - kaya/Artifact/research-2026-11-25-red-kaya-dsv-command-cargo-test-test-explain-e
+- kaya/Artifact/research-2026-11-25-red-kaya-w68-tests-explain-rs-brief-backed-tutor
+- kaya/Artifact/research-2026-11-25-refactor-kaya-9w6-extracted-kind-refusals-graph
+- kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-34g-no-fixes-required-verdict-r
 - kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-dsv-zero-critical-h1-research-ma
+- kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-w68-all-findings-fixed-before-the
 - kaya/Artifact/research-2026-11-25-ro5u-kaya-dsv-review-fixes
+- kaya/Artifact/research-2026-11-25-ro5u-review-kaya-9w6-reviewer-subagent-rule-of-5
+- kaya/Artifact/research-2026-11-25-ship-close-kaya-w68-commit-e78546885a-feat-publi
+- kaya/Artifact/research-2026-11-25-ship-kaya-34g-data-only-dogfood-commit-ledger
 - kaya/Artifact/research-2026-11-25-ship-kaya-dsv-commit-14a01124f0-feat-explain-on
 
 ### Observation — 0

@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-25-kaya-34g-seed-executes-observes-derives-chain-to-un-omit-example-gallery, pipeline-step:orient]
+---
+
+ORIENT kaya-34g (verified against HEAD 2ad99853c7): Ledger carries kaya/Experiment/add-core-research-record + kaya/Run/cargo-test-results + investigates/predicts/realizes edges; missing the executes/observes/derives chain. Census today: omitted=tutorial, example, example-gallery. Grammar fixed-direction (src/model.rs): Run-executes->Experiment, Observation-observes->Run, Finding-derives->Observation. experiment-record emptiness = no executes edge (src/explain.rs:516-523). Dossiers anchor Experiment nodes (report.rs render_record). kaya note/finding create entities, NO anchor flag - joins via import model seeds (model.* Event JSONL, main.rs:846). Acceptance predicts 3->2 omissions but product 'example' ALSO admits exploration.experiment-record (vocabulary.rs:192) alongside collection example-gallery (collection.rs:36); expect 3->1, tutorial (w68 flip, out of scope) staying omitted; verify live.

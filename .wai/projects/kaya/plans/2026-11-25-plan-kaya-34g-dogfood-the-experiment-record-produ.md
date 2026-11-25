@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-25-kaya-34g-seed-executes-observes-derives-chain-to-un-omit-example-gallery, pipeline-step:plan]
+---
+
+PLAN kaya-34g: dogfood the experiment-record producer end to end, no source changes. Steps: (1) RED: capture census + kaya explain example-gallery showing no-backing-document/omitted (no executes edge in ledger). (2) Seed .kaya/seeds/kaya-34g-executes-chain.jsonl with model.relationship.asserted executes: kaya/Run/cargo-test-results -> kaya/Experiment/add-core-research-record (entities exist; joins have no capture command). (3) kaya note --actor sasha (Observation entity via capture path), seed observes edge Observation -> Run. (4) kaya finding --actor sasha, seed derives edge Finding -> Observation. (5) kaya build --allow-uncommitted: docs/research/experiments/ dossier renders the anchored record. (6) GREEN: census omissions drop from 3 (tutorial, example, example-gallery); example + example-gallery emit, tutorial stays (w68 run flip, out of scope). Verify: cargo test --test explain green (no source edits; suite guards existing behavior), just record-verify. Commit ledger + seeds + dossier as ticket commit.
