@@ -61,6 +61,7 @@ tests and in real use.
 - kaya/Artifact/0cd2fd6 — 0cd2fd6af445980341e9687ca6ebb1b36882ba6c
 - kaya/Artifact/0f3b8b2 — 0f3b8b2c8a6476ca728476be3e5ec4484583dbe5
 - kaya/Artifact/10d7f0e — 10d7f0e96cfc704561cb3d9f7a2263e7a19c19bf
+- kaya/Artifact/14a0112 — 14a01124f02fca3122608c9d81418c21c145e623
 - kaya/Artifact/162afa8 — 162afa812626f09ecd79d05ace6ab01be03ff768
 - kaya/Artifact/1bdef7b — 1bdef7b38389345ac182c452a0ea14419f90de4d
 - kaya/Artifact/1c2b3d3 — 1c2b3d3a9a787e6b8c05e7db9724a0b84e25a8f1
@@ -79,6 +80,7 @@ tests and in real use.
 - kaya/Artifact/3095266 — 3095266e9b91e0e22c3355a80f9b076637573468
 - kaya/Artifact/32a3d2d — 32a3d2d9dd54159488e4b2aa150fe2e531e1f274
 - kaya/Artifact/331401a — 331401a14a5a1b5658e5e51c6cab9d78682be4f9
+- kaya/Artifact/33e0fde — 33e0fde1b6b6bbba4e2075e1bb5ed2877abd8043
 - kaya/Artifact/360a769 — 360a7693c57c64257499406a57aa2ade2a099d82
 - kaya/Artifact/36ab8f5 — 36ab8f5d48b48f40d03ba59b47e23f413eba1e62
 - kaya/Artifact/395c006 — 395c0065adddaeefa3dda5b850d4706166205ac0
@@ -895,7 +897,11 @@ tests and in real use.
 - kaya/Artifact/research-2026-11-24-ship-remediation-batch-committed-6c0892373e-fix-r — .wai/projects/kaya/research/2026-11-24-ship-remediation-batch-committed-6c0892373e-fix-r.md
 - kaya/Artifact/research-2026-11-24-tags-pipeline-run-tdd-ro5u-2026-11-24-kaya-y — .wai/projects/kaya/research/2026-11-24-tags-pipeline-run-tdd-ro5u-2026-11-24-kaya-y.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-dsv-products-compose-from-the-11-kind — .wai/projects/kaya/research/2026-11-25-orient-kaya-dsv-products-compose-from-the-11-kind.md
+- kaya/Artifact/research-2026-11-25-quality-ledger-kaya-dsv-changed-src-explain-rs — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-dsv-changed-src-explain-rs.md
 - kaya/Artifact/research-2026-11-25-red-kaya-dsv-command-cargo-test-test-explain-e — .wai/projects/kaya/research/2026-11-25-red-kaya-dsv-command-cargo-test-test-explain-e.md
+- kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-dsv-zero-critical-h1-research-ma — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-dsv-zero-critical-h1-research-ma.md
+- kaya/Artifact/research-2026-11-25-ro5u-kaya-dsv-review-fixes — .wai/projects/kaya/research/2026-11-25-ro5u-kaya-dsv-review-fixes.md
+- kaya/Artifact/research-2026-11-25-ship-kaya-dsv-commit-14a01124f0-feat-explain-on — .wai/projects/kaya/research/2026-11-25-ship-kaya-dsv-commit-14a01124f0-feat-explain-on.md
 
 ### Runs
 - kaya/Run/cargo-test-results — passed 430, failed 0, ignored 0
@@ -908,5 +914,5 @@ tests and in real use.
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_860 nodes from 1001 events._
+_866 nodes from 1007 events._
 <!-- kaya:end generated:orientation.research-map -->

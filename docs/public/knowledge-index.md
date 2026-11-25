@@ -31,7 +31,7 @@ _(none)_
 
 - kaya/Run/cargo-test-results
 
-### Artifact — 842
+### Artifact — 848
 
 - kaya/Artifact/0291837
 - kaya/Artifact/03fb233
@@ -40,6 +40,7 @@ _(none)_
 - kaya/Artifact/0cd2fd6
 - kaya/Artifact/0f3b8b2
 - kaya/Artifact/10d7f0e
+- kaya/Artifact/14a0112
 - kaya/Artifact/162afa8
 - kaya/Artifact/1bdef7b
 - kaya/Artifact/1c2b3d3
@@ -58,6 +59,7 @@ _(none)_
 - kaya/Artifact/3095266
 - kaya/Artifact/32a3d2d
 - kaya/Artifact/331401a
+- kaya/Artifact/33e0fde
 - kaya/Artifact/360a769
 - kaya/Artifact/36ab8f5
 - kaya/Artifact/395c006
@@ -874,7 +876,11 @@ _(none)_
 - kaya/Artifact/research-2026-11-24-ship-remediation-batch-committed-6c0892373e-fix-r
 - kaya/Artifact/research-2026-11-24-tags-pipeline-run-tdd-ro5u-2026-11-24-kaya-y
 - kaya/Artifact/research-2026-11-25-orient-kaya-dsv-products-compose-from-the-11-kind
+- kaya/Artifact/research-2026-11-25-quality-ledger-kaya-dsv-changed-src-explain-rs
 - kaya/Artifact/research-2026-11-25-red-kaya-dsv-command-cargo-test-test-explain-e
+- kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-dsv-zero-critical-h1-research-ma
+- kaya/Artifact/research-2026-11-25-ro5u-kaya-dsv-review-fixes
+- kaya/Artifact/research-2026-11-25-ship-kaya-dsv-commit-14a01124f0-feat-explain-on
 
 ### Observation — 0
 
