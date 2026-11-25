@@ -36,6 +36,5 @@ phase: design
 
 ```
 No issues found.
-
 ```
 
