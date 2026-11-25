@@ -10,50 +10,37 @@
 //! class (`usage`, `missing-ledger`, `ledger-io`, `build-io`, `not-a-file`) or
 //! the label raised by the library that refused the run.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::fs::{self, File, OpenOptions};
-use std::io::{ErrorKind, Read};
+use std::collections::{BTreeMap, HashSet};
+use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::{Command as ProcessCommand, ExitCode};
 
 use clap::error::ErrorKind as ClapErrorKind;
 use clap::{Parser, Subcommand};
-use kaya::ledger::{
-    AppendOutcome, LABEL_ID_REUSE, Ledger, LedgerError, changed_event_ids, sha256_hex,
-};
-use serde_json::json;
+use kaya::ledger::{Ledger, LedgerError, sha256_hex};
 
-use kaya::adapters::{
-    AdapterError, correction_generation, git, reobservation_correction, stored_correction_for,
-    testrunner, turu, wai,
-};
-use kaya::doctest;
+use kaya::adapters::AdapterError;
+
 use kaya::envelope::Envelope;
-use kaya::event::{Actor, ActorType, Event, Provenance, SCHEMA_V0, Subject, new_id, parse_line};
-use kaya::impact::{self, ChangeSet};
+use kaya::event::{Actor, ActorType, Event, parse_line};
 use kaya::model::{self, EntityType, ModelError};
-use kaya::projection::{
-    BlockKind, ProjectionError, StaleBlock, Summary, index, ir, render_invocations, report, reuse,
-    scan, state,
-};
-use kaya::promotion::{self, PROPOSAL_BUDGET, PromotionError, PromotionState, cap_proposals};
-use kaya::publication;
+use kaya::projection::{BlockKind, ProjectionError, Summary, index, ir, report, reuse, scan};
+use kaya::promotion::{PromotionError, PromotionState};
 
 mod capture;
+mod commands;
 mod explain;
 use kaya::verification;
 
 /// Project-local directory holding kaya state.
-const KAYA_DIR: &str = ".kaya";
+pub(crate) const KAYA_DIR: &str = ".kaya";
 
 /// The append-only research ledger, relative to the working directory.
-const LEDGER_PATH: &str = ".kaya/ledger.jsonl";
-
-/// Size of the single buffer streamed over the ledger by `kaya status`.
-const STATUS_BUFFER_BYTES: usize = 64 * 1024;
+pub(crate) const LEDGER_PATH: &str = ".kaya/ledger.jsonl";
 
 /// A failure class label plus a human-readable explanation.
-type Failure = (String, String);
+pub(crate) type Failure = (String, String);
 
 #[derive(Debug, Parser)]
 #[command(
@@ -69,19 +56,19 @@ struct Cli {
 /// The argument set shared by every capture subcommand; the text is the
 /// subcommand's positional and `capture::Kind` its only real difference.
 #[derive(Debug, clap::Args)]
-struct CaptureArgs {
+pub(crate) struct CaptureArgs {
     /// Name of the author
     #[arg(long, value_name = "NAME")]
-    actor: String,
+    pub(crate) actor: String,
     /// Actor kind: `human` (the default) or `agent`
     #[arg(long = "actor-type", default_value = "human", value_name = "TYPE")]
-    actor_type: String,
+    pub(crate) actor_type: String,
     /// Node key; defaults to `<UTC date>-<sha256(text)[:8]>`
     #[arg(long, value_name = "SLUG")]
-    key: Option<String>,
+    pub(crate) key: Option<String>,
     /// Project namespace recorded in the subject id
     #[arg(long, default_value = "kaya", value_name = "NAME")]
-    project: String,
+    pub(crate) project: String,
 }
 
 #[derive(Debug, Subcommand)]
@@ -287,7 +274,7 @@ enum Command {
 }
 
 #[derive(Debug, Subcommand)]
-enum ImportSource {
+pub(crate) enum ImportSource {
     /// Import observed artifacts from the `.wai/` artifact tree
     Wai {
         /// Directory containing the `.wai/` tree
@@ -367,16 +354,16 @@ fn main() -> ExitCode {
         },
     };
     let outcome = match cli.command {
-        Command::Init => cmd_init(),
-        Command::Status => cmd_status(),
+        Command::Init => commands::status::cmd_init(),
+        Command::Status => commands::status::cmd_status(),
         Command::Explain { name } => explain::run(name.as_deref()),
-        Command::Import { source } => cmd_import(source),
+        Command::Import { source } => commands::import::cmd_import(source),
         Command::Build {
             out,
             expect_digest,
             allow_uncommitted,
             instrument,
-        } => cmd_build(
+        } => commands::publication::cmd_build(
             &out,
             expect_digest.as_deref(),
             allow_uncommitted,
@@ -386,8 +373,8 @@ fn main() -> ExitCode {
             out,
             expect_digest,
             allow_uncommitted,
-        } => cmd_ir(&out, expect_digest.as_deref(), allow_uncommitted),
-        Command::Publish { out } => cmd_publish(&out),
+        } => commands::publication::cmd_ir(&out, expect_digest.as_deref(), allow_uncommitted),
+        Command::Publish { out } => commands::publication::cmd_publish(&out),
         Command::Check {
             root,
             out,
@@ -404,7 +391,7 @@ fn main() -> ExitCode {
                 require_sources: require_source,
                 fail_on_stale_authored,
             };
-            return cmd_check(
+            return commands::publication::cmd_check(
                 &root,
                 &out,
                 &publish_out,
@@ -415,26 +402,28 @@ fn main() -> ExitCode {
         Command::Promote {
             assertion_id,
             actor,
-        } => cmd_promote(&assertion_id, &actor),
+        } => commands::verification::cmd_promote(&assertion_id, &actor),
         Command::Challenge {
             conclusion_id,
             events,
             actor,
-        } => cmd_challenge(&conclusion_id, &events, &actor),
+        } => commands::verification::cmd_challenge(&conclusion_id, &events, &actor),
         Command::Acknowledge {
             document,
             block,
             events,
             actor,
             actor_type,
-        } => cmd_acknowledge(&document, &block, &events, &actor, &actor_type),
+        } => {
+            commands::verification::cmd_acknowledge(&document, &block, &events, &actor, &actor_type)
+        }
         Command::Impact {
             staged,
             range,
             out,
             timeout,
         } => {
-            return match cmd_impact(staged, range.as_deref(), &out, timeout) {
+            return match commands::impact::cmd_impact(staged, range.as_deref(), &out, timeout) {
                 Ok((envelope, code)) => emit_code(envelope, code),
                 Err((label, message)) => emit(Envelope::error("error", &label, message)),
             };
@@ -446,7 +435,7 @@ fn main() -> ExitCode {
             actor,
             actor_type,
             out,
-        } => cmd_disposition(
+        } => commands::impact::cmd_disposition(
             &record,
             &kind,
             rationale.as_deref(),
@@ -458,17 +447,25 @@ fn main() -> ExitCode {
             out,
             project,
             timeout,
-        } => cmd_doctest(&out, &project, timeout),
+        } => commands::doctest::cmd_doctest(&out, &project, timeout),
         Command::SupersedeDoctest {
             document,
             label,
             actor,
             actor_type,
-        } => cmd_supersede_doctest(&document, &label, &actor, &actor_type),
-        Command::Note { text, args } => cmd_capture(capture::Kind::Note, &text, &args),
-        Command::Question { text, args } => cmd_capture(capture::Kind::Question, &text, &args),
-        Command::Decision { text, args } => cmd_capture(capture::Kind::Decision, &text, &args),
-        Command::Finding { text, args } => cmd_capture(capture::Kind::Finding, &text, &args),
+        } => commands::doctest::cmd_supersede_doctest(&document, &label, &actor, &actor_type),
+        Command::Note { text, args } => {
+            commands::capture::cmd_capture(capture::Kind::Note, &text, &args)
+        }
+        Command::Question { text, args } => {
+            commands::capture::cmd_capture(capture::Kind::Question, &text, &args)
+        }
+        Command::Decision { text, args } => {
+            commands::capture::cmd_capture(capture::Kind::Decision, &text, &args)
+        }
+        Command::Finding { text, args } => {
+            commands::capture::cmd_capture(capture::Kind::Finding, &text, &args)
+        }
     };
     emit(outcome.unwrap_or_else(|(label, message)| Envelope::error("error", &label, message)))
 }
@@ -501,7 +498,7 @@ fn emit(envelope: Envelope) -> ExitCode {
 /// the exit code is decided by the caller rather than by `ok`: usage and I/O
 /// failures print an error envelope and exit 2, an executed check exits with
 /// the drift verdict.
-fn emit_code(envelope: Envelope, code: u8) -> ExitCode {
+pub(crate) fn emit_code(envelope: Envelope, code: u8) -> ExitCode {
     match envelope.print() {
         Ok(()) => ExitCode::from(code),
         Err(message) => {
@@ -511,58 +508,8 @@ fn emit_code(envelope: Envelope, code: u8) -> ExitCode {
     }
 }
 
-fn failure(label: impl Into<String>, message: impl Into<String>) -> Failure {
+pub(crate) fn failure(label: impl Into<String>, message: impl Into<String>) -> Failure {
     (label.into(), message.into())
-}
-
-fn cmd_init() -> Result<Envelope, Failure> {
-    fs::create_dir_all(KAYA_DIR)
-        .map_err(|err| failure("ledger-io", format!("failed to create {KAYA_DIR}: {err}")))?;
-    let created = match OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(LEDGER_PATH)
-    {
-        Ok(_) => true,
-        Err(err) if err.kind() == ErrorKind::AlreadyExists => {
-            ensure_ledger_is_regular_file()?;
-            false
-        }
-        Err(err) => {
-            return Err(failure(
-                "ledger-io",
-                format!("failed to create {LEDGER_PATH}: {err}"),
-            ));
-        }
-    };
-    Ok(Envelope::ok(
-        "init",
-        json!({ "ledger": LEDGER_PATH, "created": created }),
-    ))
-}
-
-/// Reject a pre-existing path that shadows the ledger but is not a regular file.
-fn ensure_ledger_is_regular_file() -> Result<(), Failure> {
-    match fs::metadata(LEDGER_PATH) {
-        Ok(metadata) if metadata.is_file() => Ok(()),
-        Ok(_) => Err(not_a_file()),
-        // A dangling symlink exists but resolves to no regular file.
-        Err(err) if err.kind() == ErrorKind::NotFound => Err(not_a_file()),
-        Err(err) => Err(failure(
-            "ledger-io",
-            format!("failed to inspect {LEDGER_PATH}: {err}"),
-        )),
-    }
-}
-
-fn not_a_file() -> Failure {
-    failure(
-        "not-a-file",
-        format!(
-            "{LEDGER_PATH} exists but is not a regular ledger file; \
-             move it aside and rerun `kaya init`"
-        ),
-    )
 }
 
 /// Map a library ledger refusal onto the CLI failure classes.
@@ -570,7 +517,7 @@ fn not_a_file() -> Failure {
 /// A missing ledger is the one class the CLI renames: `kaya.ledger.missing`
 /// becomes `missing-ledger`, matching `status`, and the message already
 /// points at `kaya init`.
-fn ledger_failure(err: LedgerError) -> Failure {
+pub(crate) fn ledger_failure(err: LedgerError) -> Failure {
     let label = if err.label == "kaya.ledger.missing" {
         "missing-ledger".to_string()
     } else {
@@ -579,29 +526,15 @@ fn ledger_failure(err: LedgerError) -> Failure {
     (label, err.message)
 }
 
-fn adapter_failure(err: AdapterError) -> Failure {
+pub(crate) fn adapter_failure(err: AdapterError) -> Failure {
     (err.label, err.message)
 }
 
-/// Capture one authored text as a `model.entity.created` event.
-fn cmd_capture(kind: capture::Kind, text: &str, args: &CaptureArgs) -> Result<Envelope, Failure> {
-    let mut ledger = open_ledger()?;
-    capture::run(
-        &mut ledger,
-        kind,
-        text,
-        &args.actor,
-        &args.actor_type,
-        args.key.as_deref(),
-        &args.project,
-    )
-}
-
-fn model_failure(err: ModelError) -> Failure {
+pub(crate) fn model_failure(err: ModelError) -> Failure {
     (err.label, err.message)
 }
 
-fn projection_failure(err: ProjectionError) -> Failure {
+pub(crate) fn projection_failure(err: ProjectionError) -> Failure {
     (err.label, err.message)
 }
 
@@ -609,12 +542,8 @@ fn promotion_failure(err: PromotionError) -> Failure {
     (err.label, err.message)
 }
 
-fn publication_failure(err: publication::PublicationError) -> Failure {
-    (err.label, err.message)
-}
-
 /// Open the existing ledger, refusing an absent one with `missing-ledger`.
-fn open_ledger() -> Result<Ledger, Failure> {
+pub(crate) fn open_ledger() -> Result<Ledger, Failure> {
     Ledger::open(LEDGER_PATH).map_err(ledger_failure)
 }
 
@@ -622,606 +551,11 @@ fn open_ledger() -> Result<Ledger, Failure> {
 ///
 /// The CLI has no way to name a tool or agent actor: promotion and
 /// acknowledgment are the human doors into the record.
-fn human_actor(name: &str) -> Actor {
+pub(crate) fn human_actor(name: &str) -> Actor {
     Actor {
         r#type: ActorType::Human,
         name: name.to_owned(),
     }
-}
-
-fn cmd_status() -> Result<Envelope, Failure> {
-    let mut file = File::open(LEDGER_PATH).map_err(|err| match err.kind() {
-        ErrorKind::NotFound => failure(
-            "missing-ledger",
-            format!("missing ledger {LEDGER_PATH}: run `kaya init` to create it"),
-        ),
-        _ => failure("ledger-io", format!("failed to read {LEDGER_PATH}: {err}")),
-    })?;
-
-    // One streaming pass: size, and tail byte together; the digest is the
-    // shared one-shot sha256_hex over the same bytes build and check use.
-    let mut buffer = [0u8; STATUS_BUFFER_BYTES];
-    let mut bytes: u64 = 0;
-    let mut last_byte: Option<u8> = None;
-    let mut content = Vec::new();
-    loop {
-        let read = file
-            .read(&mut buffer)
-            .map_err(|err| failure("ledger-io", format!("failed to read {LEDGER_PATH}: {err}")))?;
-        if read == 0 {
-            break;
-        }
-        let chunk = &buffer[..read];
-        content.extend_from_slice(chunk);
-        bytes += read as u64;
-        last_byte = Some(chunk[read - 1]);
-    }
-    let digest = sha256_hex(&content);
-
-    let (events, blank_lines) = line_counts(&content);
-
-    let replay_integrity = match last_byte {
-        None | Some(b'\n') => "ok",
-        Some(_) => "recovered-truncated-tail",
-    };
-    Ok(Envelope::ok(
-        "status",
-        json!({
-            "ledger": LEDGER_PATH,
-            "events": events,
-            "blank_lines": blank_lines,
-            "bytes": bytes,
-            "digest": digest,
-            "replay_integrity": replay_integrity,
-            "pending_proposals": pending_proposals()?,
-        }),
-    ))
-}
-
-/// Count ledger lines by recognition, not by newline.
-///
-/// Returns `(events, blank_lines)`: the number of non-empty lines that are
-/// recognizable `kaya.event/v0` records — a JSON object naming the supported
-/// schema, so a complete-but-unterminated final line counts while a
-/// truncated or corrupt line does not — and the number of empty lines (under
-/// the trailing-newline split convention, so a terminated file's final empty
-/// split element is not a line). Lines that are neither count as neither;
-/// status stays a cheap, non-failing, lenient read and replay commands
-/// report the exact faults.
-fn line_counts(bytes: &[u8]) -> (u64, u64) {
-    let mut events: u64 = 0;
-    let mut blank_lines: u64 = 0;
-    if bytes.is_empty() {
-        return (0, 0);
-    }
-    // Drop the split artifact left by a trailing newline; an unterminated
-    // tail keeps its final (possibly complete) line.
-    let body = bytes.strip_suffix(b"\n").unwrap_or(bytes);
-    for line in body.split(|byte| *byte == b'\n') {
-        if line.is_empty() {
-            blank_lines += 1;
-        } else if is_event_record(line) {
-            events += 1;
-        }
-    }
-    (events, blank_lines)
-}
-
-/// Recognize a ledger line structurally as a `kaya.event/v0` record.
-///
-/// Status counts by recognition, not replay-grade validation: a line counts
-/// when it is a JSON object naming the supported schema, so a minimal but
-/// well-formed record counts while a truncated tail, a corrupt line, or a
-/// foreign-schema object does not. The full record grammar stays with the
-/// replay commands, which can point at the offending line.
-fn is_event_record(line: &[u8]) -> bool {
-    let Ok(text) = std::str::from_utf8(line) else {
-        return false;
-    };
-    let Ok(record) = serde_json::from_str::<serde_json::Value>(text.trim()) else {
-        return false;
-    };
-    let Some(map) = record.as_object() else {
-        return false;
-    };
-    map.get("schema").and_then(serde_json::Value::as_str) == Some(SCHEMA_V0)
-}
-
-/// Count assertions awaiting human approval, capped at `PROPOSAL_BUDGET`
-/// (ranked and capped per `pending_proposals_bounded`, never surfaced whole).
-///
-/// Status stays a cheap, non-failing read: lines that do not parse as
-/// `kaya.event/v0` records are skipped here and reported by the commands
-/// that actually replay the ledger. Only when a well-formed promotion record
-/// contradicts the promotion rules does status surface the refusal.
-fn pending_proposals() -> Result<usize, Failure> {
-    let bytes = match fs::read(LEDGER_PATH) {
-        Ok(bytes) => bytes,
-        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(0),
-        Err(err) => {
-            return Err(failure(
-                "ledger-io",
-                format!("failed to read {LEDGER_PATH}: {err}"),
-            ));
-        }
-    };
-    let mut events = Vec::new();
-    for line in bytes.split(|byte| *byte == b'\n') {
-        let Ok(text) = std::str::from_utf8(line) else {
-            continue;
-        };
-        if let Ok(event) = parse_line(text) {
-            events.push(event);
-        }
-    }
-    PromotionState::from_events(&events)
-        .map(|state| cap_proposals(&state.assertions, PROPOSAL_BUDGET).len())
-        .map_err(promotion_failure)
-}
-
-fn cmd_import(source: ImportSource) -> Result<Envelope, Failure> {
-    let mut ledger = open_ledger()?;
-    let (source_name, events) = match source {
-        ImportSource::Wai { root, project } => (
-            "wai",
-            wai::capture(&root, &project).map_err(adapter_failure)?,
-        ),
-        ImportSource::Git {
-            root,
-            project,
-            limit,
-            exclude_message_prefix,
-        } => (
-            "git",
-            git::capture_excluding(&root, &project, limit, &exclude_message_prefix)
-                .map_err(adapter_failure)?,
-        ),
-        ImportSource::Test { report, project } => (
-            "test-runner",
-            vec![testrunner::capture(&report, &project).map_err(adapter_failure)?],
-        ),
-        ImportSource::Turu { bundle, project } => (
-            "turu",
-            turu::capture(&bundle, &project).map_err(adapter_failure)?,
-        ),
-        ImportSource::Model { file } => ("model", read_model_events(&file)?),
-    };
-
-    let mut appended = 0usize;
-    let mut duplicates = 0usize;
-    let mut stored = ledger.read_recovered().map_err(ledger_failure)?.0;
-    for event in &events {
-        let outcome = match ledger.append(event) {
-            Ok(outcome @ AppendOutcome::Appended) => outcome,
-            Ok(_outcome @ AppendOutcome::Duplicate)
-                if event.r#type.starts_with("capture.")
-                    && stored_correction_for(&stored, event) =>
-            {
-                // A replay of a previously captured line whose effective
-                // view a later correction overrides (e.g. a revert to an
-                // earlier heading): re-correct so the newest state wins.
-                let generation = correction_generation(&stored, event);
-                let correction = reobservation_correction(event, generation);
-                let outcome = ledger.append(&correction).map_err(ledger_failure)?;
-                stored.push(correction);
-                outcome
-            }
-            Ok(outcome) => outcome,
-            Err(err) if err.label == LABEL_ID_REUSE && event.r#type.starts_with("capture.") => {
-                // A corrected re-observation: re-derive the correction event
-                // (deterministic per artifact identity, revisit generation,
-                // and data state) and append that instead. Any refusal from
-                // the correction itself still propagates.
-                let generation = correction_generation(&stored, event);
-                let correction = reobservation_correction(event, generation);
-                let outcome = ledger.append(&correction).map_err(ledger_failure)?;
-                stored.push(correction);
-                outcome
-            }
-            Err(err) => return Err(ledger_failure(err)),
-        };
-        match outcome {
-            AppendOutcome::Appended => appended += 1,
-            AppendOutcome::Duplicate => duplicates += 1,
-        }
-    }
-
-    Ok(Envelope::ok(
-        "import",
-        json!({
-            "source": source_name,
-            "events": events.len(),
-            "appended": appended,
-            "duplicates": duplicates,
-            "ledger": LEDGER_PATH,
-        }),
-    ))
-}
-
-/// Read every `model.*` record from a JSONL seed file.
-///
-/// The whole file is validated before any event is returned, so a refusal
-/// appends nothing. Each line must parse as one `kaya.event/v0` object and
-/// name a `model.` type; every refusal names the 1-based line.
-fn read_model_events(path: &Path) -> Result<Vec<Event>, Failure> {
-    let bytes = fs::read(path).map_err(|err| {
-        failure(
-            "kaya.adapters.failure_atomic",
-            format!("model: record {}: read: {err}", path.display()),
-        )
-    })?;
-
-    let mut events = Vec::new();
-    for (index, raw) in bytes.split_inclusive(|byte| *byte == b'\n').enumerate() {
-        let line = index + 1;
-        let content = raw.strip_suffix(b"\n").unwrap_or(raw);
-        let text = std::str::from_utf8(content).map_err(|err| {
-            failure(
-                "kaya.adapters.failure_atomic",
-                format!(
-                    "model: record {line} in {}: line is not UTF-8: {err}",
-                    path.display()
-                ),
-            )
-        })?;
-        let event = parse_line(text).map_err(|err| {
-            failure(
-                "kaya.adapters.failure_atomic",
-                format!(
-                    "model: record {line} in {}: {}",
-                    path.display(),
-                    err.message
-                ),
-            )
-        })?;
-        if !event.r#type.starts_with("model.") {
-            return Err(failure(
-                "kaya.adapters.failure_atomic",
-                format!(
-                    "model: record {line} in {}: type \"{}\" is not a model event; only model.* records are importable",
-                    path.display(),
-                    event.r#type
-                ),
-            ));
-        }
-        events.push(event);
-    }
-    Ok(events)
-}
-
-fn cmd_build(
-    out: &Path,
-    expect_digest: Option<&str>,
-    allow_uncommitted: bool,
-    instrument: bool,
-) -> Result<Envelope, Failure> {
-    let (events, ledger_digest) = read_build_ledger(expect_digest, allow_uncommitted)?;
-    let changed_ids = changed_event_ids(&events);
-    let known_ids: BTreeSet<String> = events.iter().map(|event| event.id.clone()).collect();
-
-    let graph = model::build(&events).map_err(model_failure)?;
-    let state = PromotionState::from_events(&events).map_err(promotion_failure)?;
-
-    fs::create_dir_all(out).map_err(|err| {
-        failure(
-            "build-io",
-            format!("failed to create {}: {err}", out.display()),
-        )
-    })?;
-
-    // Incremental regeneration: a document whose inputs — ledger digest,
-    // generator identity, and on-disk bytes — all match the last successful
-    // build is not rebuilt; its recorded contribution is restored into the
-    // summary instead, so the envelope stays complete and truthful. Citation
-    // validation and staleness flagging below always run, even when skipped.
-    let state_path = Path::new(LEDGER_PATH).with_file_name("build-state.json");
-    let saved = state::BuildState::current(state::BuildState::load(&state_path), &ledger_digest);
-    // Skipped documents keep their recorded entries: a run that skips every
-    // document must persist the same gate it consumed, or the next build
-    // would alternate back to a full render. The digest gate above guarantees
-    // carried entries still belong to this build's document set.
-    let mut documents = saved
-        .as_ref()
-        .map(|saved| saved.documents.clone())
-        .unwrap_or_default();
-    let mut omitted: Vec<state::OmittedEntry> = Vec::new();
-    let mut summary = Summary::default();
-
-    let index_path = out.join("index.md");
-    let index_paths = vec![("index.md".to_owned(), index_path.clone())];
-    match saved
-        .as_ref()
-        .and_then(|s| s.skippable("index.md", &index_paths))
-    {
-        Some(entry) => restore_skipped(&mut summary, entry),
-        None => {
-            let built = index::build(&graph, &index_path, report::recorded_event_count(&events))
-                .map_err(projection_failure)?;
-            state::record(
-                &mut documents,
-                "index.md",
-                &index_paths,
-                &built.summary,
-                &[],
-            );
-            merge_summary(&mut summary, built.summary);
-        }
-    }
-    flag_stale_authored(&mut summary, &index_path, &changed_ids, &known_ids, &events)?;
-
-    let experiments: Vec<String> = graph
-        .nodes()
-        .filter(|node| node.entity == EntityType::Experiment)
-        .map(|node| node.id.clone())
-        .collect();
-    if !experiments.is_empty() {
-        let experiments_dir = out.join("experiments");
-        fs::create_dir_all(&experiments_dir).map_err(|err| {
-            failure(
-                "build-io",
-                format!("failed to create {}: {err}", experiments_dir.display()),
-            )
-        })?;
-        for experiment_id in experiments {
-            let file_name = format!("{}.md", experiment_id.replace('/', "-"));
-            let report_path = experiments_dir.join(&file_name);
-            let key = format!("experiments/{file_name}");
-            let paths = vec![(key.clone(), report_path.clone())];
-            match saved.as_ref().and_then(|s| s.skippable(&key, &paths)) {
-                Some(entry) => {
-                    restore_skipped(&mut summary, entry);
-                    omitted.extend(entry.omitted.iter().cloned());
-                }
-                None => {
-                    let built = report::build(&graph, &experiment_id, &report_path, &state)
-                        .map_err(projection_failure)?;
-                    let entry_omitted: Vec<state::OmittedEntry> = built
-                        .omitted
-                        .iter()
-                        .map(state::OmittedEntry::from)
-                        .collect();
-                    omitted.extend(entry_omitted.iter().cloned());
-                    state::record(&mut documents, &key, &paths, &built.summary, &entry_omitted);
-                    merge_summary(&mut summary, built.summary);
-                }
-            }
-            flag_stale_authored(
-                &mut summary,
-                &report_path,
-                &changed_ids,
-                &known_ids,
-                &events,
-            )?;
-        }
-    }
-
-    // The understanding projection is project-level: one document, both
-    // kinds, whether or not the ledger declares an experiment. An empty
-    // ledger leaves the document absent rather than writing a blank file.
-    build_single(
-        &mut summary,
-        &mut omitted,
-        &mut documents,
-        saved.as_ref(),
-        "understanding.md",
-        &out.join("understanding.md"),
-        |path| report::build_understanding(&graph, path),
-    )?;
-    flag_stale_authored(
-        &mut summary,
-        &out.join("understanding.md"),
-        &changed_ids,
-        &known_ids,
-        &events,
-    )?;
-
-    // The overview is the orientation slice of the same graph: Project,
-    // Question, and current Findings, or no document at all.
-    build_single(
-        &mut summary,
-        &mut omitted,
-        &mut documents,
-        saved.as_ref(),
-        "overview.md",
-        &out.join("overview.md"),
-        |path| report::build_overview(&graph, path),
-    )?;
-    flag_stale_authored(
-        &mut summary,
-        &out.join("overview.md"),
-        &changed_ids,
-        &known_ids,
-        &events,
-    )?;
-
-    build_single(
-        &mut summary,
-        &mut omitted,
-        &mut documents,
-        saved.as_ref(),
-        "brief.md",
-        &out.join("brief.md"),
-        |path| report::build_brief(&graph, path),
-    )?;
-    flag_stale_authored(
-        &mut summary,
-        &out.join("brief.md"),
-        &changed_ids,
-        &known_ids,
-        &events,
-    )?;
-
-    // The reuse projection always runs, even when the ledger holds no reuse
-    // references: an existing document's stale blocks and legacy names are
-    // only visible by validating the documents, and an empty kind is reported
-    // once so callers see the whole closed family.
-    let reuse_paths: Vec<(String, PathBuf)> = reuse::documents(out)
-        .into_iter()
-        .map(|(block, path)| (block.to_owned(), path))
-        .collect();
-    match saved
-        .as_ref()
-        .and_then(|s| s.skippable("reuse", &reuse_paths))
-    {
-        Some(entry) => {
-            restore_skipped(&mut summary, entry);
-            omitted.extend(entry.omitted.iter().cloned());
-        }
-        None => {
-            let reuse_inputs = reuse::inputs(&graph).map_err(projection_failure)?;
-            let built = reuse::build(&reuse_inputs, out).map_err(projection_failure)?;
-            let entry_omitted: Vec<state::OmittedEntry> = built
-                .omitted
-                .iter()
-                .map(state::OmittedEntry::from)
-                .collect();
-            omitted.extend(entry_omitted.iter().cloned());
-            state::record(
-                &mut documents,
-                "reuse",
-                &reuse_paths,
-                &built.summary,
-                &entry_omitted,
-            );
-            merge_summary(&mut summary, built.summary);
-        }
-    }
-    for (_, path) in reuse::documents(out) {
-        flag_stale_authored(&mut summary, &path, &changed_ids, &known_ids, &events)?;
-    }
-
-    let mut recomputed = summary.recomputed;
-    recomputed.sort();
-    recomputed.dedup();
-    let mut unchanged = summary.unchanged;
-    unchanged.sort();
-    unchanged.dedup();
-    let mut stale: Vec<StaleBlock> = summary.stale;
-    stale.sort_by(|left, right| {
-        left.block
-            .cmp(&right.block)
-            .then_with(|| left.evidence.cmp(&right.evidence))
-    });
-    stale.dedup();
-    let stale: Vec<serde_json::Value> = stale
-        .into_iter()
-        .map(|block| json!({ "block": block.block, "evidence": block.evidence }))
-        .collect();
-    let mut sources = summary.sources;
-    for ids in sources.values_mut() {
-        ids.sort();
-        ids.dedup();
-    }
-    omitted.sort();
-    omitted.dedup();
-    let omitted: Vec<serde_json::Value> = omitted
-        .into_iter()
-        .map(|item| {
-            json!({
-                "family": item.family,
-                "kind": item.kind,
-                "reason": item.reason,
-            })
-        })
-        .collect();
-
-    // Persist the state only after a successful build, so a failed build
-    // leaves the previous state authoritative for the next run.
-    let final_state = state::BuildState::empty(&ledger_digest).with_documents(documents);
-    final_state.store(&state_path).map_err(|error| {
-        failure(
-            "build-io",
-            format!("failed to write {}: {error}", state_path.display()),
-        )
-    })?;
-
-    let mut data = json!({
-        "out": out.display().to_string(),
-        "recomputed": recomputed,
-        "unchanged": unchanged,
-        "omitted": omitted,
-        "stale": stale,
-        "sources": sources,
-        "events": events.len(),
-        "pending_proposals": state.pending_count(),
-        "ledger_digest": ledger_digest,
-    });
-    if instrument {
-        data["render_invocations"] = json!(render_invocations());
-    }
-    Ok(Envelope::ok("build", data))
-}
-
-/// Build one single-document projection with the skip predicate, or record
-/// and merge its contribution after a real build.
-fn build_single<B>(
-    summary: &mut Summary,
-    omitted: &mut Vec<state::OmittedEntry>,
-    documents: &mut BTreeMap<String, state::DocumentState>,
-    saved: Option<&state::BuildState>,
-    key: &str,
-    path: &Path,
-    build: B,
-) -> Result<(), Failure>
-where
-    B: FnOnce(&Path) -> Result<report::Built, ProjectionError>,
-{
-    let paths = vec![(key.to_owned(), path.to_path_buf())];
-    match saved.and_then(|s| s.skippable(key, &paths)) {
-        Some(entry) => {
-            restore_skipped(summary, entry);
-            omitted.extend(entry.omitted.iter().cloned());
-        }
-        None => {
-            let built = build(path).map_err(projection_failure)?;
-            let entry_omitted: Vec<state::OmittedEntry> = built
-                .omitted
-                .iter()
-                .map(state::OmittedEntry::from)
-                .collect();
-            omitted.extend(entry_omitted.iter().cloned());
-            state::record(documents, key, &paths, &built.summary, &entry_omitted);
-            merge_summary(summary, built.summary);
-        }
-    }
-    Ok(())
-}
-
-/// Restore a skipped document's recorded summary contribution: its generated
-/// blocks report `unchanged` exactly as a real unchanged build would, and its
-/// source map is restored verbatim.
-fn restore_skipped(summary: &mut Summary, entry: &state::DocumentState) {
-    summary.unchanged.extend(entry.blocks.iter().cloned());
-    for (block, ids) in &entry.sources {
-        summary
-            .sources
-            .entry(block.clone())
-            .or_default()
-            .extend(ids.iter().cloned());
-    }
-}
-
-/// Print the document IR of the compiled record without writing anything.
-///
-/// The plans run read-only against the existing document sources and the
-/// ledger: nothing outside the document sources and the ledger feeds the IR,
-/// so build caches and stale sidecars cannot change it. The IR covers the
-/// research index, every experiment report, the understanding and overview
-/// documents, and the reuse family.
-fn cmd_ir(
-    out: &Path,
-    expect_digest: Option<&str>,
-    allow_uncommitted: bool,
-) -> Result<Envelope, Failure> {
-    let (events, _) = read_build_ledger(expect_digest, allow_uncommitted)?;
-    let (document_ir, _) = collect_document_ir(out, &events)?;
-    let payload = serde_json::to_value(&document_ir).map_err(|error| {
-        failure(
-            "ir-serialize",
-            format!("failed to serialize the document IR: {error}"),
-        )
-    })?;
-    Ok(Envelope::ok("ir", payload))
 }
 
 /// Materialize the document IR from the research sources, using the same
@@ -1229,7 +563,7 @@ fn cmd_ir(
 ///
 /// The gate reads the record build ships, never a parallel one, so the gate
 /// and the compiled record cannot disagree about record ids or edges.
-fn collect_document_ir(
+pub(crate) fn collect_document_ir(
     out: &Path,
     events: &[Event],
 ) -> Result<(ir::DocumentIr, IrCollector), Failure> {
@@ -1369,171 +703,6 @@ impl IrCollector {
     }
 }
 
-/// Compose the twelve declared products and both declared packages over the
-/// compiled research documents.
-///
-/// The declarations are [`publication::default_declarations`], so `kaya
-/// publish` and `kaya check` compile exactly the same tree. The document
-/// source is read once from `docs/research`; the publication layer refuses
-/// invalid declarations before writing, omits products without a backing
-/// document, and exports the same attribution it renders. It also owns the
-/// write: each page is a `publication.<tier>.<name>` managed block inside its
-/// file, so published bytes stay compiler-owned without a second pass here.
-fn cmd_publish(out: &Path) -> Result<Envelope, Failure> {
-    let documents =
-        publication::read_documents(Path::new("docs/research")).map_err(publication_failure)?;
-
-    let declarations = publication::default_declarations();
-
-    let built = publication::build(&declarations, &documents, out).map_err(publication_failure)?;
-
-    let pages: Vec<serde_json::Value> = built
-        .pages
-        .iter()
-        .map(|page| {
-            json!({
-                "name": page.name,
-                "path": page.path.display().to_string(),
-                "question": page.question,
-                "documents": page.documents,
-            })
-        })
-        .collect();
-    let omitted: Vec<serde_json::Value> = built
-        .omitted
-        .iter()
-        .map(|entry| {
-            json!({
-                "tier": entry.tier,
-                "name": entry.name,
-                "reason": entry.reason,
-            })
-        })
-        .collect();
-    // The envelope reports the documents the tree actually attributes, in kind
-    // order: one entry per kind the export carries, never a compiled document
-    // no emitted product composes.
-    let mut attributed: BTreeSet<&str> = BTreeSet::new();
-    for page in &built.pages {
-        for kind in &page.documents {
-            attributed.insert(kind.as_str());
-        }
-    }
-    let documents: Vec<serde_json::Value> = attributed
-        .into_iter()
-        .filter_map(|kind| documents.0.get(kind))
-        .map(|document| {
-            json!({
-                "kind": document.kind,
-                "event_ids": document.event_ids,
-            })
-        })
-        .collect();
-    // The build's own summary is the publish report: it names every page block
-    // and the export exactly as the writer saw them.
-    let mut recomputed = built.summary.recomputed.clone();
-    recomputed.sort();
-    recomputed.dedup();
-    let mut unchanged = built.summary.unchanged.clone();
-    unchanged.sort();
-    unchanged.dedup();
-
-    Ok(Envelope::ok(
-        "publish",
-        json!({
-            "out": out.display().to_string(),
-            "recomputed": recomputed,
-            "unchanged": unchanged,
-            "pages": pages,
-            "omitted": omitted,
-            "documents": documents,
-        }),
-    ))
-}
-
-/// Verify the record without writing: the expected bytes come from the same
-/// planners `build` and `publish` use, compared against the worktree or, with
-/// `options.index`, against the staged blobs a commit would record.
-///
-/// `check` reports drift, unmet requirements, and staleness in its own success
-/// envelope and lets the exit code carry the verdict: 0 clean, 1 drift or an
-/// enabled violation, 2 usage or I/O failure. Only the flags decide which
-/// findings are violations, so the same envelope proves both a plain advisory
-/// run and an enforced gate. It creates no directory, appends no event, and
-/// evaluates no threshold.
-fn cmd_check(
-    root: &Path,
-    out: &Path,
-    publish_out: &Path,
-    expect_digest: Option<&str>,
-    options: &verification::CheckOptions,
-) -> ExitCode {
-    match verification::check(root, out, publish_out, expect_digest, options) {
-        Ok(outcome) => {
-            let code = outcome.exit_code();
-            let facts = outcome.facts;
-            let envelope = Envelope::ok(
-                "check",
-                json!({
-                    "drift": outcome.drift,
-                    "required": outcome.required,
-                    "stale": outcome.stale,
-                    "events": facts.events,
-                    "ledger_digest": facts.ledger_digest,
-                    "last_capture_commit": facts.last_capture_commit,
-                    "newest_event_at": facts.newest_event_at,
-                    "events_by_source": facts.events_by_source,
-                    "emitted_kinds": facts.emitted_kinds,
-                    "omitted_kinds": facts.omitted_kinds,
-                }),
-            );
-            emit_code(envelope, code)
-        }
-        Err(error) => emit_code(Envelope::error("error", &error.label, error.message), 2),
-    }
-}
-
-/// Validate and report the authored blocks of one compiled document.
-///
-/// The document is read back after compilation, never rewritten, so authored
-/// bytes stay exactly as the human left them. Its citation markers are checked
-/// first — always, even when nothing changed — because staleness over a
-/// citation of an id the ledger does not record would report on evidence that
-/// does not exist. Only then are changed citations reported, minus the ids a
-/// human acknowledged for this document and block.
-fn flag_stale_authored(
-    summary: &mut Summary,
-    path: &Path,
-    changed_ids: &[String],
-    known_ids: &BTreeSet<String>,
-    events: &[Event],
-) -> Result<(), Failure> {
-    let document = match fs::read_to_string(path) {
-        Ok(document) => document,
-        // A report can legitimately be absent: when both kinds have no
-        // source records, the build writes no file. Absence means there is
-        // no authored prose to check, not an I/O failure.
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
-        Err(error) => {
-            return Err(failure(
-                "build-io",
-                format!("failed to read {}: {error}", path.display()),
-            ));
-        }
-    };
-    let label = report::document_label_for(path);
-    report::validate_citations(&document, &label, known_ids).map_err(projection_failure)?;
-    if changed_ids.is_empty() {
-        return Ok(());
-    }
-    let acknowledged = report::acknowledged(events, &label);
-    let stale = report::stale_authored(&document, changed_ids, &acknowledged);
-    summary
-        .stale
-        .extend(report::unacknowledged(stale, &acknowledged));
-    Ok(())
-}
-
 /// Read and verify the ledger for a build, without a second read.
 ///
 /// The bytes are read exactly once. When git tracks the ledger, the committed
@@ -1541,7 +710,7 @@ fn flag_stale_authored(
 /// newline-terminated line, so only ledger history git already recorded is
 /// served. An untracked ledger has no such history: it is accepted only when
 /// the caller pins its digest or explicitly allows uncommitted history.
-fn read_build_ledger(
+pub(crate) fn read_build_ledger(
     expect_digest: Option<&str>,
     allow_uncommitted: bool,
 ) -> Result<(Vec<Event>, String), Failure> {
@@ -1687,770 +856,4 @@ fn parse_ledger_bytes(bytes: &[u8]) -> Result<Vec<Event>, Failure> {
         events.push(event);
     }
     Ok(events)
-}
-
-fn merge_summary(into: &mut Summary, from: Summary) {
-    into.recomputed.extend(from.recomputed);
-    into.unchanged.extend(from.unchanged);
-    into.stale.extend(from.stale);
-    for (block, ids) in from.sources {
-        into.sources.entry(block).or_default().extend(ids);
-    }
-}
-
-fn cmd_promote(assertion_id: &str, actor_name: &str) -> Result<Envelope, Failure> {
-    let mut ledger = open_ledger()?;
-    let (events, _recovery) = ledger.read_recovered().map_err(ledger_failure)?;
-    let approval =
-        promotion::approve(&human_actor(actor_name), assertion_id).map_err(promotion_failure)?;
-
-    // Replaying the record with the candidate event is what refuses an
-    // approval of an assertion that was never recorded: the projection, not
-    // the CLI, owns the promotion rules.
-    let mut replayed = events;
-    replayed.push(approval.clone());
-    PromotionState::from_events(&replayed).map_err(promotion_failure)?;
-
-    ledger.append(&approval).map_err(ledger_failure)?;
-    Ok(Envelope::ok("promote", json!({ "event": approval })))
-}
-
-fn cmd_challenge(
-    conclusion_id: &str,
-    counter_event_ids: &[String],
-    actor_name: &str,
-) -> Result<Envelope, Failure> {
-    let mut ledger = open_ledger()?;
-    let (events, _recovery) = ledger.read_recovered().map_err(ledger_failure)?;
-    let challenge =
-        promotion::challenge(&human_actor(actor_name), conclusion_id, counter_event_ids)
-            .map_err(promotion_failure)?;
-
-    // Replay proves the target is an established conclusion before the
-    // challenge is written; the projection carries the refusal label.
-    let mut replayed = events;
-    replayed.push(challenge.clone());
-    PromotionState::from_events(&replayed).map_err(promotion_failure)?;
-
-    ledger.append(&challenge).map_err(ledger_failure)?;
-    Ok(Envelope::ok("challenge", json!({ "event": challenge })))
-}
-
-/// Append a human acknowledgment of one authored block's changed evidence.
-///
-/// This is the writer the staleness report reads: exactly one
-/// `verification.acknowledged` event naming the document, the block, and the
-/// ids reviewed. Only a human may acknowledge — the record is a claim that a
-/// person read the evidence. Every refusal happens before the append, so a
-/// rejected invocation leaves the ledger byte-identical. An equivalent
-/// acknowledgment already recorded is reported with `appended: false` and the
-/// stored event, so repeating the command appends nothing. Authored bytes are
-/// never touched and nothing is rebuilt: the next `build` or `check` reflects
-/// the acknowledgment.
-fn cmd_acknowledge(
-    document: &Path,
-    block: &str,
-    event_ids: &[String],
-    actor_name: &str,
-    actor_type: &str,
-) -> Result<Envelope, Failure> {
-    if actor_type != "human" {
-        return Err(failure(
-            "kaya.acknowledge.tool_actor",
-            format!(
-                "actor type \"{actor_type}\" may not acknowledge authored evidence; \
-                 only a human can acknowledge what a human wrote"
-            ),
-        ));
-    }
-
-    let canonical = fs::canonicalize(document).ok();
-    let canonical_cwd = std::env::current_dir()
-        .ok()
-        .and_then(|dir| fs::canonicalize(dir).ok());
-    let label = report::document_label_for(document);
-    if let (Some(canonical), Some(cwd)) = (&canonical, &canonical_cwd)
-        && canonical.strip_prefix(cwd).is_err()
-    {
-        return Err(failure(
-            "kaya.acknowledge.unknown_document",
-            format!(
-                "unknown document \"{label}\": it lies outside the working directory {}",
-                cwd.display()
-            ),
-        ));
-    }
-    match fs::metadata(document) {
-        Ok(metadata) if metadata.is_file() => {}
-        Ok(_) => {
-            return Err(failure(
-                "kaya.acknowledge.unknown_document",
-                format!("unknown document \"{label}\": the path is not a file"),
-            ));
-        }
-        Err(error) if error.kind() == ErrorKind::NotFound => {
-            return Err(failure(
-                "kaya.acknowledge.unknown_document",
-                format!("unknown document \"{label}\": {error}"),
-            ));
-        }
-        Err(error) => {
-            return Err(failure(
-                "kaya.acknowledge.document_io",
-                format!("failed to inspect \"{label}\": {error}"),
-            ));
-        }
-    }
-
-    let text = fs::read_to_string(document).map_err(|error| {
-        failure(
-            "kaya.acknowledge.document_io",
-            format!("failed to read \"{label}\": {error}"),
-        )
-    })?;
-    let blocks = report::authored_block_names(&text).map_err(projection_failure)?;
-    if !blocks.iter().any(|name| name == block) {
-        let available = if blocks.is_empty() {
-            "it carries none".to_owned()
-        } else {
-            format!("the document carries {}", blocks.join(", "))
-        };
-        return Err(failure(
-            "kaya.acknowledge.unknown_block",
-            format!("\"{label}\" has no authored block \"{block}\": {available}"),
-        ));
-    }
-
-    let mut ledger = Ledger::open(LEDGER_PATH).map_err(acknowledge_ledger_failure)?;
-    let (events, _recovery) = ledger
-        .read_recovered()
-        .map_err(acknowledge_ledger_failure)?;
-
-    let known: BTreeSet<&str> = events.iter().map(|event| event.id.as_str()).collect();
-    for id in event_ids {
-        if !known.contains(id.as_str()) {
-            return Err(failure(
-                "kaya.acknowledge.unknown_event",
-                format!(
-                    "unknown event id \"{id}\": an acknowledgment covers evidence the ledger records"
-                ),
-            ));
-        }
-    }
-    let covered: Vec<String> = event_ids
-        .iter()
-        .cloned()
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect();
-    let latest = report::latest_corrections(&events);
-    let reviewed: BTreeMap<String, String> = covered
-        .iter()
-        .filter_map(|id| {
-            latest
-                .get(id)
-                .map(|correction| (id.clone(), correction.clone()))
-        })
-        .collect();
-
-    if let Some(existing) = equivalent_acknowledgment(&events, &label, block, &covered, &reviewed) {
-        return Ok(Envelope::ok(
-            "acknowledge",
-            json!({ "event": existing, "appended": false }),
-        ));
-    }
-
-    let acknowledgment = Event {
-        id: new_id(),
-        schema: SCHEMA_V0.to_owned(),
-        r#type: report::ACKNOWLEDGED_EVENT.to_owned(),
-        timestamp: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-        actor: human_actor(actor_name),
-        subject: Subject {
-            r#type: report::DOCUMENT_SUBJECT.to_owned(),
-            id: label.clone(),
-        },
-        data: json!({ "block": block, "events": covered, "reviewed": reviewed }),
-        provenance: Provenance {
-            tool: "kaya".to_owned(),
-            version: env!("CARGO_PKG_VERSION").to_owned(),
-            reference: label,
-        },
-        artifacts: Vec::new(),
-    };
-    let outcome = ledger
-        .append(&acknowledgment)
-        .map_err(acknowledge_ledger_failure)?;
-
-    Ok(Envelope::ok(
-        "acknowledge",
-        json!({
-            "event": acknowledgment,
-            "appended": outcome == AppendOutcome::Appended,
-        }),
-    ))
-}
-
-/// The recorded acknowledgment covering exactly `(document, block, ids,
-/// reviewed)`, if any.
-///
-/// Replay is a no-op only when the id sets and the reviewed correction map
-/// match: acknowledging a subset again is a second, narrower review, and the
-/// same ids after a newer correction reviewed a version the human has not
-/// seen.
-fn equivalent_acknowledgment<'a>(
-    events: &'a [Event],
-    document: &str,
-    block: &str,
-    ids: &[String],
-    reviewed: &BTreeMap<String, String>,
-) -> Option<&'a Event> {
-    let wanted: BTreeSet<&str> = ids.iter().map(String::as_str).collect();
-    events.iter().find(|event| {
-        if event.r#type != report::ACKNOWLEDGED_EVENT
-            || event.subject.r#type != report::DOCUMENT_SUBJECT
-            || report::document_label(&event.subject.id) != document
-        {
-            return false;
-        }
-        let Some(data) = event.data.as_object() else {
-            return false;
-        };
-        if data.get("block").and_then(|value| value.as_str()) != Some(block) {
-            return false;
-        }
-        let stored: BTreeSet<&str> = data
-            .get("events")
-            .and_then(|value| value.as_array())
-            .into_iter()
-            .flatten()
-            .filter_map(|id| id.as_str())
-            .filter(|id| !id.is_empty())
-            .collect();
-        if stored != wanted {
-            return false;
-        }
-        let stored_reviewed: BTreeMap<&str, &str> = data
-            .get("reviewed")
-            .and_then(|value| value.as_object())
-            .into_iter()
-            .flatten()
-            .filter_map(|(target, correction)| {
-                correction
-                    .as_str()
-                    .map(|correction| (target.as_str(), correction))
-            })
-            .collect();
-        stored_reviewed.len() == reviewed.len()
-            && reviewed.iter().all(|(target, correction)| {
-                stored_reviewed.get(target.as_str()).copied() == Some(correction.as_str())
-            })
-    })
-}
-
-/// A ledger refusal inside `kaya acknowledge`, kept in the command's namespace.
-fn acknowledge_ledger_failure(error: LedgerError) -> Failure {
-    failure(
-        "kaya.acknowledge.ledger",
-        format!("{}: {}", error.label, error.message),
-    )
-}
-
-/// Run every declared doctest contract and record the run as one fact.
-///
-/// Documents are read in sorted order, every declared contract runs through
-/// the controlled runner, and one `experiment.run.completed` event of kind
-/// `doctest` records the run's counts. A document that refuses the doctest
-/// grammar fails the whole run before any step executes; a failing step is
-/// recorded as a failed count and the run still records its fact.
-fn cmd_doctest(out: &Path, project: &str, timeout: u64) -> Result<Envelope, Failure> {
-    let documents = doctest::collect_documents(out).map_err(|err| {
-        failure(
-            "kaya.doctest.unknown_dir",
-            format!("cannot read document directory {}: {err}", out.display()),
-        )
-    })?;
-
-    let mut declared = 0usize;
-    let mut passed = 0usize;
-    let mut failed = 0usize;
-    let mut failures: Vec<String> = Vec::new();
-    let mut labels: Vec<String> = Vec::new();
-    let mut report_lines = String::new();
-    for path in &documents {
-        let text = fs::read_to_string(path).map_err(|err| {
-            failure(
-                "kaya.doctest.document_io",
-                format!("cannot read {}: {err}", path.display()),
-            )
-        })?;
-        let contracts = doctest::extract(&text).map_err(|error| {
-            failure(
-                "kaya.doctest.grammar",
-                format!("{}: {error}", path.display()),
-            )
-        })?;
-        for contract in &contracts {
-            declared += 1;
-            labels.push(format!("{}#{}", path.display(), contract.label));
-            match doctest::run(contract, std::time::Duration::from_secs(timeout)) {
-                doctest::Outcome::Passed => {
-                    passed += 1;
-                    report_lines.push_str("{\"type\":\"test\",\"event\":\"ok\"}\n");
-                }
-                doctest::Outcome::Failed { step, reason } => {
-                    failed += 1;
-                    failures.push(format!(
-                        "{}#{} step {}: {}",
-                        path.display(),
-                        contract.label,
-                        step,
-                        describe_failure(&reason),
-                    ));
-                    report_lines.push_str("{\"type\":\"test\",\"event\":\"failed\"}\n");
-                }
-            }
-        }
-    }
-
-    let mut appended = 0usize;
-    let mut duplicates = 0usize;
-    if declared > 0 {
-        let report_path = Path::new(".kaya/doctest-run.jsonl");
-        fs::create_dir_all(KAYA_DIR).map_err(|err| {
-            failure(
-                "kaya.doctest.report_io",
-                format!("cannot create {KAYA_DIR}: {err}"),
-            )
-        })?;
-        fs::write(report_path, &report_lines).map_err(|err| {
-            failure(
-                "kaya.doctest.report_io",
-                format!("cannot write {}: {err}", report_path.display()),
-            )
-        })?;
-        let event = doctest::capture_with_kind(report_path, project, Some("doctest"))
-            .map_err(adapter_failure)?;
-        let mut ledger = open_ledger()?;
-        match ledger.append(&event).map_err(ledger_failure)? {
-            AppendOutcome::Appended => appended += 1,
-            AppendOutcome::Duplicate => duplicates += 1,
-        }
-    }
-
-    Ok(Envelope::ok(
-        "doctest",
-        json!({
-            "declared": declared,
-            "passed": passed,
-            "failed": failed,
-            "failures": failures,
-            "labels": labels,
-            "appended": appended,
-            "duplicates": duplicates,
-            "ledger": LEDGER_PATH,
-        }),
-    ))
-}
-
-/// Human-readable phrasing of one failed step.
-fn describe_failure(reason: &doctest::Failure) -> String {
-    match reason {
-        doctest::Failure::Exit(code) => format!("exited with {code}"),
-        doctest::Failure::Mismatch => "output did not match".to_owned(),
-        doctest::Failure::Timeout => "timed out".to_owned(),
-    }
-}
-
-/// Record a human decision that a doctest's expected output changed.
-///
-/// The human edits the document first; this command records the event
-/// naming the new expected-output hash, so the ledger shows who changed a
-/// contract and when. A tool or agent actor is refused here exactly as the
-/// library refuses it: expected output answers to humans only.
-fn cmd_supersede_doctest(
-    document: &Path,
-    label: &str,
-    actor_name: &str,
-    actor_type: &str,
-) -> Result<Envelope, Failure> {
-    if actor_type != "human" {
-        return Err(failure(
-            "kaya.supersede.tool_actor",
-            format!(
-                "actor type \"{actor_type}\" may not supersede doctest expected output; \
-                 only a human can declare what a human verified"
-            ),
-        ));
-    }
-    let text = fs::read_to_string(document).map_err(|err| {
-        failure(
-            "kaya.supersede.document_io",
-            format!("cannot read {}: {err}", document.display()),
-        )
-    })?;
-    let contracts = doctest::extract(&text).map_err(|error| {
-        failure(
-            "kaya.doctest.grammar",
-            format!("{}: {error}", document.display()),
-        )
-    })?;
-    let contract = contracts
-        .iter()
-        .find(|contract| contract.label == label)
-        .ok_or_else(|| {
-            failure(
-                "kaya.supersede.unknown_doctest",
-                format!(
-                    "document {} declares no doctest labeled \"{label}\"",
-                    document.display()
-                ),
-            )
-        })?;
-    let record_id = format!("{}#{label}", document.display());
-    let to_hash = doctest::contract_hash(&contract.body);
-    let previous = latest_supersede(&record_id)?;
-    if let Some((_, previous_hash)) = &previous
-        && *previous_hash == to_hash
-    {
-        return Err(failure(
-            "kaya.supersede.unchanged",
-            format!(
-                "the expected output of \"{record_id}\" already carries hash {to_hash}; \
-                 edit the document first, then record the supersede"
-            ),
-        ));
-    }
-    let event = doctest::supersede_event(
-        &record_id,
-        &to_hash,
-        previous.as_ref().map(|(id, _)| id.as_str()),
-        &human_actor(actor_name),
-    )
-    .map_err(|error| failure(error.label, error.message))?;
-    let mut ledger = open_ledger()?;
-    let appended = match ledger.append(&event).map_err(ledger_failure)? {
-        AppendOutcome::Appended => true,
-        AppendOutcome::Duplicate => false,
-    };
-    Ok(Envelope::ok(
-        "supersede-doctest",
-        json!({
-            "record": record_id,
-            "to_hash": to_hash,
-            "supersedes": previous.as_ref().map(|(id, _)| id),
-            "event": event.id,
-            "appended": appended,
-            "ledger": LEDGER_PATH,
-        }),
-    ))
-}
-
-/// The id and recorded hash of the newest supersede event naming
-/// `record_id`, if one exists.
-fn latest_supersede(record_id: &str) -> Result<Option<(String, String)>, Failure> {
-    let text = fs::read_to_string(LEDGER_PATH).map_err(|err| {
-        failure(
-            "kaya.supersede.ledger_io",
-            format!("cannot read the ledger {LEDGER_PATH}: {err}"),
-        )
-    })?;
-    let mut latest: Option<(String, String)> = None;
-    for line in text.lines() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let Ok(event) = parse_line(line) else {
-            continue;
-        };
-        if event.r#type == "verification.doctest.superseded"
-            && event.data.get("record").and_then(|value| value.as_str()) == Some(record_id)
-        {
-            let to_hash = event
-                .data
-                .get("to_hash")
-                .and_then(|value| value.as_str())
-                .unwrap_or_default()
-                .to_owned();
-            latest = Some((event.id, to_hash));
-        }
-    }
-    Ok(latest)
-}
-
-/// Gate a change set: map it over the document IR, derive the disposition
-/// of every impacted record, run the mandatory mechanical checks, and
-/// report `pass`, `review`, or `fail`.
-///
-/// The gate reads the same verified ledger path build reads: appended
-/// corrections and observations are visible, rewritten history is refused.
-/// Exit codes carry the verdict — 0 for pass and review, 2 for fail — while
-/// the envelope always carries the full report.
-fn cmd_impact(
-    staged: bool,
-    range: Option<&str>,
-    out: &Path,
-    timeout_secs: u64,
-) -> Result<(Envelope, u8), Failure> {
-    if staged && range.is_some() {
-        return Err(failure(
-            "kaya.impact.usage",
-            "--staged and --range are exclusive; name exactly one change source",
-        ));
-    }
-    if !staged && range.is_none() {
-        return Err(failure(
-            "kaya.impact.usage",
-            "name exactly one change source: --staged or --range <revset>",
-        ));
-    }
-    let policy = impact::Policy::load(Path::new(impact::IMPACT_RULES))
-        .map_err(|error| failure(error.label, error.message))?;
-
-    let (events, _) = read_build_ledger(None, false)?;
-    let (document_ir, collector) = collect_document_ir(out, &events)?;
-    let sources: Vec<(String, String)> = collector
-        .sources
-        .iter()
-        .map(|source| (source.path.clone(), source.bytes.clone()))
-        .collect();
-
-    let base_ref = if staged {
-        "HEAD".to_owned()
-    } else {
-        impact_base_rev(range.unwrap_or_default())?
-    };
-    let change_set = ChangeSet {
-        paths: git_changed_paths(staged, &base_ref)?,
-        event_ids: git_ledger_event_ids(staged, &base_ref)?,
-    };
-    let base_docs = base_documents(&sources, &base_ref)?;
-
-    let input = impact::GateInput {
-        ir: &document_ir,
-        sources: &sources,
-        base_docs: &base_docs,
-        events: &events,
-        changes: &change_set,
-        policy: &policy,
-        timeout: std::time::Duration::from_secs(timeout_secs),
-    };
-    let report = impact::evaluate(&input);
-    let code = if report.result == "fail" { 2 } else { 0 };
-    let payload = serde_json::to_value(&report).map_err(|error| {
-        failure(
-            "kaya.impact.serialize",
-            format!("failed to serialize the impact report: {error}"),
-        )
-    })?;
-    Ok((Envelope::ok("impact", payload), code))
-}
-
-/// Record one human disposition — a review or a waiver — for one impacted
-/// record.
-///
-/// The record must exist in the current IR; the event names it with the
-/// subject typed Document, carries the actor and, for a waiver, the
-/// rationale and the dependency digest the waiver binds. Refusals happen
-/// before any append, so a refused decision appends nothing.
-#[allow(clippy::too_many_arguments)]
-fn cmd_disposition(
-    record_id: &str,
-    kind: &str,
-    rationale: Option<&str>,
-    actor_name: &str,
-    actor_type: &str,
-    out: &Path,
-) -> Result<Envelope, Failure> {
-    if actor_type != "human" {
-        return Err(failure(
-            impact::LABEL_HUMAN_ACTOR,
-            format!(
-                "actor type \"{actor_type}\" may not record dispositions; \
-                 only a human can review or waive an impact"
-            ),
-        ));
-    }
-    let (event_type, waived) = match kind {
-        "reviewed" => (impact::REVIEWED_EVENT, false),
-        "waived" => (impact::WAIVED_EVENT, true),
-        other => {
-            return Err(failure(
-                "kaya.impact.unknown_disposition",
-                format!("unknown disposition \"{other}\": name `reviewed` or `waived`"),
-            ));
-        }
-    };
-    if waived && rationale.is_none() {
-        return Err(failure(
-            "kaya.impact.rationale_required",
-            "a waived disposition carries a rationale",
-        ));
-    }
-
-    let mut ledger = open_ledger()?;
-    let (events, _recovery) = ledger.read_recovered().map_err(ledger_failure)?;
-    let (document_ir, _collector) = collect_document_ir(out, &events)?;
-    let record = document_ir.records.get(record_id).ok_or_else(|| {
-        failure(
-            "kaya.impact.unknown_record",
-            format!(
-                "unknown record \"{record_id}\": a disposition names a record the \
-                 document IR materializes"
-            ),
-        )
-    })?;
-    let digest = impact::dependency_digest(record);
-
-    let mut data = json!({ "record": record_id, "disposition": kind });
-    if let Some(rationale) = rationale {
-        data["rationale"] = json!(rationale);
-    }
-    if waived {
-        data["digest"] = json!(digest);
-    }
-
-    let existing = events.iter().find(|event| {
-        event.r#type == event_type
-            && event.subject.r#type == report::DOCUMENT_SUBJECT
-            && event.subject.id == record_id
-            && event.data == data
-    });
-    if let Some(existing) = existing {
-        return Ok(Envelope::ok(
-            "disposition",
-            json!({ "event": existing, "appended": false }),
-        ));
-    }
-
-    let event = Event {
-        id: new_id(),
-        schema: SCHEMA_V0.to_owned(),
-        r#type: event_type.to_owned(),
-        timestamp: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-        actor: human_actor(actor_name),
-        subject: Subject {
-            r#type: report::DOCUMENT_SUBJECT.to_owned(),
-            id: record_id.to_owned(),
-        },
-        data,
-        provenance: Provenance {
-            tool: "kaya".to_owned(),
-            version: env!("CARGO_PKG_VERSION").to_owned(),
-            reference: record_id.to_owned(),
-        },
-        artifacts: Vec::new(),
-    };
-    let appended = matches!(
-        ledger.append(&event).map_err(ledger_failure)?,
-        AppendOutcome::Appended
-    );
-    Ok(Envelope::ok(
-        "disposition",
-        json!({ "event": event, "appended": appended }),
-    ))
-}
-
-/// The base rev named by a `--range` value: `main..` names `main`; a bare
-/// rev names itself. A full range with two revs is refused — the gate
-/// always diffs the base against HEAD, never an arbitrary pair.
-fn impact_base_rev(range: &str) -> Result<String, Failure> {
-    let base = range.strip_suffix("..").unwrap_or(range);
-    if base.is_empty() || base.contains("..") {
-        return Err(failure(
-            "kaya.impact.usage",
-            "--range names the base of the comparison, e.g. `main` or `main..`; \
-             the gate diffs it against HEAD",
-        ));
-    }
-    Ok(base.to_owned())
-}
-
-/// The change set's repository paths from git: the staged diff against
-/// HEAD, or the diff between the base rev and HEAD.
-fn git_changed_paths(staged: bool, base: &str) -> Result<BTreeSet<String>, Failure> {
-    let text = if staged {
-        git_output(["diff", "--cached", "--name-only", "-z"])?
-    } else {
-        git_output(["diff", "--name-only", "-z", &format!("{base}..HEAD")])?
-    };
-    Ok(text
-        .split('\0')
-        .filter(|path| !path.is_empty())
-        .map(str::to_owned)
-        .collect())
-}
-
-/// The change set's introduced ledger event ids, read from the patch git
-/// reports for the ledger itself: every added line is one event.
-fn git_ledger_event_ids(staged: bool, base: &str) -> Result<BTreeSet<String>, Failure> {
-    let text = if staged {
-        git_output(["diff", "--cached", "--", LEDGER_PATH])?
-    } else {
-        git_output(["diff", &format!("{base}..HEAD"), "--", LEDGER_PATH])?
-    };
-    let mut ids = BTreeSet::new();
-    for line in text.lines() {
-        let Some(added) = line.strip_prefix('+') else {
-            continue;
-        };
-        if added.starts_with("++") || added.trim().is_empty() {
-            continue;
-        }
-        let Ok(event) = parse_line(added) else {
-            return Err(failure(
-                "kaya.impact.ledger_diff",
-                format!("the ledger diff carries a line that is not an event: {added}"),
-            ));
-        };
-        ids.insert(event.id);
-    }
-    Ok(ids)
-}
-
-/// The document sources at the change-set base, for regenerated-different
-/// comparisons.
-///
-/// The base's tracked paths are read once from `git ls-tree`, so a source
-/// absent at the base is absent from the map while a broken base rev — or
-/// any other git failure — is a labeled refusal, never silence.
-fn base_documents(
-    sources: &[(String, String)],
-    base: &str,
-) -> Result<BTreeMap<String, String>, Failure> {
-    let listing = git_output(["ls-tree", "-r", "--name-only", base])?;
-    let tracked: BTreeSet<&str> = listing.lines().collect();
-    let mut base_docs = BTreeMap::new();
-    for (path, _) in sources {
-        if !tracked.contains(path.as_str()) {
-            continue;
-        }
-        let bytes = git_output(["show", &format!("{base}:{path}")])?;
-        base_docs.insert(path.clone(), bytes);
-    }
-    Ok(base_docs)
-}
-
-/// Run git, returning stdout; a failed git invocation is a labeled refusal.
-fn git_output<const N: usize>(args: [&str; N]) -> Result<String, Failure> {
-    let output = ProcessCommand::new("git")
-        .args(args)
-        .output()
-        .map_err(|error| {
-            failure(
-                "kaya.impact.git_io",
-                format!("git {} could not run: {error}", args.join(" ")),
-            )
-        })?;
-    if !output.status.success() {
-        return Err(failure(
-            "kaya.impact.git_io",
-            format!(
-                "git {} failed: {}",
-                args.join(" "),
-                String::from_utf8_lossy(&output.stderr).trim()
-            ),
-        ));
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }

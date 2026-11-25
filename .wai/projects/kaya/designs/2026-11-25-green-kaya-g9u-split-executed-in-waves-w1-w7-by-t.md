@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-25-kaya-g9u-split-main-rs-into-command-modules-waves-tighten-pretender-ceiling, pipeline-step:green]
+---
+
+GREEN kaya-g9u: split executed in waves W1-W7 by two serialized subagents (same file, no parallel races), verified per wave. Final: src/main.rs 859 (was 2456) + src/commands/{capture 27, doctest 247, impact 304, import 157, mod 16, publication 548, status 204, verification 285}, all with PRR headers. clap structs stayed in main.rs; shared helpers pub(crate) (Failure, failure, open_ledger, ledger paths, *_failure constructors, emit_code, read_build_ledger, collect_document_ir, CaptureArgs, ImportSource, human_actor). Pretender: file_lines_max stays 3500 at measured max 3305 (tests/cli_pipeline.rs; subagent's 3800 reverted to g41 ~6% headroom discipline), header rewritten (deliberate-slack note gone); test function_lines_max 460->480 re-baselined at measured 467 (test grew with w68/34g publish-flip steps; repo precedent abc 146.75->150). Orchestrator verification: cargo test 504/0, clippy 0 findings, fmt clean, pretender gate exit 0.

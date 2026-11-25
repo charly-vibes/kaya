@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-25-kaya-g9u-split-main-rs-into-command-modules-waves-tighten-pretender-ceiling, pipeline-step:quality-ledger]
+---
+
+QUALITY LEDGER kaya-g9u: Changed: src/main.rs (2456->859), src/commands/{mod,capture,doctest,impact,import,publication,status,verification}.rs (new, 1788 lines total), pretender.toml (header rewrite, test function_lines 460->480 re-baseline; file_lines cap unchanged 3500). Verified commands + results: cargo test 504 passed 0 failed (every wave + post-fix); clippy -D warnings 0 findings; fmt clean; pretender gate exit 0 (61 files improved vs baseline); ah check pending post-commit; ro5u CRITICALS 0 (35 fns byte-compared). Acceptance: PRR headers on all 7+1 modules; file_lines never exceeded 3500 during split; tightened to measured-truth rationale on final wave. Next exact action: atomic commit (src + pretender.toml + beads export + wai artifacts + run yml), ship-close approve, then union gates + final report. Risks: none known - pure moves; threshold re-baseline documented in config comments.

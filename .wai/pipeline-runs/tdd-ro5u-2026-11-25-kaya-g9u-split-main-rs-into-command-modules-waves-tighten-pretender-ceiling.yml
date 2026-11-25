@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-25-kaya-g9u-split-main-rs-into-command-modules-waves-tighten-pretender-ceiling
+pipeline: tdd-ro5u
+topic: kaya-g9u split main.rs into command modules waves tighten pretender ceiling
+created_at: '2026-11-25T10:44:19.550529637+00:00'
+current_step: 9
+approvals:
+  ship-close: '2026-11-25T11:14:48.533874019+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []
