@@ -978,6 +978,39 @@ fn reviewed_disposition_binds_evidence_digest() {
     );
 }
 
+/// A re-review of a record whose only prior review predates the digest
+/// binding (a legacy event without `data.digest`) must dedup against it —
+/// `appended: false` — instead of appending a second event.
+#[test]
+fn reviewed_reimport_dedups_against_legacy_digestless_event() {
+    let fixture = L46Fixture::new();
+    let root = fixture.root();
+
+    // Legacy-only state: a reviewed event with the pre-l46 data shape
+    // (record + disposition, no digest), reshaped from a valid seed event so
+    // the envelope stays codec-clean.
+    let seed = &ledger_events(&root)[0];
+    let mut legacy = seed.clone();
+    legacy["type"] = json!("verification.record.reviewed");
+    legacy["id"] = json!("01JLEGACYREVIEWTEST0000000000");
+    legacy["subject"] = json!({ "type": "Document", "id": L46_AUTHORED_RECORD });
+    legacy["data"] = json!({
+        "record": L46_AUTHORED_RECORD,
+        "disposition": "reviewed",
+    });
+    let ledger_path = root.join(LEDGER);
+    let mut text = fs::read_to_string(&ledger_path).expect("the ledger is readable");
+    text.push_str(&format!("{legacy}\n"));
+    fs::write(&ledger_path, text).expect("append the legacy review");
+
+    let again = l46_review_authored(&root);
+    assert_eq!(
+        again["data"]["appended"],
+        json!(false),
+        "an identical review dedups against a legacy digest-less review: {again}"
+    );
+}
+
 /// `kaya ir --walk` resolves provenance and the human trail; staleness
 /// shows the moment the record's backing input changes without a re-review.
 #[test]

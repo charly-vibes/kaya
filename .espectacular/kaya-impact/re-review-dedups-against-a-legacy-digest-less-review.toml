@@ -1,0 +1,9 @@
+id = "re-review-dedups-against-a-legacy-digest-less-review"
+description = "A re-review whose only prior recording predates the digest binding dedups against the legacy event instead of appending a second one."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "reviewed_reimport_dedups_against_legacy_digestless_event"}]

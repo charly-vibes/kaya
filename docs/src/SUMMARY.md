@@ -2,6 +2,7 @@
 
 - [kaya — motivation & design](index.md)
 - [Documentation taxonomy](document-taxonomy.md)
+- [Walking the record](verification-walk.md)
 - [Status](status.md)
 
 ---

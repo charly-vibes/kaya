@@ -1,0 +1,9 @@
+id = "reviewed-binds-the-record-s-evidence-digest"
+description = "A recorded review names the actor, the disposition, and the record's dependency digest at recording time."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "reviewed_disposition_binds_evidence_digest"}]

@@ -1,0 +1,9 @@
+id = "unresolved-provenance-is-flagged-not-dropped"
+description = "A provenance id the ledger does not know is reported unresolved by the walk's resolver instead of being dropped."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "resolve_provenance_flags_unknown_ids"}]

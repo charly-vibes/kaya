@@ -1,0 +1,9 @@
+id = "provenance-resolves-beside-the-block"
+description = "Walk provenance resolves to event type, subject, actor, and timestamp (correcting event when superseded), and trail freshness flips true to false when the record's input changes."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "ir_walk_resolves_provenance_and_trail"}]

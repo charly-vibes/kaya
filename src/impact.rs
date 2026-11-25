@@ -797,13 +797,27 @@ fn run_doctest(
     }
 }
 
+/// The ledger spellings of an IR record's block name.
+///
+/// The ledger's staleness and acknowledgment layer names authored regions
+/// `authored-1`, `authored-2`, …, while the IR names its first authored span
+/// `authored` and the rest `authored-2`, …; the first block's two names are
+/// bridged here. Consumers translating between the vocabularies go through
+/// these helpers — [`ir_block_name`] collapses ledger → IR, this one expands
+/// IR → every ledger spelling — one seam, kept in one place, until the
+/// naming convention is unified.
+pub fn ledger_block_names(ir_name: &str) -> Vec<String> {
+    if ir_name == "authored" {
+        vec!["authored".to_owned(), "authored-1".to_owned()]
+    } else {
+        vec![ir_name.to_owned()]
+    }
+}
+
 /// The IR name of an authored block the staleness layer reports.
 ///
-/// The staleness and acknowledgment layer names authored regions
-/// `authored-1`, `authored-2`, …, while the IR names its first authored span
-/// `authored` and the rest `authored-2`, …; the gate reports IR record ids,
-/// so the first block's two names are bridged here. One seam, kept in one
-/// place, until the naming convention is unified.
+/// The reverse of [`ledger_block_names`]: the gate reports IR record ids,
+/// so the ledger's first-block ordinal collapses to the IR spelling.
 fn ir_block_name(block: &str) -> String {
     if block == "authored-1" {
         "authored".to_owned()

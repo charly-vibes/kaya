@@ -42,12 +42,28 @@ Each impact SHALL carry exactly one disposition from the closed vocabulary —
 missing or unknown disposition is an unmet obligation, as is a stale authored
 block whose scoped acknowledgment is missing. A `waived` disposition SHALL
 bind to the record's dependency digest and SHALL lapse when the record's
-dependencies change again.
+dependencies change again. A `reviewed` disposition SHALL likewise bind the
+record's dependency digest at recording time, so the recorded event names who
+verified what against which evidence; a re-review of a decision whose only
+prior recording predates the digest binding SHALL dedup against that legacy
+event instead of appending a second event.
 
 #### Scenario: Every impact dispositioned
 
 - **WHEN** the impact set holds three records and one has no disposition
 - **THEN** the result is `fail` naming the unmet record
+
+#### Scenario: Reviewed binds the record's evidence digest
+
+- **WHEN** a reviewed disposition is recorded
+- **THEN** the appended event names the actor, the disposition, and the
+  record's dependency digest at recording time
+
+#### Scenario: Re-review dedups against a legacy digest-less review
+
+- **WHEN** the only prior review of the record carries no digest (a
+  pre-binding event) and an identical review is recorded again
+- **THEN** nothing is appended and the stored legacy event is returned
 
 #### Scenario: Stale block is an unmet obligation
 

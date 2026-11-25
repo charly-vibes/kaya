@@ -424,15 +424,10 @@ fn record_trail<'a>(by_subject: &EventIndex<'a>, record_id: &str) -> Vec<&'a Eve
         .cloned()
         .collect();
     if let Some((document, block)) = record_id.rsplit_once('#') {
-        // The IR names the first authored block `authored` while the ledger's
-        // acknowledgments carry the document-ordinal spelling `authored-1`;
-        // every later ordinal is spelled the same way, so a record matches the
-        // acknowledgment of its block under either form of its own name.
-        let names: &[&str] = if block == "authored" {
-            &["authored", "authored-1"]
-        } else {
-            &[block]
-        };
+        // The acknowledgment's block name uses the ledger spelling(s) of the
+        // IR block name — `authored` vs the ledger's `authored-1` ordinal;
+        // the bridge lives in kaya::impact::ledger_block_names.
+        let names = impact::ledger_block_names(block);
         trail.extend(
             by_subject
                 .get(document)
@@ -447,7 +442,7 @@ fn record_trail<'a>(by_subject: &EventIndex<'a>, record_id: &str) -> Vec<&'a Eve
                             .data
                             .get("block")
                             .and_then(|b| b.as_str())
-                            .is_some_and(|ack_block| names.contains(&ack_block))
+                            .is_some_and(|ack_block| names.iter().any(|name| name == ack_block))
                 })
                 .cloned(),
         );
@@ -750,4 +745,48 @@ fn merge_summary(into: &mut Summary, from: Summary) {
 
 fn publication_failure(err: publication::PublicationError) -> Failure {
     (err.label, err.message)
+}
+
+#[cfg(test)]
+mod walk_provenance_tests {
+    use super::*;
+
+    /// The walk's provenance resolver prefers a subject id's successor, falls
+    /// back to the id itself, and flags an id the ledger does not know as
+    /// `unresolved` instead of dropping it from the rendered provenance.
+    #[test]
+    fn resolve_provenance_flags_unknown_ids() {
+        let parse =
+            |text: &str| -> Event { serde_json::from_str(text).expect("the probe event parses") };
+        let events = [
+            parse(
+                r#"{"schema":"kaya.event/v0","id":"01JSUCCESSOR","type":"model.entity.updated","subject":{"type":"Entity","id":"entity-a"},"timestamp":"2026-11-25T00:00:00Z","actor":{"name":"kaya","type":"tool"},"provenance":{"tool":"kaya","version":"0.4.0","reference":"repo"},"artifacts":[],"data":{}}"#,
+            ),
+            parse(
+                r#"{"schema":"kaya.event/v0","id":"01JBYSELF","type":"model.entity.created","subject":{"type":"Entity","id":"entity-b"},"timestamp":"2026-11-25T00:00:00Z","actor":{"name":"kaya","type":"tool"},"provenance":{"tool":"kaya","version":"0.4.0","reference":"repo"},"artifacts":[],"data":{}}"#,
+            ),
+        ];
+        let mut by_subject: EventIndex<'_> = BTreeMap::new();
+        by_subject
+            .entry("entity-a")
+            .or_default()
+            .push((0, &events[0]));
+        let mut by_id: EventIndex<'_> = BTreeMap::new();
+        by_id.entry("01JBYSELF").or_default().push((1, &events[1]));
+
+        // A subject whose origin was superseded resolves to the successor.
+        let successor = resolve_provenance(&by_subject, &by_id, "entity-a");
+        assert_eq!(successor["id"], json!("entity-a"));
+        assert_eq!(successor["type"], json!("model.entity.updated"));
+        // An id known only as an event id resolves to its own event.
+        assert_eq!(
+            resolve_provenance(&by_subject, &by_id, "01JBYSELF")["type"],
+            json!("model.entity.created")
+        );
+        // An id the ledger does not know is flagged, not dropped.
+        assert_eq!(
+            resolve_provenance(&by_subject, &by_id, "01JGONE")["unresolved"],
+            json!(true)
+        );
+    }
 }

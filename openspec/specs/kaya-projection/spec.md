@@ -32,6 +32,7 @@ never finding out.
 | staleness_scope          | invariant | `a cited id ages its block only when a supersede changes that id's effective data; newly appended events never age a block`                                                                          | [[kaya.projection]] |
 | acknowledgment_effect    | invariant | `a human-recorded acknowledgment clears exactly the named document, block, and cited ids, refuses an unknown document or block, never alters authored bytes, and never enters the research graph (verification events are ignored by the model)`    | [[kaya.projection]] |
 | document_ir              | invariant | `the compiler materializes a deterministic document IR between the ledger-model state and every rendered projection: records carry stable ids, content hashes, and their event ids; generated records come from the compiler's rendering results, authored blocks are referenced by document, block, region hash, and cited ids and never copied, composed records hold containment edges to the records they contain; rendered projections compile from the IR and the emitted source map equals record provenance`    | [[kaya.projection]] |
+| walk_trail               | invariant | `kaya ir --walk adds, modifies, and deletes nothing and appends no event; it renders each generated block beside its body and its provenance resolved against the ledger — an unresolvable id is flagged unresolved, never dropped, and corrected evidence resolves to the correcting event — beside the owning record's human verification trail, where a disposition or acknowledgment entry carries the actor, the disposition, and digest freshness: true while the bound digest still matches the record's dependencies, false once they change, null when the event carries none (legacy or acknowledgment), never assumed stale` | [[kaya.projection]] |
 
 ## Model
 
@@ -66,6 +67,8 @@ never finding out.
 | ir_authored_referenced   | unit | [[kaya.projection.document_ir]]          | `authored_block_with_cites()`        | `record names document ∧ block ∧ region hash ∧ cites ∧ stores no bytes` |
 | ir_cache_independent     | unit | [[kaya.projection.document_ir]]          | `planted_cache_and_copy()`           | `deleting caches/sidecars/copies outside sources leaves the IR identical` |
 | ir_containment_edges     | unit | [[kaya.projection.document_ir]]          | `composed_page_over_documents()`     | `composed record holds edges to contained document records` |
+| walk_provenance_resolved | unit | [[kaya.projection.walk_trail]]           | `ir_walk_resolves_provenance_and_trail()` | `provenance resolves to actor+type ∧ trail freshness flips true→false on input change` |
+| walk_trail_acknowledged  | unit | [[kaya.projection.walk_trail]]           | `ir_walk_includes_acknowledged_blocks()` | `acknowledged trail entry carries actor, disposition, and null freshness` |
 
 ## Requirements
 
@@ -256,6 +259,38 @@ on.
 - **WHEN** a structural consumer needs document structure
 - **THEN** it reads the IR; rendered markdown is never reparsed to recover
   records or dependencies
+
+### Requirement: Walk-through surface
+
+`kaya ir --walk` SHALL render, read-only, each generated block beside its
+body, its provenance resolved against the ledger, and the owning record's
+human verification trail, so a human can check a generated block against its
+evidence and its recorded review in one command. Unresolvable provenance ids
+SHALL be reported as unresolved rather than dropped; corrected evidence SHALL
+resolve to the correcting event; trail entries SHALL carry the actor, the
+disposition, and digest freshness that is `true` while the bound digest still
+matches the record's dependencies, `false` once they change, and `null` when
+the event carries no digest — `null` is unknown, never treated as stale.
+
+#### Scenario: Provenance resolves beside the block
+
+- **WHEN** the walk renders a generated block whose provenance names ledger
+  events, and the record's input changes after its recorded review
+- **THEN** each provenance id resolves to the event's type, subject, actor,
+  and timestamp (the correcting event when superseded), and the trail's
+  freshness flips from `true` to `false` without any write
+
+#### Scenario: Acknowledgments appear in the trail
+
+- **WHEN** a human acknowledges an authored block and the walk renders it
+- **THEN** the trail carries the acknowledgment with its actor, the
+  `acknowledged` disposition, and `null` freshness
+
+#### Scenario: Unresolved provenance is flagged, not dropped
+
+- **WHEN** a provenance id names nothing in the ledger
+- **THEN** the walk reports that id as unresolved and still renders the rest
+  of the block
 
 ### Requirement: Property coverage mirror
 

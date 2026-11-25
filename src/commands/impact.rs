@@ -160,10 +160,22 @@ pub(crate) fn cmd_disposition(
     data["digest"] = json!(digest);
 
     let existing = events.iter().find(|event| {
-        event.r#type == event_type
-            && event.subject.r#type == report::DOCUMENT_SUBJECT
-            && event.subject.id == record_id
-            && event.data == data
+        if event.r#type != event_type
+            || event.subject.r#type != report::DOCUMENT_SUBJECT
+            || event.subject.id != record_id
+        {
+            return false;
+        }
+        if event.data == data {
+            return true;
+        }
+        // A legacy reviewed event predates the digest binding: its data is
+        // `{record, disposition}` only. Dedup on the candidate's digest-less
+        // shape instead of appending a second event for the same decision.
+        // Waivers always carried a digest, so they compare whole.
+        !waived
+            && event.data.get("digest").is_none()
+            && event.data == json!({ "record": record_id, "disposition": kind })
     });
     if let Some(existing) = existing {
         return Ok(Envelope::ok(

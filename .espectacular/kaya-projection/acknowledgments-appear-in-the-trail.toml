@@ -1,0 +1,9 @@
+id = "acknowledgments-appear-in-the-trail"
+description = "The walk's trail carries a recorded acknowledgment with its actor, the acknowledged disposition, and null freshness."
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.12.3"
+
+[tests]
+cargo = [{flags = "ir_walk_includes_acknowledged_blocks"}]

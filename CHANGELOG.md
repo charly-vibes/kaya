@@ -12,6 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which prepends `target/release` to PATH so espectacular pipelines can never
   resolve a stale global `kaya` install (e.g. `~/.cargo/bin/kaya`) and rewrite
   generated publications in an outdated export format.
+- Re-reviewing a decision whose only prior recording predates the digest
+  binding dedups against that legacy digest-less event instead of appending a
+  second review (kaya-eaj, EDGE-002).
+- The scheduled record capture abandons its snapshot push immediately when a
+  rebase conflict is present instead of retrying through it, naming
+  `scripts/record-conflicts.md` (kaya-eaj, EDGE-001).
+- The authored-block name bridge between ledger and IR vocabularies lives in
+  one place: `kaya::impact::ledger_block_names` / `ir_block_name` (kaya-eaj,
+  EXCL-001).
+
+### Added
+- `docs/src/verification-walk.md`: reader page for `kaya ir --walk` — block
+  body, resolved provenance, human trail, digest freshness semantics
+  (kaya-eaj, CLAR-001); kaya-impact and kaya-projection specs gained the
+  matching requirements, scenarios, and property rows.
 
 ## [0.4.0] - 2026-11-24
 
