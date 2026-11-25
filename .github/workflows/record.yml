@@ -4,12 +4,16 @@
 # recent commits, rebuild the research and publication products, and commit the
 # snapshot deliberately. Capture never runs in a pre-commit hook or on a pull
 # request; kaya evaluates no thresholds here.
+#
+# Deliberately NOT triggered on push: a capture derived from push N collides
+# with local commits landing while the run executes (live twice on
+# 2026-11-25 — conflicting ledger snapshots, union-by-id recovery per
+# scripts/record-conflicts.md). The nightly snapshot already covers pushed
+# state; dispatch runs the capture whenever an immediate one is wanted.
 
 name: Record
 
 on:
-  push:
-    branches: [main]
   schedule:
     - cron: "17 4 * * *"
   workflow_dispatch:

@@ -51,10 +51,23 @@ release-claims:
 
 # Full record gate: verify, claims, links, lag (mode warn|fail)
 record-check mode="warn": record-verify release-claims links
-	python3 scripts/record-lag.py --mode {{mode}} --bound 25
+	python3 scripts/record-lag.py --mode {{mode}} --bound 60
 
-# Capture a scheduled snapshot: observe wai and git, then rebuild products
+# Capture a scheduled snapshot: observe wai and git, then rebuild products.
+# Serialized against concurrent captures via a lockfile; skipped when the
+# tree is dirty (checked under the lock, so a queued capture re-checks),
+# so a capture never builds over half-finished work (the Record workflow's
+# checkout is always clean and is unaffected).
 record-capture:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	mkdir -p .kaya
+	exec 9>.kaya/capture.lock
+	flock 9
+	if [ -n "$(git status --porcelain)" ]; then
+		echo "record-capture: SKIP - working tree is dirty; commit or stash first"
+		exit 0
+	fi
 	cargo run --quiet -- import wai
 	cargo run --quiet -- import git --exclude-message-prefix "chore(record):"
 	cargo run --quiet -- build
@@ -67,7 +80,9 @@ record-verify:
 	cargo run --quiet -- check
 
 # Fail when the record's capture frontier is more than `bound` commits behind
-record-lag mode="fail" bound="25":
+# (nightly-only capture makes a day of lag normal; 60 covers the busiest
+# measured day, 42 record-relevant commits on 2026-11-24)
+record-lag mode="fail" bound="60":
 	python3 scripts/record-lag.py --mode {{mode}} --bound {{bound}}
 
 # Validate spec ↔ test correspondence (espectacular, bin: ah, run through

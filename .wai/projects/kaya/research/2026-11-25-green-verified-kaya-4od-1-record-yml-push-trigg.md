@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-25-kaya-4od-scheduled-record-capture-races-in-flight-work, pipeline-step:refactor]
+---
+
+GREEN-VERIFIED kaya-4od: (1) record.yml push trigger removed (nightly + dispatch only), header comment records why with the live 2026-11-25 collisions and points at scripts/record-conflicts.md; (2) justfile record-capture now shebang-guarded: visible SKIP on dirty tree (verified in the dirty main tree: 'record-capture: SKIP - working tree is dirty', exit 0, zero mutations) + flock .kaya/capture.lock serialization; (3) scripts/record-conflicts.md documents the union-by-id recipe used live (stage-3 vs stage-2 id comm, checkout --theirs for superset, build+publish re-derive, record-verify + impact gates before push) plus the stale-sha note. Scratch-clone oracle rerun after green was invalid mid-flight (clone cannot see uncommitted main-tree edits); the dirty-main-tree run IS the acceptance proof: capture refuses over uncommitted work with a visible signal. Gates: cargo test 510/0 (shell-only change), just record-check warn ok, lag 3 commits within bound 25.

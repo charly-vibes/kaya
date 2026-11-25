@@ -11,6 +11,8 @@
 
 # kaya incremental build state (per-workspace cache)
 .kaya/build-state.json
+# record-capture flock target (recipe creates it; never a tracked file)
+.kaya/capture.lock
 
 # release workflow artifacts (downloaded binaries + packaged archives)
 /bins/
