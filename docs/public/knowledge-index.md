@@ -31,7 +31,7 @@ _(none)_
 
 - kaya/Run/cargo-test-results
 
-### Artifact — 837
+### Artifact — 842
 
 - kaya/Artifact/0291837
 - kaya/Artifact/03fb233
@@ -331,6 +331,8 @@ _(none)_
 - kaya/Artifact/designs-2026-11-24-refactor-step-kaya-w9t-tidy-applied-while-tests-s
 - kaya/Artifact/designs-2026-11-24-refactor-step-kaya-y5v-refactor-pass-recorded-sa
 - kaya/Artifact/designs-2026-11-24-ro5u-review-step-kaya-w9t-step-artifact-reviewe
+- kaya/Artifact/designs-2026-11-25-green-kaya-dsv-implemented-kaya-explain-as-src-ex
+- kaya/Artifact/designs-2026-11-25-refactor-kaya-dsv-dropped-the-duplicate-all-block
 - kaya/Artifact/df81656
 - kaya/Artifact/dfe6d6c
 - kaya/Artifact/e0685ac
@@ -448,6 +450,7 @@ _(none)_
 - kaya/Artifact/plans-2026-11-24-plan-remediation-batch-desired-behavior-the-six
 - kaya/Artifact/plans-2026-11-24-plan-step-kaya-bvg-step-artifact-minimal-tdd
 - kaya/Artifact/plans-2026-11-24-plan-step-kaya-w9t-step-artifact-content-the-p
+- kaya/Artifact/plans-2026-11-25-plan-kaya-dsv-part-a-kaya-explain-a-read-only
 - kaya/Artifact/research-2026-11-16-orient-kaya-10k-closed-nine-field-kaya-event-v0-s
 - kaya/Artifact/research-2026-11-16-orient-kaya-5cg-experiment-report-projection-with
 - kaya/Artifact/research-2026-11-16-orient-kaya-5ea-promotion-rate-cap-requirement-fr
@@ -870,6 +873,8 @@ _(none)_
 - kaya/Artifact/research-2026-11-24-ship-kaya-yd9-pending-approval-implementation-c
 - kaya/Artifact/research-2026-11-24-ship-remediation-batch-committed-6c0892373e-fix-r
 - kaya/Artifact/research-2026-11-24-tags-pipeline-run-tdd-ro5u-2026-11-24-kaya-y
+- kaya/Artifact/research-2026-11-25-orient-kaya-dsv-products-compose-from-the-11-kind
+- kaya/Artifact/research-2026-11-25-red-kaya-dsv-command-cargo-test-test-explain-e
 
 ### Observation — 0
 
@@ -879,21 +884,36 @@ _(none)_
 
 _(none)_
 
-### Finding — 0
+### Finding — 2
 
-_(none)_
+- kaya/Finding/2026-11-25-121fc9ca
+- kaya/Finding/2026-11-25-5be3a163
 
-### Decision — 0
+### Decision — 5
 
-_(none)_
+- kaya/Decision/2026-11-25-05000531
+- kaya/Decision/2026-11-25-0c7dd16e
+- kaya/Decision/2026-11-25-9806082e
+- kaya/Decision/2026-11-25-a6d6cf17
+- kaya/Decision/2026-11-25-e1533efd
 
-### Source — 6
+### Source — 16
 
 - kaya/Source/docs-src-index.md@43b606f
 - kaya/Source/openspec-changes-add-core-research-record-proposal.md@43b606f
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-adapters-spec.md@43b606f
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-event-layer.md@43b606f
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f
+- kaya/Source/spec-kaya-adapters
+- kaya/Source/spec-kaya-documents
+- kaya/Source/spec-kaya-event
+- kaya/Source/spec-kaya-impact
+- kaya/Source/spec-kaya-ledger
+- kaya/Source/spec-kaya-model
+- kaya/Source/spec-kaya-projection
+- kaya/Source/spec-kaya-promotion
+- kaya/Source/spec-kaya-publications
+- kaya/Source/spec-kaya-verification
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
 <!-- kaya:end generated:publication.collection.knowledge-index -->

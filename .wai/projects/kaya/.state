@@ -1,4 +1,7 @@
-current: research
+current: design
 history:
 - phase: research
   started: '2026-11-16T14:52:20.164443962Z'
+  completed: '2026-11-25T00:01:53.268143608Z'
+- phase: design
+  started: '2026-11-25T00:01:53.268143608Z'

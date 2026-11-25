@@ -28,10 +28,11 @@ pub(crate) mod source;
 mod vocabulary;
 
 pub use build::{Built, Omitted, Page, build};
+pub use collection::{IMPLEMENTED, backing_kinds};
 pub use decls::{Decl, default_declarations};
 pub use error::PublicationError;
 pub use plan::{Plan, PlannedPage, PlannedRemoval, plan};
-pub use source::{DocumentRef, Documents, read_documents, read_documents_from};
+pub use source::{DOCUMENT_KINDS, DocumentRef, Documents, read_documents, read_documents_from};
 pub use vocabulary::{
     COLLECTIONS, LABEL_BLOCK_VOCABULARY, LABEL_DOCUMENT_KIND, LABEL_DUPLICATE_BLOCK,
     LABEL_DUPLICATE_DECLARATION, LABEL_INADMISSIBLE, LABEL_IO, LABEL_PACKAGE_MEMBERS,

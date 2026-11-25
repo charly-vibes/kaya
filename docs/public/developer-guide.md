@@ -3,8 +3,8 @@
 
 - [getting-started](getting-started.md)
 - [how-to](how-to.md)
-- concept — unavailable
+- [concept](concept.md)
 - example — unavailable
-- troubleshooting — unavailable
-- faq — unavailable
+- [troubleshooting](troubleshooting.md)
+- [faq](faq.md)
 <!-- kaya:end generated:publication.package.developer-guide -->

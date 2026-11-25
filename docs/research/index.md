@@ -44,6 +44,15 @@ tests and in real use.
 - kaya/Model/M-001 -[realizes]-> kaya/Hypothesis/H-001
 - kaya/Question/mvp-1-acceptance -[investigates]-> kaya/Experiment/add-core-research-record
 
+### Isolated
+- kaya/Decision/2026-11-25-05000531 — Decision — 2026-11-25-05000531
+- kaya/Decision/2026-11-25-0c7dd16e — Decision — 2026-11-25-0c7dd16e
+- kaya/Decision/2026-11-25-9806082e — Decision — 2026-11-25-9806082e
+- kaya/Decision/2026-11-25-a6d6cf17 — Decision — 2026-11-25-a6d6cf17
+- kaya/Decision/2026-11-25-e1533efd — Decision — 2026-11-25-e1533efd
+- kaya/Finding/2026-11-25-121fc9ca — Finding — 2026-11-25-121fc9ca
+- kaya/Finding/2026-11-25-5be3a163 — Finding — 2026-11-25-5be3a163
+
 ### Artifacts
 - kaya/Artifact/0291837 — 0291837f8bc4a4356e97a7188589ce55bcdab13b
 - kaya/Artifact/03fb233 — 03fb233ebba253e3c4e8d582c4d9362b9974f8fc
@@ -343,6 +352,8 @@ tests and in real use.
 - kaya/Artifact/designs-2026-11-24-refactor-step-kaya-w9t-tidy-applied-while-tests-s — .wai/projects/kaya/designs/2026-11-24-refactor-step-kaya-w9t-tidy-applied-while-tests-s.md
 - kaya/Artifact/designs-2026-11-24-refactor-step-kaya-y5v-refactor-pass-recorded-sa — .wai/projects/kaya/designs/2026-11-24-refactor-step-kaya-y5v-refactor-pass-recorded-sa.md
 - kaya/Artifact/designs-2026-11-24-ro5u-review-step-kaya-w9t-step-artifact-reviewe — .wai/projects/kaya/designs/2026-11-24-ro5u-review-step-kaya-w9t-step-artifact-reviewe.md
+- kaya/Artifact/designs-2026-11-25-green-kaya-dsv-implemented-kaya-explain-as-src-ex — .wai/projects/kaya/designs/2026-11-25-green-kaya-dsv-implemented-kaya-explain-as-src-ex.md
+- kaya/Artifact/designs-2026-11-25-refactor-kaya-dsv-dropped-the-duplicate-all-block — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-dsv-dropped-the-duplicate-all-block.md
 - kaya/Artifact/df81656 — df81656005a9c0e10b392db0af2b8b91a8436dc1
 - kaya/Artifact/dfe6d6c — dfe6d6c5772efb5d7e2c4ba97573ca307f0729c1
 - kaya/Artifact/e0685ac — e0685ac367a6a3f700a9034a408caa1845938a6d
@@ -460,6 +471,7 @@ tests and in real use.
 - kaya/Artifact/plans-2026-11-24-plan-remediation-batch-desired-behavior-the-six — .wai/projects/kaya/plans/2026-11-24-plan-remediation-batch-desired-behavior-the-six.md
 - kaya/Artifact/plans-2026-11-24-plan-step-kaya-bvg-step-artifact-minimal-tdd — .wai/projects/kaya/plans/2026-11-24-plan-step-kaya-bvg-step-artifact-minimal-tdd.md
 - kaya/Artifact/plans-2026-11-24-plan-step-kaya-w9t-step-artifact-content-the-p — .wai/projects/kaya/plans/2026-11-24-plan-step-kaya-w9t-step-artifact-content-the-p.md
+- kaya/Artifact/plans-2026-11-25-plan-kaya-dsv-part-a-kaya-explain-a-read-only — .wai/projects/kaya/plans/2026-11-25-plan-kaya-dsv-part-a-kaya-explain-a-read-only.md
 - kaya/Artifact/research-2026-11-16-orient-kaya-10k-closed-nine-field-kaya-event-v0-s — .wai/projects/kaya/research/2026-11-16-orient-kaya-10k-closed-nine-field-kaya-event-v0-s.md
 - kaya/Artifact/research-2026-11-16-orient-kaya-5cg-experiment-report-projection-with — .wai/projects/kaya/research/2026-11-16-orient-kaya-5cg-experiment-report-projection-with.md
 - kaya/Artifact/research-2026-11-16-orient-kaya-5ea-promotion-rate-cap-requirement-fr — .wai/projects/kaya/research/2026-11-16-orient-kaya-5ea-promotion-rate-cap-requirement-fr.md
@@ -882,6 +894,8 @@ tests and in real use.
 - kaya/Artifact/research-2026-11-24-ship-kaya-yd9-pending-approval-implementation-c — .wai/projects/kaya/research/2026-11-24-ship-kaya-yd9-pending-approval-implementation-c.md
 - kaya/Artifact/research-2026-11-24-ship-remediation-batch-committed-6c0892373e-fix-r — .wai/projects/kaya/research/2026-11-24-ship-remediation-batch-committed-6c0892373e-fix-r.md
 - kaya/Artifact/research-2026-11-24-tags-pipeline-run-tdd-ro5u-2026-11-24-kaya-y — .wai/projects/kaya/research/2026-11-24-tags-pipeline-run-tdd-ro5u-2026-11-24-kaya-y.md
+- kaya/Artifact/research-2026-11-25-orient-kaya-dsv-products-compose-from-the-11-kind — .wai/projects/kaya/research/2026-11-25-orient-kaya-dsv-products-compose-from-the-11-kind.md
+- kaya/Artifact/research-2026-11-25-red-kaya-dsv-command-cargo-test-test-explain-e — .wai/projects/kaya/research/2026-11-25-red-kaya-dsv-command-cargo-test-test-explain-e.md
 
 ### Runs
 - kaya/Run/cargo-test-results — passed 430, failed 0, ignored 0
@@ -894,5 +908,5 @@ tests and in real use.
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_848 nodes from 979 events._
+_860 nodes from 1001 events._
 <!-- kaya:end generated:orientation.research-map -->

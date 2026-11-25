@@ -23,13 +23,29 @@ const MAP_KIND: &str = "orientation.research-map";
 const RECORD_KIND: &str = "exploration.experiment-record";
 const TECH_KIND: &str = "reuse-handoff.technical-reference";
 
+/// The document kinds whose populated blocks back a collection.
+///
+/// `None` marks the collections that emit from the compiled document set
+/// unconditionally (glossary renders the closed kind vocabulary) or from any
+/// document at all (knowledge-index renders the census), so they never carry
+/// a per-kind backing row. Explaining omissions names the same keys the
+/// renderer consults, so the two can never disagree about what backs what.
+pub fn backing_kinds(name: &str) -> Option<&'static [&'static str]> {
+    match name {
+        "api-catalogue" => Some(&[TECH_KIND]),
+        "example-gallery" => Some(&[RECORD_KIND]),
+        "topic-map" => Some(&[MAP_KIND]),
+        _ => None,
+    }
+}
+
 /// The collections this release implements, in vocabulary order. The
 /// partition refusal quotes this list, so a new renderer registers here and
 /// the refusal stays truthful without a second edit. The list and
 /// [`collection_page`]'s dispatch must change together in both directions: a
 /// name here without a dispatch arm silently renders as an omission, and a
 /// dispatch arm without a name here is refused at the partition.
-pub(super) const IMPLEMENTED: [&str; 5] = [
+pub const IMPLEMENTED: [&str; 5] = [
     "api-catalogue",
     "example-gallery",
     "glossary",

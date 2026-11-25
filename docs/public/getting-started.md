@@ -1,3 +1,29 @@
+<!-- kaya:authored -->
+## Reaching a first result
+
+kaya compiles a research record from artifacts your repository already
+produces. Five commands take a fresh checkout to a verified record:
+
+```sh
+kaya init                 # create .kaya/ledger.jsonl
+kaya import wai           # observe the .wai/ artifact tree
+kaya build                # compile docs/research from the ledger
+kaya publish              # compose docs/public from the compiled research
+kaya check                # verify the tree without writing
+```
+
+Observations beyond the adapters are first-class captures:
+`kaya note`, `kaya question`, `kaya decision`, and `kaya finding` append one
+model event each, so decisions and findings you record during work become
+ledger content that later compiles into the concept, faq, and
+decision-record projections.
+
+`kaya explain` names every publication omission and the exact command path
+that un-omits it — the machine-readable form of the admission contract, so
+you never need to read kaya's source to learn what a missing page needs.
+
+<!-- kaya:end authored -->
+
 <!-- kaya:begin generated:publication.product.getting-started -->
 ## Getting-started
 
@@ -8,6 +34,11 @@ Reader question: how do I reach a first result
 ### Questions
 
 - kaya/Question/mvp-1-acceptance — mvp-1-acceptance
+
+### Findings
+
+- kaya/Finding/2026-11-25-121fc9ca — 2026-11-25-121fc9ca
+- kaya/Finding/2026-11-25-5be3a163 — 2026-11-25-5be3a163
 
 ### reuse-handoff.reproduction-package
 

@@ -40,6 +40,7 @@ use kaya::promotion::{self, PROPOSAL_BUDGET, PromotionError, PromotionState, cap
 use kaya::publication;
 
 mod capture;
+mod explain;
 use kaya::verification;
 
 /// Project-local directory holding kaya state.
@@ -278,6 +279,11 @@ enum Command {
         #[command(flatten)]
         args: CaptureArgs,
     },
+    /// Explain publication omissions and their unblock paths without writing
+    Explain {
+        /// Optional product, collection, or document kind name
+        name: Option<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -363,6 +369,7 @@ fn main() -> ExitCode {
     let outcome = match cli.command {
         Command::Init => cmd_init(),
         Command::Status => cmd_status(),
+        Command::Explain { name } => explain::run(name.as_deref()),
         Command::Import { source } => cmd_import(source),
         Command::Build {
             out,
