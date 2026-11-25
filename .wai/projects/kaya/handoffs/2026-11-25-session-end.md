@@ -32,9 +32,23 @@ phase: design
 
 ## Context
 
+### git_status
+
+```
+ M .wai/pipeline-runs/tdd-ro5u-2026-11-25-kaya-eaj-session-review-remediation-four-findings.yml
+?? .wai/projects/kaya/research/2026-11-25-ship-kaya-eaj-committed-5d0c24d-on-main-4-findi.md
+?? .wai/resources/pipelines/.last-run
+```
+
 ### open_issues
 
 ```
-No issues found.
+○ kaya-msh P2 [bug] wai adapter: re-import not idempotent - kaya.ledger.id_reuse on re-observed records (absorbs content-hash dedup seam)
+
+--------------------------------------------------------------------------------
+Total: 1 issues (1 open, 0 in progress)
+
+Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred
+Priority: P0–P4 (label only; not a status icon)
 ```
 
