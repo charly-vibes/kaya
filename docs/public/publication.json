@@ -2057,8 +2057,16 @@
       "question": "why is this broken and how do I fix it"
     },
     {
-      "documents": [],
-      "emitted": false,
+      "documents": [
+        {
+          "event_ids": [
+            "kaya/Hypothesis/H-001",
+            "kaya/Question/mvp-1-acceptance"
+          ],
+          "kind": "exploration.exploration-brief"
+        }
+      ],
+      "emitted": true,
       "name": "tutorial",
       "question": "can you teach me through a guided outcome"
     }

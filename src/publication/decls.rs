@@ -28,8 +28,9 @@ pub struct Decl {
 /// (exploration.experiment-record, exploration.exploration-brief) have
 /// producers in the research projection. Every include is the product's
 /// admission row, so a declaration can never widen a product beyond its
-/// contract. Until exploration documents carry records, tutorial publishes
-/// as the spec-pinned `no-backing-document` omission instead of a page.
+/// contract. A populated `exploration.exploration-brief` backs tutorial:
+/// brief.md is in the publication reader set, so tutorial publishes a page
+/// from a question-only ledger.
 const DEFAULT_PRODUCTS: [&str; 12] = [
     "overview",
     "reference",

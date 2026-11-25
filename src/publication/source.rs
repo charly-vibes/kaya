@@ -55,17 +55,18 @@ pub struct Documents(pub BTreeMap<String, DocumentRef>);
 /// The fixed reader files, in read order; the sorted experiment dossiers
 /// follow them. One contract with `verification`'s `RESEARCH_READ_ORDER` —
 /// a parity test pins the two lists together.
-pub(crate) const READER_FILES: [&str; 6] = [
+pub(crate) const READER_FILES: [&str; 7] = [
     "index.md",
     "overview.md",
     "understanding.md",
+    "brief.md",
     "reproduction-package.md",
     "handoff.md",
     "technical-reference.md",
 ];
 
 /// Files are read in a fixed order — `index.md`, `overview.md`,
-/// `understanding.md`, `reproduction-package.md`, `handoff.md`,
+/// `understanding.md`, `brief.md`, `reproduction-package.md`, `handoff.md`,
 /// `technical-reference.md`, then the
 /// experiment dossiers sorted by name — and only generated blocks whose
 /// names are in the document vocabulary are kept. A repeated block name

@@ -2026,9 +2026,10 @@ fn build_writes_overview_and_publish_uses_it() {
         json!("docs/public"),
         "publish defaults to docs/public: {published}"
     );
-    // The question backs the project overview and the research map, so the
-    // products admitting either emit; the understanding, reuse, and experiment
-    // products have no compiled document and are reported omitted.
+    // The question backs the project overview, the research map, and the
+    // exploration brief, so the products admitting any of those emit; the
+    // understanding, reuse, and experiment products have no compiled
+    // document and are reported omitted.
     assert_eq!(
         published["data"]["omitted"],
         json!([
@@ -2039,7 +2040,6 @@ fn build_writes_overview_and_publish_uses_it() {
             { "tier": "product", "name": "faq", "reason": "no-backing-document" },
             { "tier": "product", "name": "how-to", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
-            { "tier": "product", "name": "tutorial", "reason": "no-backing-document" },
         ]),
         "every declared product without an admissible compiled document is omitted, sorted by name: {published}"
     );
@@ -2058,6 +2058,7 @@ fn build_writes_overview_and_publish_uses_it() {
             "release-migration",
             "status-compatibility",
             "topic-map",
+            "tutorial",
         ],
         "the declared packages, every backed product, and the render-now collections get a page, sorted by name: {pages:?}"
     );
@@ -2450,6 +2451,7 @@ fn publish_renders_glossary_collection_page() {
             "release-migration",
             "status-compatibility",
             "topic-map",
+            "tutorial",
         ],
         "the glossary collection gets a page among the sorted published pages: {pages:?}"
     );
@@ -2519,6 +2521,7 @@ fn publish_declares_every_product_and_reports_justified_omissions() {
             "release-migration",
             "status-compatibility",
             "topic-map",
+            "tutorial",
         ],
         "the declared packages and every backed product get a page, sorted by name: {pages:?}"
     );
@@ -2532,7 +2535,6 @@ fn publish_declares_every_product_and_reports_justified_omissions() {
             { "tier": "collection", "name": "example-gallery", "reason": "no-backing-document" },
             { "tier": "product", "name": "faq", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
-            { "tier": "product", "name": "tutorial", "reason": "no-backing-document" },
         ]),
         "the omitted products are exactly the declared ones without an admissible document, sorted by name: {published}"
     );
@@ -2729,6 +2731,7 @@ fn publish_declares_the_remaining_products_and_export_agrees() {
             "release-migration",
             "status-compatibility",
             "topic-map",
+            "tutorial",
         ],
         "the remaining products emit beside the already-declared ones, sorted by name: {pages:?}"
     );
@@ -2741,7 +2744,6 @@ fn publish_declares_the_remaining_products_and_export_agrees() {
             { "tier": "collection", "name": "example-gallery", "reason": "no-backing-document" },
             { "tier": "product", "name": "faq", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
-            { "tier": "product", "name": "tutorial", "reason": "no-backing-document" },
         ]),
         "every remaining product is backed, so only the unbacked products are omitted: {published}"
     );
@@ -2860,11 +2862,12 @@ fn publish_declares_the_remaining_products_and_export_agrees() {
     assert_eq!(
         rendered.keys().cloned().collect::<Vec<_>>(),
         [
+            "exploration.exploration-brief",
             "orientation.project-overview",
             "orientation.research-map",
             "reuse-handoff.reproduction-package",
         ],
-        "the fixture compiles exactly three documents: {rendered:?}"
+        "the fixture compiles exactly four documents: {rendered:?}"
     );
 
     // A second publish from unchanged inputs rewrites nothing: every page and
@@ -2972,8 +2975,8 @@ fn publish_preserves_authored_pages_at_omitted_product_paths() {
             .as_array()
             .expect("pages is a list")
             .len(),
-        7,
-        "only the packages, the research-map-backed architecture-design and reference, and the render-now collections remain beside the glossary: {second}"
+        8,
+        "only the packages, the research-map-backed architecture-design and reference, the brief-backed tutorial, and the render-now collections remain beside the glossary: {second}"
     );
     assert_eq!(
         second["data"]["omitted"],
@@ -2989,7 +2992,6 @@ fn publish_preserves_authored_pages_at_omitted_product_paths() {
             { "tier": "product", "name": "release-migration", "reason": "no-backing-document" },
             { "tier": "product", "name": "status-compatibility", "reason": "no-backing-document" },
             { "tier": "product", "name": "troubleshooting", "reason": "no-backing-document" },
-            { "tier": "product", "name": "tutorial", "reason": "no-backing-document" },
         ]),
         "the products whose backing document disappeared are reported omitted: {second}"
     );

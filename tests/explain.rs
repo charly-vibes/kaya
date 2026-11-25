@@ -172,9 +172,9 @@ fn explain_product_view_agrees_with_the_bare_census() {
     let dir = tempfile::tempdir().unwrap();
     init(&dir);
 
-    // One Question populates the exploration brief, but the brief renders to
-    // docs/research/brief.md, outside the publication reader set: tutorial
-    // must read omitted from both the named view and the census.
+    // One Question populates the exploration brief, and brief.md is in both
+    // read lists, so tutorial reads emitted from the named view and the
+    // census alike.
     let output = kaya(&dir)
         .args(["question", "does explain match publish", "--actor", "probe"])
         .output()
@@ -190,16 +190,12 @@ fn explain_product_view_agrees_with_the_bare_census() {
     assert_eq!(env["ok"], json!(true));
     assert_eq!(
         env["data"]["status"],
-        json!("omitted"),
-        "the brief cannot back tutorial until the reader set reads it"
+        json!("emitted"),
+        "the populated brief backs tutorial: brief.md is in both read lists"
     );
-    assert_eq!(
-        env["data"]["note"],
-        json!(
-            "the brief renders to docs/research/brief.md, which the publication reader set \
-               does not read, so it cannot back tutorial until that contract changes"
-        ),
-        "the kind view carries the structural caveat"
+    assert!(
+        env["data"]["note"].is_null(),
+        "no structural caveat remains once the reader set reads the brief"
     );
 
     let output = kaya(&dir).arg("explain").output().unwrap();
@@ -211,8 +207,46 @@ fn explain_product_view_agrees_with_the_bare_census() {
         .map(|entry| entry["name"].as_str().expect("omission names are strings"))
         .collect();
     assert!(
-        names.contains(&"tutorial"),
-        "the census omits tutorial alongside the named view: {names:?}"
+        !names.contains(&"tutorial"),
+        "the census agrees with the named view: tutorial is emitted: {names:?}"
+    );
+}
+
+#[test]
+fn brief_backed_tutorial_publishes() {
+    let dir = tempfile::tempdir().unwrap();
+    init(&dir);
+
+    let output = kaya(&dir)
+        .args(["question", "read the brief", "--actor", "probe"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "capture question failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let output = kaya(&dir)
+        .args(["build", "--allow-uncommitted"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "build failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let output = kaya(&dir).arg("publish").output().unwrap();
+    assert!(
+        output.status.success(),
+        "publish failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let page = dir.path().join("docs/public/tutorial.md");
+    assert!(
+        page.exists(),
+        "a populated exploration brief backs tutorial: publish writes the page"
     );
 }
 

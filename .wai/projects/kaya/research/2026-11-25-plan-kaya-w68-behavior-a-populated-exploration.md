@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-25-kaya-w68-align-read-lists-so-the-exploration-brief-can-back-tutorial, pipeline-step:plan]
+---
+
+PLAN kaya-w68 — Behavior: a populated exploration.exploration-brief block in docs/research/brief.md is admissible for tutorial (spec kaya-publications admission row: tutorial <- experiment-record + exploration-brief); publish emits tutorial.md. Out of scope: 34g experiment-record seeding; renderer changes; collection behavior. Test first (RED): tests/explain.rs::brief_backed_tutorial_publishes — fresh ledger, kaya question, kaya build, kaya publish, assert docs/public/tutorial.md exists AND explain census omits nothing; expected failure at HEAD (no tutorial page). Narrow command: cargo test --test explain brief_backed_tutorial_publishes. Full verification: cargo test; just record-check; census == publication.json export. Files: src/publication/source.rs, src/verification/mod.rs, src/explain.rs, tests/explain.rs, regenerated docs/public (tutorial.md, publication.json). Commits: one feature commit (code+tests+docs regenerate atomically); refactor commit only if extraction warrants (not expected).

@@ -101,10 +101,7 @@ const KIND_CONTRACTS: &[KindContract] = &[
         attribute: None,
         ingestion: "kaya capture question; `import model` for Idea and Hypothesis",
         seed_example: None,
-        note: Some(
-            "the brief renders to docs/research/brief.md, which the publication reader set does \
-             not read, so it cannot back tutorial until that contract changes",
-        ),
+        note: None,
     },
     KindContract {
         block: "exploration.experiment-specification",
@@ -381,15 +378,8 @@ fn push_state(
 }
 
 /// Whether a product emits: at least one admissible kind is populated.
-///
-/// `exploration.exploration-brief` never counts: its block renders to
-/// `docs/research/brief.md`, outside the publication reader set, so it can
-/// never appear as a backing document (see the contract note).
 fn product_emitted(graph: &Graph, product: &str) -> bool {
-    admission(product)
-        .iter()
-        .filter(|kind| **kind != "exploration.exploration-brief")
-        .any(|kind| populated(graph, kind))
+    admission(product).iter().any(|kind| populated(graph, kind))
 }
 
 /// Whether a collection emits, mirroring `collection.rs`'s render guards:
