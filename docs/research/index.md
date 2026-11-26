@@ -59,6 +59,7 @@ tests and in real use.
 - kaya/Artifact/0291837 — 0291837f8bc4a4356e97a7188589ce55bcdab13b
 - kaya/Artifact/03fb233 — 03fb233ebba253e3c4e8d582c4d9362b9974f8fc
 - kaya/Artifact/05748b5 — 05748b566e5dc59c23373f5daafd9ec7a0958881
+- kaya/Artifact/05e7245 — 05e7245afbf253d12b9af3b48a4148fe343ae617
 - kaya/Artifact/06b7a07 — 06b7a07cce9a543f94d66c32719ec1a6def94a97
 - kaya/Artifact/0cd2fd6 — 0cd2fd6af445980341e9687ca6ebb1b36882ba6c
 - kaya/Artifact/0f3b8b2 — 0f3b8b2c8a6476ca728476be3e5ec4484583dbe5
@@ -108,12 +109,14 @@ tests and in real use.
 - kaya/Artifact/5b05375 — 5b05375218c2ef266eee1f870d4917b377d415cc
 - kaya/Artifact/5c5cd1c — 5c5cd1cc140a40f26159a258b89958b418968390
 - kaya/Artifact/5c7e381 — 5c7e381572839a48074d71c0f4a8910bcafaec10
+- kaya/Artifact/5d0c24d — 5d0c24d2a1ccb15547064b3152738bfdd034bdf0
 - kaya/Artifact/5dd91b6 — 5dd91b6946fb60054be8d22a13ba149f05bb88a3
 - kaya/Artifact/5eb26f0 — 5eb26f04f2cced2c227147aadc53c92cfad64f6b
 - kaya/Artifact/6377528 — 637752884f1fa33bbcb1e2ce0416ce07b1de8f01
 - kaya/Artifact/645a6b5 — 645a6b525500fb99d35df579a091eb0991f51c00
 - kaya/Artifact/64b5d8f — 64b5d8f5474f31050aab3a33df9ff127eb56cc59
 - kaya/Artifact/64ebc5c — 64ebc5c092f2ffe75476aa33ce5584cd964364a9
+- kaya/Artifact/650eef8 — 650eef8b310bc088724ec7cf340f0f9326df0a61
 - kaya/Artifact/664b918 — 664b9186c2ce76cc1e8c0bf74771d55bd7b436b0
 - kaya/Artifact/6789829 — 678982988a8009a125886c8ecab964363bcc2f3d
 - kaya/Artifact/680f4d0 — 680f4d0f2c764791f646ef6d978aebab78182c89
@@ -146,6 +149,7 @@ tests and in real use.
 - kaya/Artifact/88fad72 — 88fad729b2e70b97e33f8f115049f17acb65e908
 - kaya/Artifact/89e8f1b — 89e8f1b7634209ea108c1631f36376177c31998f
 - kaya/Artifact/8c0be76 — 8c0be763cc2ad689c594add43815263bf7448979
+- kaya/Artifact/8f23fe1 — 8f23fe1a4044cebb9faa62735451500f9030e66a
 - kaya/Artifact/8f45b8b — 8f45b8b310ba7becc24b20cf9f545807fe317119
 - kaya/Artifact/8f5ffb4 — 8f5ffb45b0bf6f3ddb55b1af4bed098a3b5068d6
 - kaya/Artifact/904f37f — 904f37fc6fa03785c3df4b48960dda5cf6120d2f
@@ -385,11 +389,13 @@ tests and in real use.
 - kaya/Artifact/designs-2026-11-25-green-kaya-l46-seam-2-cmd-disposition-hoists-di — .wai/projects/kaya/designs/2026-11-25-green-kaya-l46-seam-2-cmd-disposition-hoists-di.md
 - kaya/Artifact/designs-2026-11-25-green-kaya-w68-added-brief-md-to-reader-files-sr — .wai/projects/kaya/designs/2026-11-25-green-kaya-w68-added-brief-md-to-reader-files-sr.md
 - kaya/Artifact/designs-2026-11-25-green-kaya-ynj-three-minimal-seams-1-src-model — .wai/projects/kaya/designs/2026-11-25-green-kaya-ynj-three-minimal-seams-1-src-model.md
+- kaya/Artifact/designs-2026-11-25-kaya-eaj-remediation-design-four-in-run-fixes-on — .wai/projects/kaya/designs/2026-11-25-kaya-eaj-remediation-design-four-in-run-fixes-on.md
 - kaya/Artifact/designs-2026-11-25-plan-kaya-l46-seam-2-cmd-disposition-reviewed-e — .wai/projects/kaya/designs/2026-11-25-plan-kaya-l46-seam-2-cmd-disposition-reviewed-e.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-34g-no-op-change-is-ledger-data-s — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-34g-no-op-change-is-ledger-data-s.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-4od-no-refactor-applies-three-con — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-4od-no-refactor-applies-three-con.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-dar-no-refactor-step-applies-the — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-dar-no-refactor-step-applies-the.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-dsv-dropped-the-duplicate-all-block — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-dsv-dropped-the-duplicate-all-block.md
+- kaya/Artifact/designs-2026-11-25-refactor-kaya-eaj-excl-001-is-the-refactor-half — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-eaj-excl-001-is-the-refactor-half.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-g9u-the-ticket-is-a-refactor-no-fu — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-g9u-the-ticket-is-a-refactor-no-fu.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-l46-implementation-landed-in-one-pa — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-l46-implementation-landed-in-one-pa.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-msh-tidy-pass-over-the-green-diff — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-msh-tidy-pass-over-the-green-diff.md
@@ -417,6 +423,7 @@ tests and in real use.
 - kaya/Artifact/ed2474f — ed2474fb56318a36230a34922d5eef2e312829b6
 - kaya/Artifact/ed9adef — ed9adefbeaff44438d60c4bcd07532f0e4a01b66
 - kaya/Artifact/eecd2c4 — eecd2c458fcb09767749d8199672d02dc7acd14e
+- kaya/Artifact/f102b96 — f102b9685e781aaa50953c25305835be061c6f7d
 - kaya/Artifact/f2709ac — f2709ac34c57a2489f778b4dde40579c69f1dc12
 - kaya/Artifact/f31f940 — f31f9401a8826d5e2a676beb47993708d698b708
 - kaya/Artifact/f39a1fd — f39a1fd3da9a6a6861cfacce47294a00404efa81
@@ -427,6 +434,7 @@ tests and in real use.
 - kaya/Artifact/f965984 — f96598435402ea93e855f8bf8acba8f29f702dd7
 - kaya/Artifact/fa20cb2 — fa20cb292d213a3df260e904e09d79b92ded7589
 - kaya/Artifact/fad00f0 — fad00f0d8c1c8b95a940bc71bd7f010f74859f12
+- kaya/Artifact/fb240d3 — fb240d34a5a63e4598eb6df948a4b54c18be83f3
 - kaya/Artifact/fbd08ac — fbd08ac7a63976b3985b270856a4df7313d9f65c
 - kaya/Artifact/fbf8c2b — fbf8c2b3fe25380a18f6dd07b15d50170080fbb5
 - kaya/Artifact/fde2cb5 — fde2cb5e826fc533c42ce74a7372e1f18d61fb0e
@@ -522,10 +530,14 @@ tests and in real use.
 - kaya/Artifact/plans-2026-11-25-plan-kaya-9w6-step-plan-red-first-tests-expla — .wai/projects/kaya/plans/2026-11-25-plan-kaya-9w6-step-plan-red-first-tests-expla.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-dar-single-line-config-change-in-preten — .wai/projects/kaya/plans/2026-11-25-plan-kaya-dar-single-line-config-change-in-preten.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-dsv-part-a-kaya-explain-a-read-only — .wai/projects/kaya/plans/2026-11-25-plan-kaya-dsv-part-a-kaya-explain-a-read-only.md
+- kaya/Artifact/plans-2026-11-25-plan-kaya-eaj-remediation-four-findings — .wai/projects/kaya/plans/2026-11-25-plan-kaya-eaj-remediation-four-findings.md
+- kaya/Artifact/plans-2026-11-25-plan-kaya-eaj-ro5u-session-review-remediation — .wai/projects/kaya/plans/2026-11-25-plan-kaya-eaj-ro5u-session-review-remediation.md
+- kaya/Artifact/plans-2026-11-25-plan-kaya-eaj-ro5u-session-review-remediation-2 — .wai/projects/kaya/plans/2026-11-25-plan-kaya-eaj-ro5u-session-review-remediation-2.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-g9u-mechanical-extraction-in-waves-eac — .wai/projects/kaya/plans/2026-11-25-plan-kaya-g9u-mechanical-extraction-in-waves-eac.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-g9u-mechanical-extraction-in-waves-eac-2 — .wai/projects/kaya/plans/2026-11-25-plan-kaya-g9u-mechanical-extraction-in-waves-eac-2.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-l46-human-verification-trail-attrib — .wai/projects/kaya/plans/2026-11-25-plan-kaya-l46-human-verification-trail-attrib.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-l46-walk-through-and-digest-binding — .wai/projects/kaya/plans/2026-11-25-plan-kaya-l46-walk-through-and-digest-binding.md
+- kaya/Artifact/plans-2026-11-25-plan-kaya-msh-no-new-implementation-existing-evi — .wai/projects/kaya/plans/2026-11-25-plan-kaya-msh-no-new-implementation-existing-evi.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-msh-wai-adapter-idempotent-re-import-si — .wai/projects/kaya/plans/2026-11-25-plan-kaya-msh-wai-adapter-idempotent-re-import-si.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-w68-behavior-a-populated-exploration — .wai/projects/kaya/plans/2026-11-25-plan-kaya-w68-behavior-a-populated-exploration.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-ynj-three-seams-in-dependency-order-s — .wai/projects/kaya/plans/2026-11-25-plan-kaya-ynj-three-seams-in-dependency-order-s.md
@@ -955,6 +967,7 @@ tests and in real use.
 - kaya/Artifact/research-2026-11-25-green-kaya-34g-seeded-kaya-seeds-kaya-34g-execut — .wai/projects/kaya/research/2026-11-25-green-kaya-34g-seeded-kaya-seeds-kaya-34g-execut.md
 - kaya/Artifact/research-2026-11-25-green-kaya-9w6-src-explain-rs-attribute-refusals — .wai/projects/kaya/research/2026-11-25-green-kaya-9w6-src-explain-rs-attribute-refusals.md
 - kaya/Artifact/research-2026-11-25-green-kaya-dar-three-edits-applied-1-pretender — .wai/projects/kaya/research/2026-11-25-green-kaya-dar-three-edits-applied-1-pretender.md
+- kaya/Artifact/research-2026-11-25-green-kaya-eaj-edge-002-dedup-now-matches-legacy — .wai/projects/kaya/research/2026-11-25-green-kaya-eaj-edge-002-dedup-now-matches-legacy.md
 - kaya/Artifact/research-2026-11-25-green-kaya-msh-fix-landed-in-src-adapters-mod-rs — .wai/projects/kaya/research/2026-11-25-green-kaya-msh-fix-landed-in-src-adapters-mod-rs.md
 - kaya/Artifact/research-2026-11-25-green-kaya-ynj-subagent-landed-three-seams-1 — .wai/projects/kaya/research/2026-11-25-green-kaya-ynj-subagent-landed-three-seams-1.md
 - kaya/Artifact/research-2026-11-25-green-verified-kaya-4od-1-record-yml-push-trigg — .wai/projects/kaya/research/2026-11-25-green-verified-kaya-4od-1-record-yml-push-trigg.md
@@ -964,8 +977,10 @@ tests and in real use.
 - kaya/Artifact/research-2026-11-25-orient-kaya-9w6-build-refuses-a-present-but-non-s — .wai/projects/kaya/research/2026-11-25-orient-kaya-9w6-build-refuses-a-present-but-non-s.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-dar-pretender-0-7-0-src-main-rs-colle — .wai/projects/kaya/research/2026-11-25-orient-kaya-dar-pretender-0-7-0-src-main-rs-colle.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-dsv-products-compose-from-the-11-kind — .wai/projects/kaya/research/2026-11-25-orient-kaya-dsv-products-compose-from-the-11-kind.md
+- kaya/Artifact/research-2026-11-25-orient-kaya-eaj-remediate-the-repo-scope-ro5u-rev — .wai/projects/kaya/research/2026-11-25-orient-kaya-eaj-remediate-the-repo-scope-ro5u-rev.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-g9u-verified-at-head-028e748-src-ma — .wai/projects/kaya/research/2026-11-25-orient-kaya-g9u-verified-at-head-028e748-src-ma.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-l46-feature-p2-unblocks-verification — .wai/projects/kaya/research/2026-11-25-orient-kaya-l46-feature-p2-unblocks-verification.md
+- kaya/Artifact/research-2026-11-25-orient-kaya-msh-fix-already-implemented-and-shipp — .wai/projects/kaya/research/2026-11-25-orient-kaya-msh-fix-already-implemented-and-shipp.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-msh-scout-verified-facts-id-derivati — .wai/projects/kaya/research/2026-11-25-orient-kaya-msh-scout-verified-facts-id-derivati.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-w68-brief-md-is-in-neither — .wai/projects/kaya/research/2026-11-25-orient-kaya-w68-brief-md-is-in-neither.md
 - kaya/Artifact/research-2026-11-25-orient-kaya-w68-reader-files-src-publication-sou — .wai/projects/kaya/research/2026-11-25-orient-kaya-w68-reader-files-src-publication-sou.md
@@ -976,6 +991,7 @@ tests and in real use.
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-9w6-changed-src-explain-rs — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-9w6-changed-src-explain-rs.md
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-dar-changed-pretender-toml — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-dar-changed-pretender-toml.md
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-dsv-changed-src-explain-rs — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-dsv-changed-src-explain-rs.md
+- kaya/Artifact/research-2026-11-25-quality-ledger-kaya-eaj-red-captured-reviewed-re — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-eaj-red-captured-reviewed-re.md
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-g9u-changed-src-main-rs-245 — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-g9u-changed-src-main-rs-245.md
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-l46-changed-src-commands-impa — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-l46-changed-src-commands-impa.md
 - kaya/Artifact/research-2026-11-25-quality-ledger-kaya-msh-changed-src-adapters-mod — .wai/projects/kaya/research/2026-11-25-quality-ledger-kaya-msh-changed-src-adapters-mod.md
@@ -986,6 +1002,7 @@ tests and in real use.
 - kaya/Artifact/research-2026-11-25-red-kaya-9w6-tests-explain-rs-wrong-typed-feeder — .wai/projects/kaya/research/2026-11-25-red-kaya-9w6-tests-explain-rs-wrong-typed-feeder.md
 - kaya/Artifact/research-2026-11-25-red-kaya-dar-failing-precondition-captured-at-hea — .wai/projects/kaya/research/2026-11-25-red-kaya-dar-failing-precondition-captured-at-hea.md
 - kaya/Artifact/research-2026-11-25-red-kaya-dsv-command-cargo-test-test-explain-e — .wai/projects/kaya/research/2026-11-25-red-kaya-dsv-command-cargo-test-test-explain-e.md
+- kaya/Artifact/research-2026-11-25-red-kaya-eaj-reviewed-reimport-dedups-against-leg — .wai/projects/kaya/research/2026-11-25-red-kaya-eaj-reviewed-reimport-dedups-against-leg.md
 - kaya/Artifact/research-2026-11-25-red-kaya-g9u-failing-precondition-src-main-rs-2 — .wai/projects/kaya/research/2026-11-25-red-kaya-g9u-failing-precondition-src-main-rs-2.md
 - kaya/Artifact/research-2026-11-25-red-kaya-g9u-failing-precondition-src-main-rs-2-2 — .wai/projects/kaya/research/2026-11-25-red-kaya-g9u-failing-precondition-src-main-rs-2-2.md
 - kaya/Artifact/research-2026-11-25-red-kaya-l46-3-acceptance-tests-added-l46fixture — .wai/projects/kaya/research/2026-11-25-red-kaya-l46-3-acceptance-tests-added-l46fixture.md
@@ -999,6 +1016,7 @@ tests and in real use.
 - kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-4od-verdict-ready-criticals-0-aft — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-4od-verdict-ready-criticals-0-aft.md
 - kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-dar-verdict-ready-criticals-0-re — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-dar-verdict-ready-criticals-0-re.md
 - kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-dsv-zero-critical-h1-research-ma — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-dsv-zero-critical-h1-research-ma.md
+- kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-eaj-review-found-zero-criticals-a — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-eaj-review-found-zero-criticals-a.md
 - kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-g9u-applied-the-single-review-fin — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-g9u-applied-the-single-review-fin.md
 - kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-l46-verdict-ready-criticals-0-aft — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-l46-verdict-ready-criticals-0-aft.md
 - kaya/Artifact/research-2026-11-25-ro5u-fixes-kaya-msh-verdict-ready-criticals-0-re — .wai/projects/kaya/research/2026-11-25-ro5u-fixes-kaya-msh-verdict-ready-criticals-0-re.md
@@ -1011,6 +1029,7 @@ tests and in real use.
 - kaya/Artifact/research-2026-11-25-ship-kaya-9w6-commit-2ad99853c7-feat-explain-r — .wai/projects/kaya/research/2026-11-25-ship-kaya-9w6-commit-2ad99853c7-feat-explain-r.md
 - kaya/Artifact/research-2026-11-25-ship-kaya-dar-commit-the-4-file-fix-pretender-to — .wai/projects/kaya/research/2026-11-25-ship-kaya-dar-commit-the-4-file-fix-pretender-to.md
 - kaya/Artifact/research-2026-11-25-ship-kaya-dsv-commit-14a01124f0-feat-explain-on — .wai/projects/kaya/research/2026-11-25-ship-kaya-dsv-commit-14a01124f0-feat-explain-on.md
+- kaya/Artifact/research-2026-11-25-ship-kaya-eaj-committed-5d0c24d-on-main-4-findi — .wai/projects/kaya/research/2026-11-25-ship-kaya-eaj-committed-5d0c24d-on-main-4-findi.md
 - kaya/Artifact/research-2026-11-25-ship-kaya-g9u-refactor-commit-src-main-rs-split — .wai/projects/kaya/research/2026-11-25-ship-kaya-g9u-refactor-commit-src-main-rs-split.md
 - kaya/Artifact/research-2026-11-25-ship-kaya-l46-commit-the-4-file-change-impact-rs — .wai/projects/kaya/research/2026-11-25-ship-kaya-l46-commit-the-4-file-change-impact-rs.md
 - kaya/Artifact/research-2026-11-25-ship-kaya-msh-commit-the-3-file-fix-import-seam — .wai/projects/kaya/research/2026-11-25-ship-kaya-msh-commit-the-3-file-fix-import-seam.md
@@ -1027,5 +1046,5 @@ tests and in real use.
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_979 nodes from 1120 events._
+_998 nodes from 1139 events._
 <!-- kaya:end generated:orientation.research-map -->
