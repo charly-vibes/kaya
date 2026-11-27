@@ -2,7 +2,7 @@ run_id: tdd-ro5u-2026-11-27-kaya-bov-adopt-genesis-feedback-subcommand
 pipeline: tdd-ro5u
 topic: kaya-bov adopt genesis feedback subcommand
 created_at: '2026-11-27T18:56:21.422717561+00:00'
-current_step: 8
+current_step: 9
 approvals:
   ship-close: '2026-11-27T19:02:20.392094206+00:00'
 epic: null
