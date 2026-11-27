@@ -320,3 +320,68 @@ fn help_and_version_stay_human_readable_and_succeed() {
         "--version must print the version"
     );
 }
+
+#[test]
+fn feedback_dry_run_prints_fallback_envelope() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let output = kaya(&dir)
+        .arg("feedback")
+        .arg("bug")
+        .arg("--dry-run")
+        .write_stdin("Crash on init\nwith stack trace\n")
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0));
+
+    let envelope = parse_envelope(&output);
+    assert_success_envelope(&envelope);
+    assert_eq!(envelope["envelope_kind"], json!("feedback"));
+    assert_eq!(envelope["data"]["outcome"], json!("fallback"));
+    let url = envelope["data"]["url"].as_str().expect("url");
+    assert!(
+        url.ends_with("charly-vibes/kaya/issues/new"),
+        "dry-run fallback URL names the kaya repo: {url}"
+    );
+}
+
+#[test]
+fn feedback_unknown_kind_is_a_labeled_error() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let output = kaya(&dir).arg("feedback").arg("frotz").output().unwrap();
+    assert_eq!(output.status.code(), Some(1));
+
+    let envelope = parse_envelope(&output);
+    assert_eq!(envelope["envelope_kind"], json!("error"));
+    assert_eq!(envelope["error"]["label"], json!("kaya.feedback"));
+    assert!(
+        envelope["error"]["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("unknown kind")),
+        "message names the invalid kind: {envelope}"
+    );
+}
+
+#[test]
+fn feedback_from_last_error_without_record_errors() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let output = kaya(&dir)
+        .arg("feedback")
+        .arg("bug")
+        .arg("--from-last-error")
+        .arg("--dry-run")
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+
+    let envelope = parse_envelope(&output);
+    assert_eq!(envelope["error"]["label"], json!("kaya.feedback"));
+    assert!(
+        envelope["error"]["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("No recent error recorded")),
+        "message names the missing scratch record: {envelope}"
+    );
+}

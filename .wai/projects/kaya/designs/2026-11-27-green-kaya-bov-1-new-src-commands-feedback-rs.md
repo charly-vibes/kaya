@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-27-kaya-bov-adopt-genesis-feedback-subcommand, pipeline-step:green]
+---
+
+GREEN kaya-bov: (1) new src/commands/feedback.rs — cmd_feedback builds genesis::feedback::FeedbackArgs, delegates to handle_feedback(args, 'kaya', version, 'charly-vibes/kaya', cwd), maps GhResult Created/FallbackUrl/LocalFile onto data {outcome,url,number|path}, maps genesis Err(msg) to Failure(label 'kaya.feedback', msg); (2) src/main.rs — top-level Command::Feedback {kind,title,from_last_error,dry_run} (arg set mirrors dulce cli.rs) + dispatch arm; ImportSource untouched (a first edit briefly added the variant to the wrong enum, reverted before commit — no import-source behavior touched); (3) tests: dry-run requires stdin body (genesis content rule; empty stdin is genesis's 'No issue content specified' error, per dulce's test_feedback_no_content_fails) so the happy-path test pipes body text via write_stdin. Narrow: cargo test --test cli 13/13. Full cargo test: all suites green. No existing behavior changed: dispatch, ImportSource, envelopes untouched.

@@ -274,6 +274,20 @@ enum Command {
         /// Optional product, collection, or document kind name
         name: Option<String>,
     },
+    /// Report feedback about kaya to the repository issue tracker
+    Feedback {
+        /// Kind of issue (bug|feature|question|chore|aix-gap)
+        kind: String,
+        /// Override the issue title (wins over derived titles)
+        #[arg(long, value_name = "TITLE")]
+        title: Option<String>,
+        /// Auto-populate the body from the last recorded error
+        #[arg(long)]
+        from_last_error: bool,
+        /// Print the issue body and gh command without submitting
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -364,6 +378,12 @@ fn main() -> ExitCode {
         Command::Status => commands::status::cmd_status(),
         Command::Explain { name } => explain::run(name.as_deref()),
         Command::Import { source } => commands::import::cmd_import(source),
+        Command::Feedback {
+            kind,
+            title,
+            from_last_error,
+            dry_run,
+        } => commands::feedback::cmd_feedback(kind, title, dry_run, from_last_error),
         Command::Build {
             out,
             expect_digest,

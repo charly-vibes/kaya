@@ -9,6 +9,7 @@
 
 pub(crate) mod capture;
 pub(crate) mod doctest;
+pub(crate) mod feedback;
 pub(crate) mod impact;
 pub(crate) mod import;
 pub(crate) mod publication;

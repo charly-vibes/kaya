@@ -1,8 +1,10 @@
 {
   "schema_version": 1,
-  "adopted_at": "2026-11-27T18:55:57Z",
+  "adopted_at": "2026-11-27T19:02:36Z",
   "finding_ids": [
+    "src/commands/feedback.rs::::mut_ratio",
     "src/envelope.rs::::mut_ratio",
+    "tests/cli.rs::::mock_count",
     "tests/cli.rs::::unwraps"
   ]
 }
