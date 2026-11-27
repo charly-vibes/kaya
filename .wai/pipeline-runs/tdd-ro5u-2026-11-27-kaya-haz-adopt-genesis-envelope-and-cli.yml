@@ -1,0 +1,12 @@
+run_id: tdd-ro5u-2026-11-27-kaya-haz-adopt-genesis-envelope-and-cli
+pipeline: tdd-ro5u
+topic: kaya-haz adopt genesis envelope and cli
+created_at: '2026-11-27T18:43:08.310964121+00:00'
+current_step: 8
+approvals:
+  ship-close: '2026-11-27T18:55:08.504404434+00:00'
+epic: null
+child_issues: []
+child_runs: []
+handoff_artifact: null
+bypasses: []

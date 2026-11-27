@@ -1,0 +1,5 @@
+---
+tags: [pipeline-run:tdd-ro5u-2026-11-27-kaya-haz-adopt-genesis-envelope-and-cli, pipeline-step:green]
+---
+
+GREEN kaya-haz: (1) Cargo.toml adds genesis-vibes 0.15 (crates.io, wai's pin). (2) src/envelope.rs is now a thin wrapper: Envelope holds genesis::envelope::Envelope<Value> as inner (genesis owns ok invariant via EnvelopeKind Ok/Error, envelope_version/cli_version stamping, data) plus kaya-owned 0.1 wire deltas — free-form kind &'static str, error{label,message}, always-present empty warnings/hints/meta. Custom Serialize emits the exact pre-adoption field order; error omitted on success. Public API preserved: Envelope::ok/.error/.print; emit() now uses new is_ok() accessor (ok field itself no longer a kaya field). (3) src/main.rs wires genesis::cli::maybe_print_version_json('kaya', version) before Cli::parse (podras precedent). Narrow: cargo test --test cli 10/10. Full: cargo test all suites green (~290 tests). Existing shape assertions (tests/cli.rs:31-33 warnings/hints/meta, error label/message) pass UNMODIFIED — wire unchanged.

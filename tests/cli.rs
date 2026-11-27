@@ -288,6 +288,20 @@ fn unknown_subcommand_is_a_labeled_usage_error() {
 }
 
 #[test]
+fn version_json_prints_version_envelope() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let output = kaya(&dir).arg("--version").arg("--json").output().unwrap();
+    assert_eq!(output.status.code(), Some(0));
+
+    let envelope = parse_envelope(&output);
+    assert_eq!(envelope["ok"], json!(true));
+    assert_eq!(envelope["envelope_kind"], json!("version"));
+    assert_eq!(envelope["data"]["name"], json!("kaya"));
+    assert_eq!(envelope["data"]["version"], json!(env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
 fn help_and_version_stay_human_readable_and_succeed() {
     let dir = tempfile::tempdir().unwrap();
 

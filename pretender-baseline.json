@@ -1,9 +1,8 @@
 {
   "schema_version": 1,
-  "adopted_at": "2026-11-24T20:35:58Z",
+  "adopted_at": "2026-11-27T18:55:57Z",
   "finding_ids": [
-    "tests/impact.rs::dependents_found::min_assertions",
-    "tests/ledger.rs::mutual_supersedes_cycle_is_refused::min_assertions",
-    "tests/status_build_properties.rs::status_build_envelope_parity::min_assertions"
+    "src/envelope.rs::::mut_ratio",
+    "tests/cli.rs::::unwraps"
   ]
 }

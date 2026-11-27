@@ -329,6 +329,9 @@ pub(crate) enum ImportSource {
 }
 
 fn main() -> ExitCode {
+    if genesis::cli::maybe_print_version_json("kaya", env!("CARGO_PKG_VERSION")) {
+        return ExitCode::SUCCESS;
+    }
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(err) => match err.kind() {
@@ -485,7 +488,7 @@ fn invoked(name: &str) -> bool {
 
 /// Print exactly one envelope and map it onto the process exit code.
 fn emit(envelope: Envelope) -> ExitCode {
-    let ok = envelope.ok;
+    let ok = envelope.is_ok();
     match envelope.print() {
         Ok(()) if ok => ExitCode::SUCCESS,
         Ok(()) => ExitCode::FAILURE,
