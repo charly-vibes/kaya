@@ -31,7 +31,7 @@ _(none)_
 
 - kaya/Run/cargo-test-results
 
-### Artifact — 980
+### Artifact — 999
 
 - kaya/Artifact/0029641
 - kaya/Artifact/01618d8
@@ -159,6 +159,7 @@ _(none)_
 - kaya/Artifact/ab319d5
 - kaya/Artifact/ad468ca
 - kaya/Artifact/ad8e8f6
+- kaya/Artifact/ae10b8e
 - kaya/Artifact/af016e5
 - kaya/Artifact/afd222d
 - kaya/Artifact/b2ec883
@@ -169,6 +170,7 @@ _(none)_
 - kaya/Artifact/b9e5f78
 - kaya/Artifact/bb3cd72
 - kaya/Artifact/bc191e0
+- kaya/Artifact/be29c33
 - kaya/Artifact/c0c767d
 - kaya/Artifact/c2afedf
 - kaya/Artifact/c4a4f03
@@ -380,6 +382,10 @@ _(none)_
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-msh-tidy-pass-over-the-green-diff
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-w68-no-production-extraction-warran
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-ynj-tidy-pass-over-the-green-diff
+- kaya/Artifact/designs-2026-11-27-green-kaya-bov-1-new-src-commands-feedback-rs
+- kaya/Artifact/designs-2026-11-27-green-kaya-haz-1-cargo-toml-adds-genesis-vibes
+- kaya/Artifact/designs-2026-11-27-refactor-kaya-bov-no-op-pass-the-module-is-alre
+- kaya/Artifact/designs-2026-11-27-refactor-kaya-haz-no-op-pass-examined-wrapper-f
 - kaya/Artifact/df81656
 - kaya/Artifact/dfe6d6c
 - kaya/Artifact/e0685ac
@@ -396,6 +402,7 @@ _(none)_
 - kaya/Artifact/e644f4c
 - kaya/Artifact/e8dcfcb
 - kaya/Artifact/e948080
+- kaya/Artifact/ea63a73
 - kaya/Artifact/eb4f2c9
 - kaya/Artifact/ec6371e
 - kaya/Artifact/ecb28f8
@@ -429,6 +436,7 @@ _(none)_
 - kaya/Artifact/handoffs-2026-11-23-session-end
 - kaya/Artifact/handoffs-2026-11-24-session-end
 - kaya/Artifact/handoffs-2026-11-25-session-end
+- kaya/Artifact/handoffs-2026-11-27-session-end
 - kaya/Artifact/plans-2026-11-16-plan-kaya-10k-event-serde-parse-line-to-line-wi
 - kaya/Artifact/plans-2026-11-16-plan-kaya-5cg-render-question-hypothesis-runs-obs
 - kaya/Artifact/plans-2026-11-16-plan-kaya-5ea-one-requirement-proposal-budget-is
@@ -520,6 +528,8 @@ _(none)_
 - kaya/Artifact/plans-2026-11-25-plan-kaya-msh-wai-adapter-idempotent-re-import-si
 - kaya/Artifact/plans-2026-11-25-plan-kaya-w68-behavior-a-populated-exploration
 - kaya/Artifact/plans-2026-11-25-plan-kaya-ynj-three-seams-in-dependency-order-s
+- kaya/Artifact/plans-2026-11-27-plan-kaya-bov-additive-genesis-feedback-subcomma
+- kaya/Artifact/plans-2026-11-27-plan-kaya-haz-adopt-genesis-envelope-genesis
 - kaya/Artifact/research-2026-11-16-orient-kaya-10k-closed-nine-field-kaya-event-v0-s
 - kaya/Artifact/research-2026-11-16-orient-kaya-5cg-experiment-report-projection-with
 - kaya/Artifact/research-2026-11-16-orient-kaya-5ea-promotion-rate-cap-requirement-fr
@@ -1013,6 +1023,15 @@ _(none)_
 - kaya/Artifact/research-2026-11-25-ship-kaya-l46-commit-the-4-file-change-impact-rs
 - kaya/Artifact/research-2026-11-25-ship-kaya-msh-commit-the-3-file-fix-import-seam
 - kaya/Artifact/research-2026-11-25-ship-kaya-ynj-commit-the-9-file-fix-admission-of
+- kaya/Artifact/research-2026-11-27-orient-kaya-bov-adopt-genesis-feedback-as-a-new
+- kaya/Artifact/research-2026-11-27-orient-kaya-haz-adopt-genesis-envelope-cli-enve
+- kaya/Artifact/research-2026-11-27-quality-ledger-kaya-bov-changed-src-commands
+- kaya/Artifact/research-2026-11-27-quality-ledger-kaya-haz-changed-cargo-toml-c
+- kaya/Artifact/research-2026-11-27-red-kaya-bov-command-cargo-test-test-cli-exp
+- kaya/Artifact/research-2026-11-27-red-kaya-haz-command-cargo-test-test-cli-exp
+- kaya/Artifact/research-2026-11-27-ro5u-fixes-kaya-bov-nothing-to-fix-0-critical-h
+- kaya/Artifact/research-2026-11-27-ship-kaya-bov-kaya-bov-closed-commit-feat-feedb
+- kaya/Artifact/research-2026-11-27-ship-kaya-haz-staging-ticket-files-cargo-toml-c
 
 ### Observation — 0
 

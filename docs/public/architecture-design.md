@@ -170,6 +170,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/ab319d5 — ab319d59bb12c47e1da09783bb91c4300d61db61
 - kaya/Artifact/ad468ca — ad468ca1c267176873827c15f7a1b11b02485b22
 - kaya/Artifact/ad8e8f6 — ad8e8f69f92fb105f341687168479ba1033d8a71
+- kaya/Artifact/ae10b8e — ae10b8e9c8dac4123760534d61cb2bce4abb1855
 - kaya/Artifact/af016e5 — af016e5e6d35d05c0c5e146385b66dd650ead622
 - kaya/Artifact/afd222d — afd222d494fec2a7be1cecf9c385f93867e040f0
 - kaya/Artifact/b2ec883 — b2ec883693705b9fe6755ccf6d3de214440e1a73
@@ -180,6 +181,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/b9e5f78 — b9e5f788667b90419e1d5b1b021b8d374fd67c17
 - kaya/Artifact/bb3cd72 — bb3cd72def5e7ef4ac39f6de03cde2747abbf38e
 - kaya/Artifact/bc191e0 — bc191e052041446c284631d09916cd8d032d8735
+- kaya/Artifact/be29c33 — be29c334a2d997b30faf64b411cb50f6b4e72b1d
 - kaya/Artifact/c0c767d — c0c767d1ac6d43b510ce258ea2a1e86553b6b0ed
 - kaya/Artifact/c2afedf — c2afedfe113c0a83ccfc954e1943117f5052f064
 - kaya/Artifact/c4a4f03 — c4a4f038bd7bbf30e0e41e8baa68334226bd08ee
@@ -391,6 +393,10 @@ Reader question: how is it structured and why
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-msh-tidy-pass-over-the-green-diff — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-msh-tidy-pass-over-the-green-diff.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-w68-no-production-extraction-warran — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-w68-no-production-extraction-warran.md
 - kaya/Artifact/designs-2026-11-25-refactor-kaya-ynj-tidy-pass-over-the-green-diff — .wai/projects/kaya/designs/2026-11-25-refactor-kaya-ynj-tidy-pass-over-the-green-diff.md
+- kaya/Artifact/designs-2026-11-27-green-kaya-bov-1-new-src-commands-feedback-rs — .wai/projects/kaya/designs/2026-11-27-green-kaya-bov-1-new-src-commands-feedback-rs.md
+- kaya/Artifact/designs-2026-11-27-green-kaya-haz-1-cargo-toml-adds-genesis-vibes — .wai/projects/kaya/designs/2026-11-27-green-kaya-haz-1-cargo-toml-adds-genesis-vibes.md
+- kaya/Artifact/designs-2026-11-27-refactor-kaya-bov-no-op-pass-the-module-is-alre — .wai/projects/kaya/designs/2026-11-27-refactor-kaya-bov-no-op-pass-the-module-is-alre.md
+- kaya/Artifact/designs-2026-11-27-refactor-kaya-haz-no-op-pass-examined-wrapper-f — .wai/projects/kaya/designs/2026-11-27-refactor-kaya-haz-no-op-pass-examined-wrapper-f.md
 - kaya/Artifact/df81656 — df81656005a9c0e10b392db0af2b8b91a8436dc1
 - kaya/Artifact/dfe6d6c — dfe6d6c5772efb5d7e2c4ba97573ca307f0729c1
 - kaya/Artifact/e0685ac — e0685ac367a6a3f700a9034a408caa1845938a6d
@@ -407,6 +413,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/e644f4c — e644f4cc55d33a16dd530cf2a2a0f297983f98e2
 - kaya/Artifact/e8dcfcb — e8dcfcb9740720143958d6ffbe672ee3b9aa2592
 - kaya/Artifact/e948080 — e94808089cea28ae38a3fcacb0dbb871545c6fa3
+- kaya/Artifact/ea63a73 — ea63a730fd1f5c63caaaaea1a07c637639c483bd
 - kaya/Artifact/eb4f2c9 — eb4f2c98e2c6201803b8a5a8ec81207bb6a1ac7a
 - kaya/Artifact/ec6371e — ec6371e1cdad62d26f8f2104618f49416ae9967d
 - kaya/Artifact/ecb28f8 — ecb28f8dc84a8e18552c17e2bfbf0e3dd0ca3cc8
@@ -440,6 +447,7 @@ Reader question: how is it structured and why
 - kaya/Artifact/handoffs-2026-11-23-session-end — .wai/projects/kaya/handoffs/2026-11-23-session-end.md
 - kaya/Artifact/handoffs-2026-11-24-session-end — .wai/projects/kaya/handoffs/2026-11-24-session-end.md
 - kaya/Artifact/handoffs-2026-11-25-session-end — .wai/projects/kaya/handoffs/2026-11-25-session-end.md
+- kaya/Artifact/handoffs-2026-11-27-session-end — .wai/projects/kaya/handoffs/2026-11-27-session-end.md
 - kaya/Artifact/plans-2026-11-16-plan-kaya-10k-event-serde-parse-line-to-line-wi — .wai/projects/kaya/plans/2026-11-16-plan-kaya-10k-event-serde-parse-line-to-line-wi.md
 - kaya/Artifact/plans-2026-11-16-plan-kaya-5cg-render-question-hypothesis-runs-obs — .wai/projects/kaya/plans/2026-11-16-plan-kaya-5cg-render-question-hypothesis-runs-obs.md
 - kaya/Artifact/plans-2026-11-16-plan-kaya-5ea-one-requirement-proposal-budget-is — .wai/projects/kaya/plans/2026-11-16-plan-kaya-5ea-one-requirement-proposal-budget-is.md
@@ -531,6 +539,8 @@ Reader question: how is it structured and why
 - kaya/Artifact/plans-2026-11-25-plan-kaya-msh-wai-adapter-idempotent-re-import-si — .wai/projects/kaya/plans/2026-11-25-plan-kaya-msh-wai-adapter-idempotent-re-import-si.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-w68-behavior-a-populated-exploration — .wai/projects/kaya/plans/2026-11-25-plan-kaya-w68-behavior-a-populated-exploration.md
 - kaya/Artifact/plans-2026-11-25-plan-kaya-ynj-three-seams-in-dependency-order-s — .wai/projects/kaya/plans/2026-11-25-plan-kaya-ynj-three-seams-in-dependency-order-s.md
+- kaya/Artifact/plans-2026-11-27-plan-kaya-bov-additive-genesis-feedback-subcomma — .wai/projects/kaya/plans/2026-11-27-plan-kaya-bov-additive-genesis-feedback-subcomma.md
+- kaya/Artifact/plans-2026-11-27-plan-kaya-haz-adopt-genesis-envelope-genesis — .wai/projects/kaya/plans/2026-11-27-plan-kaya-haz-adopt-genesis-envelope-genesis.md
 - kaya/Artifact/research-2026-11-16-orient-kaya-10k-closed-nine-field-kaya-event-v0-s — .wai/projects/kaya/research/2026-11-16-orient-kaya-10k-closed-nine-field-kaya-event-v0-s.md
 - kaya/Artifact/research-2026-11-16-orient-kaya-5cg-experiment-report-projection-with — .wai/projects/kaya/research/2026-11-16-orient-kaya-5cg-experiment-report-projection-with.md
 - kaya/Artifact/research-2026-11-16-orient-kaya-5ea-promotion-rate-cap-requirement-fr — .wai/projects/kaya/research/2026-11-16-orient-kaya-5ea-promotion-rate-cap-requirement-fr.md
@@ -1024,6 +1034,15 @@ Reader question: how is it structured and why
 - kaya/Artifact/research-2026-11-25-ship-kaya-l46-commit-the-4-file-change-impact-rs — .wai/projects/kaya/research/2026-11-25-ship-kaya-l46-commit-the-4-file-change-impact-rs.md
 - kaya/Artifact/research-2026-11-25-ship-kaya-msh-commit-the-3-file-fix-import-seam — .wai/projects/kaya/research/2026-11-25-ship-kaya-msh-commit-the-3-file-fix-import-seam.md
 - kaya/Artifact/research-2026-11-25-ship-kaya-ynj-commit-the-9-file-fix-admission-of — .wai/projects/kaya/research/2026-11-25-ship-kaya-ynj-commit-the-9-file-fix-admission-of.md
+- kaya/Artifact/research-2026-11-27-orient-kaya-bov-adopt-genesis-feedback-as-a-new — .wai/projects/kaya/research/2026-11-27-orient-kaya-bov-adopt-genesis-feedback-as-a-new.md
+- kaya/Artifact/research-2026-11-27-orient-kaya-haz-adopt-genesis-envelope-cli-enve — .wai/projects/kaya/research/2026-11-27-orient-kaya-haz-adopt-genesis-envelope-cli-enve.md
+- kaya/Artifact/research-2026-11-27-quality-ledger-kaya-bov-changed-src-commands — .wai/projects/kaya/research/2026-11-27-quality-ledger-kaya-bov-changed-src-commands.md
+- kaya/Artifact/research-2026-11-27-quality-ledger-kaya-haz-changed-cargo-toml-c — .wai/projects/kaya/research/2026-11-27-quality-ledger-kaya-haz-changed-cargo-toml-c.md
+- kaya/Artifact/research-2026-11-27-red-kaya-bov-command-cargo-test-test-cli-exp — .wai/projects/kaya/research/2026-11-27-red-kaya-bov-command-cargo-test-test-cli-exp.md
+- kaya/Artifact/research-2026-11-27-red-kaya-haz-command-cargo-test-test-cli-exp — .wai/projects/kaya/research/2026-11-27-red-kaya-haz-command-cargo-test-test-cli-exp.md
+- kaya/Artifact/research-2026-11-27-ro5u-fixes-kaya-bov-nothing-to-fix-0-critical-h — .wai/projects/kaya/research/2026-11-27-ro5u-fixes-kaya-bov-nothing-to-fix-0-critical-h.md
+- kaya/Artifact/research-2026-11-27-ship-kaya-bov-kaya-bov-closed-commit-feat-feedb — .wai/projects/kaya/research/2026-11-27-ship-kaya-bov-kaya-bov-closed-commit-feat-feedb.md
+- kaya/Artifact/research-2026-11-27-ship-kaya-haz-staging-ticket-files-cargo-toml-c — .wai/projects/kaya/research/2026-11-27-ship-kaya-haz-staging-ticket-files-cargo-toml-c.md
 
 ### Runs
 - kaya/Run/cargo-test-results — passed 430, failed 0, ignored 0
@@ -1036,6 +1055,6 @@ Reader question: how is it structured and why
 - kaya/Source/openspec-changes-add-core-research-record-specs-kaya-promotion-spec.md@43b606f — openspec/changes/add-core-research-record/specs/kaya-promotion/spec.md@43b606f
 - kaya/Source/wai-projects-kaya-designs-2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f — .wai/projects/kaya/designs/2026-11-16-post-bootstrap-alignment-consumers-mvp-1-accep.md@43b606f
 
-_998 nodes from 1139 events._
+_1017 nodes from 1158 events._
 
 <!-- kaya:end generated:publication.product.architecture-design -->

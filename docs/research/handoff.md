@@ -7,4 +7,5 @@
 - kaya/Artifact/handoffs-2026-11-23-session-end — .wai/projects/kaya/handoffs/2026-11-23-session-end.md
 - kaya/Artifact/handoffs-2026-11-24-session-end — .wai/projects/kaya/handoffs/2026-11-24-session-end.md
 - kaya/Artifact/handoffs-2026-11-25-session-end — .wai/projects/kaya/handoffs/2026-11-25-session-end.md
+- kaya/Artifact/handoffs-2026-11-27-session-end — .wai/projects/kaya/handoffs/2026-11-27-session-end.md
 <!-- kaya:end generated:reuse-handoff.handoff -->
